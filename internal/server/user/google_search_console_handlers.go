@@ -12,14 +12,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/appurl"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
+	json "hitkeep/jsonapi"
 )
 
 const (

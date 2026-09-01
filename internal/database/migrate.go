@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/database/migrations"
-	"hitkeep/internal/hklog"
 )
 
 type migrationRunOptions struct {

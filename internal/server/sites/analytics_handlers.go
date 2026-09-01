@@ -12,9 +12,9 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {

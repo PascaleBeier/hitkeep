@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const maxLogLines = 200
@@ -59,7 +59,12 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 			return start, nil
 		}
 	}
+	_ = a.pruneTerminalRunTempRoots()
 	id := time.Now().UTC().Format("20060102T150405") + "-" + uuid.NewString()[:8]
+	runTempEnvironment, err := a.prepareRunTempEnvironment(id)
+	if err != nil {
+		return RunStart{}, fmt.Errorf("prepare run temporary environment: %w", err)
+	}
 	logPath := filepath.Join(a.workspace.StateDir, "runs", id+".log")
 	run := Run{
 		ID: id, WorkspaceID: a.workspace.ID, Request: request, Status: "queued", LogPath: logPath, StartedAt: time.Now().UTC(),
@@ -70,6 +75,7 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		}
 	}
 	if err := a.writeRun(run); err != nil {
+		_ = a.removeRunTempRoot(id)
 		return RunStart{}, err
 	}
 
@@ -84,11 +90,16 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 	fingerprint, err := DeveloperSourceFingerprint(a.workspace.Root)
 	if err != nil {
 		if launcher != a.executable {
+			_ = a.removeRunTempRoot(id)
 			return RunStart{}, fmt.Errorf("fingerprint run worker source: %w", err)
 		}
 		fingerprint = "legacy"
 	}
 	childEnvironment := []string{"HK_CHILD_RUN=1", "HK_STATE_DIR=" + stateRoot, "HK_EXPECTED_SCHEMA=" + SchemaVersion, "HK_WORKER_PROTOCOL=1", "HK_WORKSPACE_ID=" + a.workspace.ID, "HK_SOURCE_FINGERPRINT=" + fingerprint}
+	childEnvironment = append(childEnvironment, runTempEnvironment...)
+	if previousImage := os.Getenv("HITKEEP_PREVIOUS_IMAGE"); previousImage != "" {
+		childEnvironment = append(childEnvironment, "HITKEEP_PREVIOUS_IMAGE="+previousImage)
+	}
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		childEnvironment = append(childEnvironment, "GITHUB_ACTIONS=true")
 	}
@@ -114,16 +125,20 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		run.ExitCode = &exitCode
 		run.FinishedAt = &finished
 		_ = a.writeRun(run)
+		_ = a.removeRunTempRoot(id)
 		return RunStart{}, fmt.Errorf("start run worker: %w", err)
 	}
 	run.Status = "running"
 	run.PID = command.Process.Pid
 	if err := a.writeRun(run); err != nil {
 		_ = command.Process.Kill()
+		_, _ = command.Process.Wait()
+		_ = a.removeRunTempRoot(id)
 		return RunStart{}, err
 	}
 	if err := os.WriteFile(a.runReadyPath(run.ID), []byte("ready\n"), 0o600); err != nil {
 		_ = command.Process.Kill()
+		_, _ = command.Process.Wait()
 		finished := time.Now().UTC()
 		exitCode := 1
 		run.Status = "failed"
@@ -132,6 +147,7 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 		run.ExitCode = &exitCode
 		run.FinishedAt = &finished
 		_ = a.writeRun(run)
+		_ = a.removeRunTempRoot(id)
 		return RunStart{}, fmt.Errorf("release run worker: %w", err)
 	}
 	if err := command.Process.Release(); err != nil {
@@ -142,6 +158,70 @@ func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error
 
 func runStart(run Run) RunStart {
 	return RunStart{RunID: run.ID, Status: run.Status, StatusURI: "hitkeep-dev://runs/" + run.ID + "/summary", LogURI: "hitkeep-dev://runs/" + run.ID + "/logs/all"}
+}
+
+func (a *App) runTempBase() string {
+	return filepath.Join(a.workspace.StateDir, "runs", "tmp")
+}
+
+func (a *App) runTempRoot(runID string) string {
+	return filepath.Join(a.runTempBase(), runID)
+}
+
+func runTempEnvironment(root string) []string {
+	return []string{
+		"HK_RUN_TEMP_ROOT=" + root,
+		"TMPDIR=" + filepath.Join(root, "tmp"),
+		"GOTMPDIR=" + filepath.Join(root, "go-tmp"),
+		"GOCACHE=" + filepath.Join(root, "go-cache"),
+	}
+}
+
+func (a *App) prepareRunTempEnvironment(runID string) ([]string, error) {
+	if err := validateRunID(runID); err != nil {
+		return nil, err
+	}
+	root := a.runTempRoot(runID)
+	for _, path := range append([]string{root}, filepath.Join(root, "tmp"), filepath.Join(root, "go-tmp"), filepath.Join(root, "go-cache")) {
+		if err := os.MkdirAll(path, 0o700); err != nil {
+			return nil, err
+		}
+	}
+	return runTempEnvironment(root), nil
+}
+
+func (a *App) removeRunTempRoot(runID string) error {
+	if err := validateRunID(runID); err != nil {
+		return err
+	}
+	return os.RemoveAll(a.runTempRoot(runID))
+}
+
+func (a *App) cleanupRunTempRoot(runID string) {
+	_ = a.removeRunTempRoot(runID)
+}
+
+func (a *App) pruneTerminalRunTempRoots() error {
+	entries, err := os.ReadDir(a.runTempBase())
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || validateRunID(entry.Name()) != nil {
+			continue
+		}
+		run, err := a.GetRun(entry.Name())
+		if err != nil || !isTerminal(run.Status) {
+			continue
+		}
+		if err := a.removeRunTempRoot(run.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) ExecuteRun(ctx context.Context, runID string) error {
@@ -159,6 +239,7 @@ func (a *App) ExecuteRun(ctx context.Context, runID string) error {
 	if err != nil {
 		return err
 	}
+	defer a.cleanupRunTempRoot(runID)
 	logFile, err := os.OpenFile(run.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return fmt.Errorf("open run log: %w", err)
@@ -696,8 +777,10 @@ func (a *App) executeSmoke(ctx context.Context, variantID string, writer io.Writ
 	args := []string{"scripts/docker-smoke.sh", a.localImageRef(variant), variant.ID}
 	if variant.ID == "cloud" {
 		args = append(args, "--cloud")
+	} else {
+		args = append(args, "--recreate")
 	}
-	return a.runCommand(ctx, writer, commandSpec{Args: args})
+	return a.runCommand(ctx, writer, commandSpec{Args: args, Env: []string{"HITKEEP_PREVIOUS_IMAGE=" + os.Getenv("HITKEEP_PREVIOUS_IMAGE")}})
 }
 
 func (a *App) VerifyVariantBuild(ctx context.Context, variantID string, writer io.Writer) error {
@@ -1219,8 +1302,9 @@ func mergedCommandEnvironment(overrides []string) []string {
 	allowed := map[string]bool{
 		"PATH": true, "HOME": true, "TMPDIR": true, "TMP": true, "TEMP": true, "USER": true, "LOGNAME": true, "SHELL": true,
 		"LANG": true, "LC_ALL": true, "LC_CTYPE": true, "TERM": true, "NO_COLOR": true, "CI": true,
-		"GOENV": true, "GOCACHE": true, "GOMODCACHE": true, "GOPATH": true, "GOTOOLCHAIN": true, "GOPROXY": true, "GONOSUMDB": true, "GOPRIVATE": true,
-		"CGO_ENABLED": true, "CC": true, "CXX": true, "AR": true, "PKG_CONFIG_PATH": true, "SDKROOT": true, "DEVELOPER_DIR": true,
+		"GOENV": true, "GOCACHE": true, "GOMODCACHE": true, "GOPATH": true, "GOTOOLCHAIN": true, "GOPROXY": true, "GONOSUMDB": true, "GOPRIVATE": true, "GOTMPDIR": true,
+		"HK_RUN_TEMP_ROOT": true,
+		"CGO_ENABLED":      true, "CC": true, "CXX": true, "AR": true, "PKG_CONFIG_PATH": true, "SDKROOT": true, "DEVELOPER_DIR": true,
 		"NPM_CONFIG_CACHE": true, "PLAYWRIGHT_BROWSERS_PATH": true, "DOCKER_HOST": true, "DOCKER_CONTEXT": true, "BUILDKIT_PROGRESS": true,
 		"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true, "ALL_PROXY": true, "http_proxy": true, "https_proxy": true, "no_proxy": true, "all_proxy": true,
 	}

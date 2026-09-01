@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const maxAgentFeedResponseBytes = 10 << 20 // 10 MB
@@ -508,5 +508,11 @@ func fetchAgentFeed(ctx context.Context, client agentHTTPDoer, sourceURL string)
 		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
 	}
-	return io.NopCloser(io.LimitReader(resp.Body, maxAgentFeedResponseBytes)), nil
+	return struct {
+		io.Reader
+		io.Closer
+	}{
+		Reader: io.LimitReader(resp.Body, maxAgentFeedResponseBytes),
+		Closer: resp.Body,
+	}, nil
 }

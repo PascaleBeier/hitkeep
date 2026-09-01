@@ -1215,6 +1215,7 @@
     },
     "user": {
       "breadcrumb": "Einstellungen",
+      "title": "Einstellungen",
       "subtitle": "Verwalte die Sicherheit und Einstellungen deines Kontos.",
       "profile": {
         "title": "Profil",

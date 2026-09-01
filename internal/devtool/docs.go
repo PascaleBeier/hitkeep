@@ -9,16 +9,24 @@ import (
 	"slices"
 	"strings"
 
-	runtimeconfig "hitkeep/internal/config"
-	json "hitkeep/internal/jsonapi"
+	"go.yaml.in/yaml/v3"
+
+	runtimeconfig "hitkeep/config"
+	json "hitkeep/jsonapi"
 )
 
 var releaseVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
+var workflowSHA256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var configurationEnvironmentPattern = regexp.MustCompile(`\bHITKEEP_[A-Z0-9_]+\b`)
 var composeConfigurationDefaultPattern = regexp.MustCompile(`\$\{(HITKEEP_[A-Z0-9_]+):-([^}]*)\}`)
+var dockerfileDataPathPattern = regexp.MustCompile(`(?m)^\s*ENV\s+HITKEEP_DATA_PATH(?:=|\s+)(?:"([^"]+)"|'([^']+)'|([^\s#]+))`)
+var dockerfileVolumePattern = regexp.MustCompile(`(?m)^\s*VOLUME\s+(.+)$`)
+var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 
 type releasePleaseConfig struct {
+	Draft    bool `json:"draft"`
 	Packages map[string]struct {
+		Draft      *bool                    `json:"draft"`
 		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
 	} `json:"packages"`
 }
@@ -27,6 +35,250 @@ type releasePleaseExtraFile struct {
 	Type     string `json:"type"`
 	Path     string `json:"path"`
 	JSONPath string `json:"jsonpath"`
+}
+
+type workflowNeeds []string
+
+func (needs *workflowNeeds) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		*needs = []string{value.Value}
+		return nil
+	case yaml.SequenceNode:
+		result := make([]string, 0, len(value.Content))
+		for _, child := range value.Content {
+			if child.Kind != yaml.ScalarNode {
+				return fmt.Errorf("workflow needs entry must be a string")
+			}
+			result = append(result, child.Value)
+		}
+		*needs = result
+		return nil
+	case yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode:
+		return fmt.Errorf("workflow needs must be a string or list")
+	default:
+		return fmt.Errorf("workflow needs must be a string or list")
+	}
+}
+
+type workflowStep struct {
+	Name string            `yaml:"name"`
+	Run  string            `yaml:"run"`
+	Env  map[string]string `yaml:"env"`
+	With map[string]string `yaml:"with"`
+}
+
+type workflowJob struct {
+	Needs workflowNeeds  `yaml:"needs"`
+	Uses  string         `yaml:"uses"`
+	If    string         `yaml:"if"`
+	Steps []workflowStep `yaml:"steps"`
+}
+
+type releaseWorkflow struct {
+	Jobs map[string]workflowJob `yaml:"jobs"`
+}
+
+func validateDefaultTenantMigrationAcceptanceWorkflow(raw []byte) error {
+	var workflow struct {
+		On yaml.Node `yaml:"on"`
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		return fmt.Errorf("decode default-tenant migration acceptance workflow: %w", err)
+	}
+	for index := 0; index+1 < len(workflow.On.Content); index += 2 {
+		if workflow.On.Content[index].Value == "workflow_call" {
+			return nil
+		}
+	}
+	return fmt.Errorf("default-tenant migration acceptance workflow must support workflow_call")
+}
+
+func validateReleaseWorkflowGraph(raw []byte) error {
+	var workflow releaseWorkflow
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		return fmt.Errorf("decode release workflow: %w", err)
+	}
+	for job, required := range map[string][]string{
+		"build-release":                {"release-please"},
+		"migration-interruption":       {"release-please", "build-release"},
+		"upgrade-from-supported-floor": {"build-release"},
+		"publish-helm":                 {"build-release"},
+		"verify-tracker-package":       {"build-release"},
+		"docs-attestation":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package"},
+		"finalize-release":             {"release-please", "build-release", "migration-interruption", "upgrade-from-supported-floor", "publish-helm", "verify-tracker-package", "docs-attestation"},
+		"sync-docs-release":            {"finalize-release"},
+		"deploy-cloud":                 {"finalize-release"},
+	} {
+		definition, ok := workflow.Jobs[job]
+		if !ok {
+			return fmt.Errorf("release workflow is missing %s", job)
+		}
+		for _, dependency := range required {
+			if !slices.Contains(definition.Needs, dependency) {
+				return fmt.Errorf("release workflow job %s must need %s", job, dependency)
+			}
+		}
+	}
+	migrationInterruption := workflow.Jobs["migration-interruption"]
+	if migrationInterruption.Uses != "./.github/workflows/default-tenant-migration-acceptance.yml" {
+		return fmt.Errorf("release workflow migration-interruption must call the default-tenant migration acceptance workflow")
+	}
+	if !strings.Contains(migrationInterruption.If, "needs.release-please.outputs.release_created == 'true'") {
+		return fmt.Errorf("release workflow migration-interruption must be gated on release creation")
+	}
+	if !strings.Contains(migrationInterruption.If, "needs.build-release.result == 'success'") {
+		return fmt.Errorf("release workflow migration-interruption must be gated on a successful release build")
+	}
+	fixtureResolved := false
+	upgradeSmokes := map[string]bool{}
+	smokeScripts := map[string]string{
+		"docker":  "./scripts/docker-smoke.sh",
+		"compose": "./scripts/compose-smoke.sh",
+		"helm":    "./scripts/helm-smoke.sh",
+	}
+	for _, step := range workflow.Jobs["upgrade-from-supported-floor"].Steps {
+		if strings.Contains(step.Run, "tests/fixtures/release-fixtures.json") &&
+			strings.Contains(step.Run, "previous_version") {
+			fixtureResolved = true
+		}
+		for surface, script := range smokeScripts {
+			if strings.Contains(step.Run, script) &&
+				strings.Contains(step.Env["CANDIDATE_IMAGE"], "steps.fixture.outputs.candidate") &&
+				strings.Contains(step.Env["HITKEEP_PREVIOUS_IMAGE"], "steps.fixture.outputs.previous") {
+				upgradeSmokes[surface] = true
+			}
+		}
+	}
+	if !fixtureResolved {
+		return fmt.Errorf("release workflow upgrade-from-supported-floor must resolve the supported upgrade-floor fixture against the candidate digest")
+	}
+	workflowText := string(raw)
+	for _, surface := range []string{"docker", "compose", "helm"} {
+		if !strings.Contains(workflowText, "- surface: "+surface) || !upgradeSmokes[surface] {
+			return fmt.Errorf("release workflow upgrade-from-supported-floor must smoke the %s matrix surface", surface)
+		}
+	}
+
+	trackerArtifact := map[string]bool{}
+	for _, step := range workflow.Jobs["verify-tracker-package"].Steps {
+		trackerArtifact[step.Name] = true
+	}
+	if !trackerArtifact["Pack verified tracker artifact"] || !trackerArtifact["Upload verified tracker artifact"] {
+		return fmt.Errorf("release workflow verify-tracker-package must pack and upload the verified tracker artifact")
+	}
+
+	finalizer := workflow.Jobs["finalize-release"]
+	trackerDownload := false
+	trackerPublish := false
+	for _, step := range finalizer.Steps {
+		if step.Name == "Download verified tracker artifact" {
+			trackerDownload = true
+		}
+		if step.Name == "Publish immutable tracker candidate" &&
+			strings.Contains(step.Run, "npm publish \"$tarball\"") &&
+			strings.Contains(step.Run, "dist.integrity") &&
+			strings.Contains(step.Run, "openssl dgst -sha512") {
+			trackerPublish = true
+		}
+	}
+	if !trackerDownload || !trackerPublish {
+		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact with npm integrity verification")
+	}
+	for _, step := range finalizer.Steps {
+		for _, values := range []map[string]string{step.Env, step.With} {
+			for _, value := range values {
+				if strings.Contains(value, "secrets.GHT") {
+					return fmt.Errorf("release workflow finalizer must not use secrets.GHT")
+				}
+			}
+		}
+	}
+	positions := make(map[string]int, len(finalizer.Steps))
+	for index, step := range finalizer.Steps {
+		positions[step.Name] = index
+	}
+	orderedSteps := []string{
+		"Publish immutable tracker candidate",
+		"Promote tracker latest dist-tag",
+		"Promote immutable image to mutable tags",
+		"Publish draft GitHub release",
+	}
+	previous := -1
+	previousName := ""
+	for _, name := range orderedSteps {
+		position, ok := positions[name]
+		if !ok {
+			return fmt.Errorf("release workflow finalizer is missing step %q", name)
+		}
+		if position <= previous {
+			return fmt.Errorf("release workflow finalizer must run %q before %q", previousName, name)
+		}
+		previous = position
+		previousName = name
+	}
+	docsAttestation := workflow.Jobs["docs-attestation"]
+	attestedRelease := false
+	for _, step := range docsAttestation.Steps {
+		required := []string{
+			"gh workflow run sync-hitkeep-release.yml",
+			"--ref main",
+			"--event workflow_dispatch",
+			"source_run_id=\"$source_run_id\"",
+			"source_head_sha=\"$GITHUB_SHA\"",
+			"source_workflow_sha256=\"$source_workflow_sha256\"",
+			"source_catalog_sha256=\"$catalog_sha256\"",
+			"source_example_sha256=\"$example_sha256\"",
+			"source_manifest_sha256=\"$manifest_sha256\"",
+			"gh run watch \"$docs_run_id\"",
+			"actions/runs/$docs_run_id",
+			".id == $run_id",
+			".head_sha == $docs_head_sha",
+			"check-suites/$check_suite_id",
+			".app.id == 15368",
+			"hitkeep-docs-release-attestation",
+			".conclusion == \"success\"",
+			".source.tag == $tag",
+			".source.run_id == $source_run_id",
+		}
+		if slices.ContainsFunc(required, func(fragment string) bool { return !strings.Contains(step.Run, fragment) }) {
+			continue
+		}
+		if step.Env["DOCS_REPOSITORY"] == "PascaleBeier/hitkeep-docs" && workflowSHA256Pattern.MatchString(step.Env["DOCS_WORKFLOW_SHA256"]) {
+			attestedRelease = true
+			break
+		}
+	}
+	if !attestedRelease {
+		return fmt.Errorf("release workflow must block publication on an immutable documentation attestation")
+	}
+	if !strings.Contains(workflowText, "-f prepublication=true") {
+		return fmt.Errorf("release workflow documentation attestation must be prepublication-only")
+	}
+	postPublicationSync := false
+	for _, step := range workflow.Jobs["sync-docs-release"].Steps {
+		required := []string{
+			"-f prepublication=false",
+			"source_workflow_sha256=\"${SOURCE_WORKFLOW_SHA256}\"",
+			"source_catalog_sha256=\"${SOURCE_CATALOG_SHA256}\"",
+			"source_example_sha256=\"${SOURCE_EXAMPLE_SHA256}\"",
+			"source_manifest_sha256=\"${SOURCE_MANIFEST_SHA256}\"",
+		}
+		if slices.ContainsFunc(required, func(fragment string) bool { return !strings.Contains(step.Run, fragment) }) {
+			continue
+		}
+		if step.Env["SOURCE_WORKFLOW_SHA256"] == "${{ needs.docs-attestation.outputs.source_workflow_sha256 }}" &&
+			step.Env["SOURCE_CATALOG_SHA256"] == "${{ needs.docs-attestation.outputs.source_catalog_sha256 }}" &&
+			step.Env["SOURCE_EXAMPLE_SHA256"] == "${{ needs.docs-attestation.outputs.source_example_sha256 }}" &&
+			step.Env["SOURCE_MANIFEST_SHA256"] == "${{ needs.docs-attestation.outputs.source_manifest_sha256 }}" {
+			postPublicationSync = true
+			break
+		}
+	}
+	if !postPublicationSync {
+		return fmt.Errorf("release workflow post-publication documentation synchronization must use the attested immutable inputs")
+	}
+	return nil
 }
 
 func ValidateDevelopmentDocs(root string) error {
@@ -86,6 +338,28 @@ func validateConfigurationDocumentation(root string) error {
 		"HITKEEP_VERSION":       true,
 	}
 
+	requirements := runtimeconfig.PublicationRequirements()
+	if err := validateRequiredConfigurationPublications(requirements, func(path string) string {
+		if path == "config.example.yaml" {
+			return string(runtimeconfig.RenderExampleYAML())
+		}
+		raw, readErr := os.ReadFile(filepath.Join(root, path))
+		if readErr != nil {
+			return ""
+		}
+		contents := string(raw)
+		if path == "charts/hitkeep/templates/statefulset.yaml" {
+			values, valuesErr := os.ReadFile(filepath.Join(root, "charts/hitkeep/values.yaml"))
+			if valuesErr != nil {
+				return ""
+			}
+			contents += helmPublicationValuesSeparator + string(values)
+		}
+		return contents
+	}); err != nil {
+		return err
+	}
+
 	paths := []string{
 		filepath.Join(root, "README.md"),
 		filepath.Join(root, "Dockerfile"),
@@ -121,12 +395,158 @@ func validateConfigurationDocumentation(root string) error {
 			return readErr
 		}
 		relative, _ := filepath.Rel(root, path)
+		if filepath.ToSlash(relative) == "Dockerfile" {
+			if _, ok := known["HITKEEP_DATA_PATH"]; !ok {
+				return fmt.Errorf("configuration catalog is missing HITKEEP_DATA_PATH")
+			}
+			if err := validateContainerDataPath(filepath.ToSlash(relative), string(raw)); err != nil {
+				return err
+			}
+		}
 		checkDefaults := filepath.Base(path) != "compose.dev.yaml"
-		if err := validateConfigurationDocument(filepath.ToSlash(relative), string(raw), known, nonRuntime, checkDefaults); err != nil {
+		relativePath := filepath.ToSlash(relative)
+		if err := validateConfigurationDocument(relativePath, string(raw), known, nonRuntime, checkDefaults); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+var helmDataPathTemplatePattern = regexp.MustCompile(`(?ms)- name:\s*HITKEEP_DATA_PATH\s*\n\s*value:\s*\{\{\s*\.Values\.persistence\.mountPath\s*\|\s*quote\s*\}\}`)
+
+const helmPublicationValuesSeparator = "\n--- hitkeep-publication-values ---\n"
+
+func validateRequiredConfigurationPublications(requirements []runtimeconfig.ConfigurationPublication, contents func(string) string) error {
+	for _, requirement := range requirements {
+		for _, surface := range requirement.Surfaces {
+			for _, path := range requirement.Paths[surface] {
+				if actual := configurationPublicationSurface(path); actual != surface {
+					return fmt.Errorf("%s maps to publication surface %q, want %q", path, actual, surface)
+				}
+				if err := validateConfigurationPublication(path, contents(path), []runtimeconfig.ConfigurationPublication{requirement}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateConfigurationPublication(path, contents string, requirements []runtimeconfig.ConfigurationPublication) error {
+	surface := configurationPublicationSurface(path)
+	if surface == "" {
+		return nil
+	}
+	for _, requirement := range requirements {
+		if !slices.Contains(requirement.Surfaces, surface) {
+			continue
+		}
+		actual, found := configurationPublicationDefault(contents, requirement, surface)
+		if !found {
+			return fmt.Errorf("%s omits required published configuration setting %s", path, requirement.Environment)
+		}
+		if expected := requirement.Defaults[surface]; actual != expected {
+			return fmt.Errorf("%s gives %s published default %q; catalog default is %q", path, requirement.Environment, actual, expected)
+		}
+	}
+	return nil
+}
+
+func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPublicationSurface {
+	base := filepath.Base(path)
+	switch {
+	case path == "Dockerfile":
+		return runtimeconfig.ConfigurationPublicationDocker
+	case strings.HasPrefix(path, "examples/") && strings.HasPrefix(base, "compose") && (strings.HasSuffix(base, ".yaml") || strings.HasSuffix(base, ".yml")):
+		return runtimeconfig.ConfigurationPublicationExample
+	case strings.HasPrefix(base, "compose") && strings.HasSuffix(base, ".yaml"):
+		return runtimeconfig.ConfigurationPublicationCompose
+	case path == "charts/hitkeep/templates/statefulset.yaml":
+		return runtimeconfig.ConfigurationPublicationHelm
+	case base == "config.example.yaml":
+		return runtimeconfig.ConfigurationPublicationCanonicalExample
+	default:
+		return ""
+	}
+}
+
+func configurationPublicationDefault(contents string, requirement runtimeconfig.ConfigurationPublication, surface runtimeconfig.ConfigurationPublicationSurface) (string, bool) {
+	for line := range strings.SplitSeq(contents, "\n") {
+		line = strings.TrimSpace(line)
+		switch surface {
+		case runtimeconfig.ConfigurationPublicationDocker:
+			value, found := strings.CutPrefix(line, "ENV "+requirement.Environment+"=")
+			if found {
+				return strings.Trim(value, "\\\"'"), true
+			}
+		case runtimeconfig.ConfigurationPublicationCompose, runtimeconfig.ConfigurationPublicationExample:
+			value, found := strings.CutPrefix(line, requirement.Environment+":")
+			if found {
+				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
+			}
+		case runtimeconfig.ConfigurationPublicationCanonicalExample:
+			value, found := strings.CutPrefix(line, requirement.ConfigFileKey+":")
+			if found {
+				return strings.Trim(strings.TrimSpace(value), "\\\"'"), true
+			}
+		case runtimeconfig.ConfigurationPublicationHelm:
+			continue
+		}
+	}
+	if surface != runtimeconfig.ConfigurationPublicationHelm {
+		return "", false
+	}
+	template, values, found := strings.Cut(contents, helmPublicationValuesSeparator)
+	if !found || !helmDataPathTemplatePattern.MatchString(template) {
+		return "", false
+	}
+	var chartValues struct {
+		Persistence struct {
+			MountPath string `yaml:"mountPath"`
+		} `yaml:"persistence"`
+	}
+	if err := yaml.Unmarshal([]byte(values), &chartValues); err != nil {
+		return "", false
+	}
+	mountPath := strings.TrimSpace(chartValues.Persistence.MountPath)
+	return mountPath, mountPath != ""
+}
+
+func validateContainerDataPath(path, contents string) error {
+	matches := dockerfileDataPathPattern.FindAllStringSubmatch(contents, -1)
+	if len(matches) != 1 {
+		return fmt.Errorf("%s must declare exactly one HITKEEP_DATA_PATH image default", path)
+	}
+	dataPath := firstNonEmpty(matches[0][1:])
+	for _, match := range dockerfileVolumePattern.FindAllStringSubmatch(contents, -1) {
+		for _, volume := range dockerfileVolumePaths(match[1]) {
+			if dataPath == volume || strings.HasPrefix(dataPath, strings.TrimRight(volume, "/")+"/") {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("%s HITKEEP_DATA_PATH image default %q is not beneath a declared persistent VOLUME", path, dataPath)
+}
+
+func dockerfileVolumePaths(instruction string) []string {
+	quoted := dockerfileQuotedPathPattern.FindAllStringSubmatch(instruction, -1)
+	if len(quoted) > 0 {
+		paths := make([]string, 0, len(quoted))
+		for _, match := range quoted {
+			paths = append(paths, match[1])
+		}
+		return paths
+	}
+	return strings.Fields(strings.TrimSpace(instruction))
+}
+
+func firstNonEmpty(values []string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func validateConfigurationDocument(path, contents string, known map[string]runtimeconfig.ConfigurationSetting, nonRuntime map[string]bool, checkDefaults bool) error {
@@ -276,6 +696,13 @@ func validateReleaseMetadata(root string) error {
 	if !ok {
 		return fmt.Errorf("release-please-config.json is missing packages['.']")
 	}
+	effectiveDraft := config.Draft
+	if rootPackageConfig.Draft != nil {
+		effectiveDraft = *rootPackageConfig.Draft
+	}
+	if !effectiveDraft {
+		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be true")
+	}
 	expectedFiles := []releasePleaseExtraFile{
 		{Type: "json", Path: "server.json", JSONPath: "$.version"},
 		{Type: "json", Path: "frontend/dashboard/package.json", JSONPath: "$.version"},
@@ -293,14 +720,22 @@ func validateReleaseMetadata(root string) error {
 	}
 	workflowContracts := map[string][]string{
 		".github/workflows/pipeline.yml": {
+			"github.com/goreleaser/goreleaser/v2@v2.18.0",
+			"--snapshot",
+			"--clean",
+			"--single-target",
+			"--id self-hosted",
+			"--id cloud",
 			"./hk catalog configuration --output json",
+			"./hk catalog configuration-manifest",
 			"hitkeep-configuration.json",
+			"hitkeep.example.yaml",
+			"hitkeep-configuration-manifest.json",
 			"release_tag: $tag",
 			"release_version: $version",
 		},
 		".github/workflows/release.yml": {
-			"sync-docs-release:",
-			"needs.build-release.result == 'success'",
+			"finalize-release:",
 			"sync-hitkeep-release.yml",
 		},
 	}
@@ -314,14 +749,42 @@ func validateReleaseMetadata(root string) error {
 				return fmt.Errorf("%s is missing release metadata contract %q", name, fragment)
 			}
 		}
+		if name == ".github/workflows/pipeline.yml" && bytes.Contains(raw, []byte("./hk ci build-binaries")) {
+			return fmt.Errorf(".github/workflows/pipeline.yml must not run ./hk ci build-binaries")
+		}
 	}
-	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+	goreleaserManifest, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
 	if err != nil {
 		return err
 	}
-	for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
-		if bytes.Contains(releaseWorkflow, []byte(fragment)) {
-			return fmt.Errorf(".github/workflows/release.yml must not surface downstream documentation workflow failures through %q", fragment)
+	for _, artifact := range []string{runtimeconfig.ConfigurationCatalogFilename, runtimeconfig.ConfigurationExampleFilename, runtimeconfig.ConfigurationReleaseManifestFilename} {
+		if !bytes.Contains(goreleaserManifest, []byte(artifact)) {
+			return fmt.Errorf(".goreleaser.yaml is missing release configuration artifact %q", artifact)
+		}
+	}
+	releaseWorkflowRaw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+	if err != nil {
+		return err
+	}
+	if err := validateReleaseWorkflowGraph(releaseWorkflowRaw); err != nil {
+		return err
+	}
+	migrationWorkflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "default-tenant-migration-acceptance.yml"))
+	if err != nil {
+		return err
+	}
+	if err := validateDefaultTenantMigrationAcceptanceWorkflow(migrationWorkflow); err != nil {
+		return err
+	}
+	var parsedReleaseWorkflow releaseWorkflow
+	if err := yaml.Unmarshal(releaseWorkflowRaw, &parsedReleaseWorkflow); err != nil {
+		return fmt.Errorf("decode release workflow: %w", err)
+	}
+	for _, step := range parsedReleaseWorkflow.Jobs["sync-docs-release"].Steps {
+		for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
+			if strings.Contains(step.Run, fragment) {
+				return fmt.Errorf("release workflow post-publication docs notification must not surface downstream failures through %q", fragment)
+			}
 		}
 	}
 	return nil
@@ -394,6 +857,23 @@ func validateCIWorkflowContract(root string) error {
 	for group, gateIDs := range groups {
 		if !bytes.Contains(workflows, []byte("--group "+group)) {
 			return fmt.Errorf("canonical CI group %s for gates %s is not referenced by a workflow", group, strings.Join(gateIDs, ", "))
+		}
+	}
+	govulncheck, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "govulncheck.yml"))
+	if err != nil {
+		return err
+	}
+	return validateGovulncheckWorkflowContract(govulncheck)
+}
+
+func validateGovulncheckWorkflowContract(workflow []byte) error {
+	const plan = "./hk qa plan pr --output json"
+	if !bytes.Contains(workflow, []byte(plan)) {
+		return fmt.Errorf(".github/workflows/govulncheck.yml must obtain a PR QA plan ID through %q", plan)
+	}
+	for line := range bytes.SplitSeq(workflow, []byte{'\n'}) {
+		if bytes.Contains(line, []byte("./hk qa ")) && !bytes.Contains(line, []byte("./hk qa plan ")) && !bytes.Contains(line, []byte("--plan-id")) {
+			return fmt.Errorf(".github/workflows/govulncheck.yml QA invocation must pass --plan-id")
 		}
 	}
 	return nil

@@ -1,0 +1,233 @@
+name: Release validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release-validation.yml
+      - .goreleaser.yaml
+      - Dockerfile
+      - charts/hitkeep/**
+      - frontend/dashboard/**
+      - go.mod
+      - go.sum
+      - hitkeep.example.yaml
+      - scripts/helm-smoke.sh
+      - tests/fixtures/release-fixtures.json
+      - .release-please-manifest.json
+
+permissions: {}
+
+jobs:
+  homebrew-candidate:
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--main')
+    runs-on: macos-14
+    permissions:
+      contents: read
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Prepare candidate formula
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
+          [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          candidate_url="https://github.com/PascaleBeier/hitkeep/archive/${CANDIDATE_SHA}.tar.gz"
+          candidate_checksum="$(curl --fail --silent --show-error --location "$candidate_url" | shasum -a 256 | awk '{print $1}')"
+          brew tap PascaleBeier/hitkeep
+          formula="$(brew --repository PascaleBeier/hitkeep)/Formula/hitkeep.rb"
+          candidate_formula="$(mktemp)"
+          awk -v version="$candidate_version" -v url="$candidate_url" -v checksum="$candidate_checksum" '
+            /^  version "/ { print "  version \"" version "\""; versions++; next }
+            /^  url "/ {
+              if (versions == 0) { print "  version \"" version "\""; versions++ }
+              print "  url \"" url "\""; urls++; next
+            }
+            /^  sha256 "/ { print "  sha256 \"" checksum "\""; checksums++; next }
+            { print }
+            END { if (versions != 1 || urls != 1 || checksums != 1) exit 1 }
+          ' "$formula" > "$candidate_formula"
+          mv "$candidate_formula" "$formula"
+          ruby -c "$formula"
+      - name: Install and test candidate
+        run: |
+          set -euo pipefail
+          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
+          brew install --build-from-source PascaleBeier/hitkeep/hitkeep
+          test "$(hitkeep --version)" = "$candidate_version"
+          brew test PascaleBeier/hitkeep/hitkeep
+          brew uninstall hitkeep
+
+  cross-cgo:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build dashboard assets
+        run: |
+          ./hk ci build-dashboard
+          ./hk ci restore-dashboard --archive public-assets.tar.gz
+      - name: Install arm64 cross compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Prepare release configuration artifacts
+        env:
+          RELEASE_INPUTS_DIR: ${{ runner.temp }}/release-inputs
+          RELEASE_TAG_NAME: v0.0.0-validation.${{ github.run_id }}.${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          release_version="${RELEASE_TAG_NAME#v}"
+          release_inputs="${RELEASE_INPUTS_DIR:?}"
+          mkdir -p "$release_inputs"
+          ./hk catalog configuration --output json \
+            | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
+              '.data + {release_tag: $tag, release_version: $version}' \
+            > "$release_inputs/hitkeep-configuration.json"
+          env -u GOROOT go run ./cmd/hitkeep config init --output "$release_inputs/hitkeep.example.yaml"
+          cmp "$release_inputs/hitkeep.example.yaml" hitkeep.example.yaml
+          ./hk catalog configuration-manifest \
+            --catalog "$release_inputs/hitkeep-configuration.json" \
+            --example "$release_inputs/hitkeep.example.yaml" \
+            --output json \
+            | jq -c '.data' > "$release_inputs/hitkeep-configuration-manifest.json"
+          cp "$release_inputs"/hitkeep-configuration.json .
+          cp "$release_inputs"/hitkeep.example.yaml .
+          cp "$release_inputs"/hitkeep-configuration-manifest.json .
+      - name: Build and verify cross-CGO archives
+        env:
+          HITKEEP_VERSION: v0.0.0-validation.${{ github.run_id }}.${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" \
+            env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release \
+              --snapshot --clean --skip=publish --config .goreleaser.yaml
+          for arch in amd64 arm64; do
+            mapfile -t archives < <(find dist -maxdepth 1 -type f -name "hitkeep_*_Linux_${arch}.tar.gz")
+            test "${#archives[@]}" -eq 1
+            extract_dir="$(mktemp -d)"
+            tar -xzf "${archives[0]}" -C "$extract_dir"
+            binary="$extract_dir/hitkeep-linux-${arch}"
+            test -x "$binary"
+            build_metadata="$(go version -m "$binary")"
+            grep -Fq 'GOOS=linux' <<< "$build_metadata"
+            grep -Fq "GOARCH=${arch}" <<< "$build_metadata"
+            grep -Fq 'CGO_ENABLED=1' <<< "$build_metadata"
+            if [[ "$arch" == amd64 ]]; then
+              test "$("$binary" --version)" = "$HITKEEP_VERSION"
+            else
+              strings "$binary" | grep -Fxq "$HITKEEP_VERSION"
+            fi
+            rm -rf "$extract_dir"
+          done
+          (cd dist && sha256sum --check SHA256SUMS)
+
+  helm-lifecycle:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310
+      - name: Install Kind
+        run: env -u GOROOT go install sigs.k8s.io/kind@v0.29.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Run disposable Helm lifecycle
+        env:
+          CANDIDATE_VERSION: 0.0.0-validation.${{ github.run_id }}.${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          kind_bin="$(go env GOPATH)/bin/kind"
+          cluster="hitkeep-release-validation-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          registry="hitkeep-registry-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          registry_port=5001
+          chart_dir="$(mktemp -d)"
+          cleanup() {
+            "$kind_bin" delete cluster --name "$cluster" || true
+            docker rm --force "$registry" >/dev/null 2>&1 || true
+            rm -rf "$chart_dir"
+          }
+          trap cleanup EXIT
+
+          docker run --detach --restart=always \
+            --publish "127.0.0.1:${registry_port}:5000" \
+            --name "$registry" registry:2
+          cat > "$chart_dir/kind.yaml" <<EOF
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          containerdConfigPatches:
+            - |-
+              [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${registry_port}"]
+                endpoint = ["http://${registry}:5000"]
+          EOF
+          "$kind_bin" create cluster --name "$cluster" --config "$chart_dir/kind.yaml"
+          docker network connect kind "$registry"
+
+          catalog="$(./hk catalog --output json)"
+          local_image="$(jq -r '.data.variants[] | select(.id == "self-hosted") | .local_image' <<< "$catalog")"
+          test -n "$local_image"
+          ./hk build image --variant self-hosted --output json
+          candidate_tag="localhost:${registry_port}/hitkeep:${CANDIDATE_VERSION}"
+          docker tag "$local_image" "$candidate_tag"
+          push_output="$(docker push "$candidate_tag")"
+          printf '%s\n' "$push_output"
+          candidate_digest="$(sed -n 's/^.*digest: \(sha256:[a-f0-9]\{64\}\).*$/\1/p' <<< "$push_output" | tail -n 1)"
+          [[ "$candidate_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          candidate="localhost:${registry_port}/hitkeep@${candidate_digest}"
+          docker pull "$candidate"
+
+          platform="linux/$(docker image inspect "$candidate" --format '{{.Architecture}}')"
+          manifest=tests/fixtures/release-fixtures.json
+          previous_version="$(jq -r '.supported_upgrade_floor' "$manifest")"
+          previous="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_image' "$manifest")"
+          previous_chart="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_chart' "$manifest")"
+          previous_chart_digest="$(jq -r --arg platform "$platform" --arg version "$previous_version" '.fixtures[] | select(.previous_version == $version and .platform == $platform) | .previous_chart_digest' "$manifest")"
+          [[ "$previous" == *@sha256:* ]]
+          [[ "$previous_chart" == oci://* ]]
+          [[ "$previous_chart_digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker pull "$previous"
+
+          helm package charts/hitkeep \
+            --version "$CANDIDATE_VERSION" \
+            --app-version "$CANDIDATE_VERSION" \
+            --destination "$chart_dir" >/dev/null
+          candidate_chart="$chart_dir/hitkeep-${CANDIDATE_VERSION}.tgz"
+          test -f "$candidate_chart"
+          previous_output="$(helm pull "$previous_chart" --version "$previous_version" --destination "$chart_dir" 2>&1)"
+          printf '%s\n' "$previous_output"
+          grep -Fqx "Digest: $previous_chart_digest" <<< "$previous_output"
+          previous_chart_file="$chart_dir/hitkeep-${previous_version#v}.tgz"
+          test -f "$previous_chart_file"
+
+          HITKEEP_PREVIOUS_IMAGE="$previous" \
+          HITKEEP_PREVIOUS_CHART="$previous_chart_file" \
+          HITKEEP_PREVIOUS_CHART_DIGEST="$previous_chart_digest" \
+          HITKEEP_CANDIDATE_CHART="$candidate_chart" \
+          HITKEEP_CANDIDATE_CHART_VERSION="$CANDIDATE_VERSION" \
+            bash ./scripts/helm-smoke.sh "$candidate" self-hosted

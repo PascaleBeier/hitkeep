@@ -20,10 +20,13 @@ type SpamDecision struct {
 }
 
 type SpamFilter struct {
-	path   string
-	logger *slog.Logger
+	path       string
+	logger     *slog.Logger
+	fetch      func(context.Context) (SpamFeedData, error)
+	transition chan struct{}
 
-	mu            sync.RWMutex
+	mu sync.RWMutex
+
 	data          SpamFeedData
 	referrerHosts map[string]struct{}
 	networks      []netip.Prefix
@@ -33,16 +36,41 @@ func NewSpamFilter(path string, logger *slog.Logger) *SpamFilter {
 	if logger == nil {
 		panic("blocking: logger is required")
 	}
-	filter := &SpamFilter{path: path, logger: logger}
+	filter := &SpamFilter{
+		path:       path,
+		logger:     logger,
+		transition: make(chan struct{}, 1),
+	}
+	filter.transition <- struct{}{}
 	if embedded, err := LoadEmbeddedSpamFeedData(); err == nil {
 		filter.apply(embedded)
 	}
 	return filter
 }
 
+func (f *SpamFilter) acquireTransition(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-f.transition:
+		return nil
+	}
+}
+
 func (f *SpamFilter) RefreshFromDisk() error {
+	return f.refreshFromDisk(context.Background())
+}
+
+func (f *SpamFilter) refreshFromDisk(ctx context.Context) error {
 	if strings.TrimSpace(f.path) == "" {
 		return nil
+	}
+	if err := f.acquireTransition(ctx); err != nil {
+		return err
+	}
+	defer func() { f.transition <- struct{}{} }()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	data, err := LoadSpamFeedData(f.path)
@@ -64,13 +92,16 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 		interval = defaultSpamRefreshInterval
 	}
 
-	if isLeader() {
-		if err := f.Update(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			f.logger.Warn("Failed initial spam filter update", "error", err)
-		}
-	}
-
 	go func() {
+		if ctx.Err() != nil {
+			return
+		}
+		if isLeader() {
+			if err := f.Update(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				f.logger.Warn("Failed initial spam filter update", "error", err)
+			}
+		}
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
@@ -83,7 +114,7 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 					if err := f.Update(ctx); err != nil && !errors.Is(err, context.Canceled) {
 						f.logger.Warn("Failed to refresh spam filter feeds", "error", err)
 					}
-				} else if err := f.RefreshFromDisk(); err != nil && !errors.Is(err, context.Canceled) {
+				} else if err := f.refreshFromDisk(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					f.logger.Warn("Failed to reload spam filter cache from disk", "error", err, "path", f.path)
 				}
 			}
@@ -92,10 +123,41 @@ func (f *SpamFilter) StartRefreshLoop(ctx context.Context, autoUpdate bool, inte
 }
 
 func (f *SpamFilter) Update(ctx context.Context) error {
-	data, err := FetchSpamFeedData(ctx, nil, f.logger)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := f.acquireTransition(ctx); err != nil {
+		return err
+	}
+	defer func() { f.transition <- struct{}{} }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	fetch := f.fetch
+	if fetch == nil {
+		fetch = func(ctx context.Context) (SpamFeedData, error) {
+			return FetchSpamFeedData(ctx, nil, f.logger)
+		}
+	}
+	data, err := fetch(ctx)
 	if err != nil {
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	return f.saveAndApply(ctx, data)
+}
+
+func (f *SpamFilter) saveAndApply(ctx context.Context, data SpamFeedData) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	data.normalize()
 	if strings.TrimSpace(f.path) != "" {
 		if err := SaveSpamFeedData(f.path, data); err != nil {
 			return err

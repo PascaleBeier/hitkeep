@@ -10,13 +10,13 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
+	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	"hitkeep/internal/exportfmt"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
+	json "hitkeep/jsonapi"
 )
 
 func newShareTestContext(t *testing.T, store *database.Store) *shared.Context {

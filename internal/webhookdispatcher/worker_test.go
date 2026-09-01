@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 func TestWorkerEndpointAdmissionDoesNotBlock(t *testing.T) {

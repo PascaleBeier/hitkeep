@@ -17,6 +17,22 @@ type fakeFeedClient struct {
 	providerErrors map[string]error
 }
 
+type feedDoerFunc func(*http.Request) (*http.Response, error)
+
+func (f feedDoerFunc) Do(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+type closeTrackingBody struct {
+	io.Reader
+	closes int
+}
+
+func (b *closeTrackingBody) Close() error {
+	b.closes++
+	return nil
+}
+
 func (c *fakeFeedClient) Do(req *http.Request) (*http.Response, error) {
 	url := req.URL.String()
 	if err, ok := c.providerErrors[url]; ok {
@@ -50,6 +66,46 @@ func newFakeFeedClient() *fakeFeedClient {
 
 func testAIAgentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func TestFetchAgentFeedBoundsAndClosesSuccessfulBody(t *testing.T) {
+	body := &closeTrackingBody{Reader: strings.NewReader(strings.Repeat("x", int(maxAgentFeedResponseBytes)+1))}
+	feed, err := fetchAgentFeed(context.Background(), feedDoerFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: body}, nil
+	}), aiRobotsTxtURL)
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+
+	contents, err := io.ReadAll(feed)
+	if err != nil {
+		t.Fatalf("read limited body: %v", err)
+	}
+	if got, want := len(contents), maxAgentFeedResponseBytes; got != want {
+		t.Fatalf("limited body length = %d, want %d", got, want)
+	}
+	if body.closes != 0 {
+		t.Fatalf("body closed before caller closes returned feed: %d", body.closes)
+	}
+	if err := feed.Close(); err != nil {
+		t.Fatalf("close returned feed: %v", err)
+	}
+	if body.closes != 1 {
+		t.Fatalf("underlying body close count = %d, want 1", body.closes)
+	}
+}
+
+func TestFetchAgentFeedClosesNonSuccessBody(t *testing.T) {
+	body := &closeTrackingBody{Reader: strings.NewReader("failure")}
+	_, err := fetchAgentFeed(context.Background(), feedDoerFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusBadGateway, Body: body}, nil
+	}), aiRobotsTxtURL)
+	if err == nil {
+		t.Fatal("expected non-success status error")
+	}
+	if body.closes != 1 {
+		t.Fatalf("non-success body close count = %d, want 1", body.closes)
+	}
 }
 
 func findAgent(t *testing.T, data AIAgentData, token string) AIAgentEntry {

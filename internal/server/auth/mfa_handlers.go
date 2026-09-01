@@ -7,13 +7,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/appurl"
+	"hitkeep/appurl"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type mfaTotpVerifyRequest struct {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/access"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {

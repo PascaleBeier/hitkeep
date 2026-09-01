@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type Consumer struct {

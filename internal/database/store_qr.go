@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func (s *Store) CreateQRCode(ctx context.Context, siteID, createdBy uuid.UUID, req api.QRCodeCreateRequest) (*api.QRCode, string, error) {

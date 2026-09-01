@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/nsqio/go-nsq"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
+	"hitkeep/hklog"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const Channel = "dispatcher"

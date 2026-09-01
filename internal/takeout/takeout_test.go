@@ -16,12 +16,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	"hitkeep/internal/exportfmt"
 	"hitkeep/internal/importables"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestTakeoutWebhookExportsExcludeSecretsAndPayloadBodies(t *testing.T) {

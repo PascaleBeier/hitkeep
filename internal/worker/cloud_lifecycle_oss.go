@@ -5,7 +5,7 @@ package worker
 import (
 	"context"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 )

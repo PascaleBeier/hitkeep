@@ -142,6 +142,10 @@ func TestRecoveryCodeLifecycle(t *testing.T) {
 		}
 		hashes = append(hashes, hash)
 	}
+	// Persisted recovery-code hashes are untrusted at verification time. The store
+	// must surface a non-canonical Argon2 parameter set rather than deriving it.
+	validHash := hashes[0]
+	hashes[0] = "$argon2id$v=19$m=1,t=1,p=4$invalid$invalid"
 	if err := store.ReplaceUserRecoveryCodes(ctx, userID, hashes); err != nil {
 		t.Fatalf("replace recovery codes: %v", err)
 	}
@@ -155,6 +159,22 @@ func TestRecoveryCodeLifecycle(t *testing.T) {
 	}
 	if status.Remaining != len(codes) {
 		t.Fatalf("expected %d remaining codes, got %d", len(codes), status.Remaining)
+	}
+
+	if _, _, err := store.ConsumeRecoveryCode(ctx, userID, codes[0]); err == nil {
+		t.Fatal("expected persisted non-canonical parameters to be rejected")
+	}
+	status, err = store.GetRecoveryCodeStatus(ctx, userID)
+	if err != nil {
+		t.Fatalf("get recovery code status after rejected consume: %v", err)
+	}
+	if status.Remaining != len(codes) {
+		t.Fatalf("expected %d remaining codes after rejected consume, got %d", len(codes), status.Remaining)
+	}
+
+	hashes[0] = validHash
+	if err := store.ReplaceUserRecoveryCodes(ctx, userID, hashes); err != nil {
+		t.Fatalf("restore valid recovery codes: %v", err)
 	}
 
 	remaining, consumed, err := store.ConsumeRecoveryCode(ctx, userID, codes[0])

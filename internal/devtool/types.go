@@ -44,8 +44,8 @@ type QAPlan struct {
 	PlannerVersion        string   `json:"planner_version"`
 	CatalogVersion        string   `json:"catalog_version"`
 	ChangedPaths          []string `json:"changed_paths,omitempty"`
-	ChangedPathCount      int      `json:"changed_path_count,omitempty"`
-	ChangedPathsTruncated bool     `json:"changed_paths_truncated,omitempty"`
+	ChangedPathCount      int      `json:"changed_path_count,omitzero"`
+	ChangedPathsTruncated bool     `json:"changed_paths_truncated,omitzero"`
 	GateIDs               []string `json:"selected_gates"`
 	SkippedGateIDs        []string `json:"skipped_gates,omitempty"`
 	DecisionRequired      bool     `json:"decision_required"`

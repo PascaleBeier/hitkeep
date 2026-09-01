@@ -13,14 +13,14 @@ import (
 	"github.com/google/uuid"
 	stripe "github.com/stripe/stripe-go/v86"
 
+	"hitkeep/appurl"
+	"hitkeep/config"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	authcore "hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleStripeEvent(ctx context.Context, event stripe.Event) error {

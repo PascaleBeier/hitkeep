@@ -12,15 +12,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/appurl"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 const (

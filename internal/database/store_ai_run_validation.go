@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 var rawPayloadPromptFields = map[string]bool{

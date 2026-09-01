@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"hitkeep/internal/exportfmt"
+	"hitkeep/exportfmt"
 )
 
 func (s *Store) exportQueryToTempFile(

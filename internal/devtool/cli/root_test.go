@@ -12,8 +12,9 @@ import (
 	"testing"
 	"time"
 
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/devtool"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestJSONOutputUsesVersionedEnvelope(t *testing.T) {
@@ -29,6 +30,38 @@ func TestJSONOutputUsesVersionedEnvelope(t *testing.T) {
 	}
 	if envelope.SchemaVersion != devtool.SchemaVersion || envelope.Command != "catalog" || envelope.Status != "ok" {
 		t.Fatalf("unexpected envelope: %+v", envelope)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("unexpected stderr: %s", stderr.String())
+	}
+}
+
+func TestCatalogConfigurationManifestUsesExactArtifactBytes(t *testing.T) {
+	root := testRepository(t)
+	catalog := []byte("{\"schema_version\":\"hitkeep.config/v2\"}\n")
+	example := []byte("data-path: /var/lib/hitkeep/data\n")
+	catalogPath := filepath.Join(t.TempDir(), runtimeconfig.ConfigurationCatalogFilename)
+	examplePath := filepath.Join(t.TempDir(), runtimeconfig.ConfigurationExampleFilename)
+	if err := os.WriteFile(catalogPath, catalog, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(examplePath, example, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"--workspace", root, "--output", "json", "catalog", "configuration-manifest", "--catalog", catalogPath, "--example", examplePath}
+	if err := Execute(context.Background(), "test", args, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	var output struct {
+		Data runtimeconfig.ConfigurationReleaseManifest `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatalf("decode output: %v\n%s", err, stdout.String())
+	}
+	if !reflect.DeepEqual(output.Data, runtimeconfig.ConfigurationReleaseManifestFor(catalog, example)) {
+		t.Fatalf("manifest = %#v", output.Data)
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("unexpected stderr: %s", stderr.String())

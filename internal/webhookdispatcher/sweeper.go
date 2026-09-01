@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type Sweeper struct {

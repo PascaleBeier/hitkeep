@@ -1,6 +1,7 @@
 package devtool
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -108,7 +109,7 @@ func TestRaceShardsAreDisjointAndComplete(t *testing.T) {
 func TestTestBearingGoPackagesExcludeProductionOnlyAndFrontendDependencies(t *testing.T) {
 	output := []byte(`{"ImportPath":"hitkeep/internal/database","TestGoFiles":["store_test.go"]}
 {"ImportPath":"hitkeep/internal/server","XTestGoFiles":["server_test.go"]}
-{"ImportPath":"hitkeep/internal/config"}
+{"ImportPath":"hitkeep/config"}
 {"ImportPath":"hitkeep/frontend/dashboard/node_modules/flatted/golang/pkg/flatted","TestGoFiles":["flatted_test.go"]}
 `)
 	got, err := testBearingGoPackages(output, "self-hosted")
@@ -162,6 +163,107 @@ func TestRaceTestArgsUseGateBoundedPackageTimeout(t *testing.T) {
 	want := []string{"go", "test", "-race", "-count=1", "-timeout", "20m", "hitkeep/internal/database"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("race arguments = %v, want %v", got, want)
+	}
+}
+
+func TestGoReleaserConfigPreservesReleaseArtifactContract(t *testing.T) {
+	gate, err := GateByID("goreleaser-check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(gate.Profiles, "pr") || !slices.Contains(gate.Profiles, "full") || !slices.Contains(gate.Paths, ".goreleaser.yaml") {
+		t.Fatalf("GoReleaser gate is not wired to PR/full release coverage: %#v", gate)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", ".goreleaser.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"version: 2", "id: self-hosted", "binary: hitkeep-linux-{{ .Arch }}",
+		"id: cloud", "binary: hitkeep-cloud-linux-{{ .Arch }}", "HITKEEP_VERSION",
+		"hashicorpmetrics", "timetzdata", "s3", "billing", "tenancy", "name_template: SHA256SUMS",
+	} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("GoReleaser config is missing release contract %q", required)
+		}
+	}
+}
+
+func TestSelfHostedImageGateCoversContainerRecreation(t *testing.T) {
+	gate, err := GateByID("self-hosted-image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(gate.Profiles, "full") || !slices.Contains(gate.Paths, "scripts/docker-smoke.sh") {
+		t.Fatalf("self-hosted image gate is not wired to full recreation coverage: %#v", gate)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "docker-smoke.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"--recreate", "HITKEEP_PREVIOUS_IMAGE", "@sha256:", "docker volume create", "docker pull --platform \"$platform\"", "docker stop -t 15", "release-fixtures.json", "upgrade-fixture", "--platform \"$platform\"", "fixture --verify-image", "fixture --verify-storage", "fixture --verify-legacy-storage", "fixture --seed", "fixture --verify", "verify_stopped_storage", "verify_legacy_stopped_storage", "snapshot_volume()", "restore_snapshot()", "type=volume,src=$volume,dst=/source,readonly", "type=volume,src=$rollback_volume,dst=/target", "rollback_helper_image=\"busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662\"", "\"$rollback_helper_image\" tar", "start_container \"$previous_image\" \"$rollback_volume\"", "start_container \"$image\""} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("docker smoke script is missing recreation contract %q", required)
+		}
+	}
+	if bytes.Contains(raw, []byte("busybox:")) {
+		t.Fatal("docker smoke rollback helper must not use a mutable BusyBox tag")
+	}
+	rollbackStart := bytes.Index(raw, []byte(`start_container "$previous_image" "$rollback_volume"`))
+	if rollbackStart < 0 {
+		t.Fatal("docker smoke does not start the restored volume with the historical image")
+	}
+	candidateStart := bytes.Index(raw[rollbackStart:], []byte(`start_container "$image"`))
+	if candidateStart < 0 {
+		t.Fatal("docker smoke does not resume the candidate volume after rollback verification")
+	}
+	rollback := raw[rollbackStart : rollbackStart+candidateStart]
+	if bytes.Count(rollback, []byte("verify_legacy_stopped_storage")) != 1 || bytes.Contains(rollback, []byte("verify_stopped_storage")) {
+		t.Fatal("restored legacy volume must use only the legacy stopped-storage verifier")
+	}
+	if bytes.Contains(raw, []byte("remove_container() {\n  docker rm -f")) || bytes.Contains(raw, []byte("verify_stopped_storage() {\n  docker rm -f")) {
+		t.Fatal("docker smoke normal recreation lifecycle must not force-remove containers")
+	}
+	if !bytes.Contains(raw, []byte("remove_container() {\n  local exit_code\n  docker stop -t 15 \"$container\" >/dev/null\n  exit_code=\"$(docker inspect \"$container\" --format '{{.State.ExitCode}}')\"\n  if [[ \"$exit_code\" != \"0\" ]]")) {
+		t.Fatal("docker smoke normal removal must require a clean graceful-stop exit code before removal")
+	}
+}
+
+func TestComposeUpgradeSmokeUsesSupportedSurface(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "scripts", "compose-smoke.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"docker compose --project-name \"$compose_project\" -f compose.yaml -f \"$override\"",
+		"build: !reset null",
+		"container_name: ${container}",
+		"ports: !override",
+		"127.0.0.1::8080",
+		"compose down --remove-orphans",
+		"compose down -v --remove-orphans",
+		"fixture --seed",
+		"fixture --verify",
+		"verify_stopped_storage verify-storage",
+		"verify_stopped_storage verify-legacy-storage",
+		"write_override \"$previous_image\" primary",
+		"write_override \"$image\" primary",
+		"restore_data_volume \"$legacy_archive\"",
+		"HITKEEP_PREVIOUS_IMAGE",
+		"@sha256:",
+	} {
+		if !bytes.Contains(raw, []byte(required)) {
+			t.Fatalf("compose upgrade smoke is missing contract %q", required)
+		}
+	}
+	candidateStart := bytes.Index(raw, []byte(`write_override "$image" primary`))
+	if candidateStart < 0 {
+		t.Fatal("compose upgrade smoke must start the candidate on the shared primary volume")
+	}
+	candidateStorage := bytes.Index(raw[candidateStart:], []byte("verify_stopped_storage verify-storage"))
+	rollbackReset := bytes.Index(raw[candidateStart:], []byte("compose down -v --remove-orphans"))
+	if candidateStorage < 0 || rollbackReset < candidateStorage {
+		t.Fatal("compose upgrade smoke must retain shared volumes until candidate storage verification completes")
 	}
 }
 

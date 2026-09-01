@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 )
@@ -115,6 +115,32 @@ func TestServiceTeamEntitlements(t *testing.T) {
 	ent = env.service(provider).TeamEntitlements(ctx, env.teamID)
 	if ent == nil || ent.MaxTeamMembers != 3 || ent.MaxSitesPerTeam != 5 {
 		t.Fatalf("expected provider entitlements, got %+v", ent)
+	}
+}
+
+func TestServiceTeamSiteLimit(t *testing.T) {
+	env := newServiceEnv(t)
+	ctx := context.Background()
+	regularOwnerID := env.createMember(t, "site-limit-team-owner@example.test")
+	regularTeam, err := env.store.CreateTenant(ctx, regularOwnerID, "Site limit team", "")
+	if err != nil {
+		t.Fatalf("create regular team: %v", err)
+	}
+
+	limited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxSitesPerTeam: 3}, entitlements.PlanInfo{}))
+	if got := limited.TeamSiteLimit(ctx, regularTeam.ID); got != 3 {
+		t.Fatalf("expected regular team site limit 3, got %d", got)
+	}
+	unlimited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{}, entitlements.PlanInfo{}))
+	if got := unlimited.TeamSiteLimit(ctx, regularTeam.ID); got != 0 {
+		t.Fatalf("expected zero site limit to be unlimited, got %d", got)
+	}
+	if got := limited.TeamSiteLimit(ctx, env.teamID); got != 0 {
+		t.Fatalf("expected operator-owned team to bypass site limit, got %d", got)
+	}
+	env.cfg.CloudHosted = false
+	if got := limited.TeamSiteLimit(ctx, regularTeam.ID); got != 0 {
+		t.Fatalf("expected self-hosted site limit to be unlimited, got %d", got)
 	}
 }
 

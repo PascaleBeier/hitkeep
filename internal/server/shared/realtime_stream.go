@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,14 +11,24 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/realtime"
+	json "hitkeep/jsonapi"
 )
 
 const realtimeHeartbeatInterval = 15 * time.Second
 
+var realtimeStreamLifetime = time.Minute
+
 func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtime.Broker, siteID uuid.UUID) {
 	controller := http.NewResponseController(w)
+	cutoff := time.Now().Add(realtimeStreamLifetime)
+	lifetime := time.NewTimer(time.Until(cutoff))
+	defer lifetime.Stop()
+	if err := controller.SetWriteDeadline(cutoff); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		LoggerFromContext(r.Context()).Debug("Failed to set realtime stream write deadline", "error", err, "site_id", siteID)
+		return
+	}
+
 	subscription, replay, missed := broker.Subscribe(siteID, r.Header.Get("Last-Event-ID"))
 	if subscription == nil {
 		http.Error(w, "Service not available", http.StatusServiceUnavailable)
@@ -65,6 +76,8 @@ func ServeRealtimeStream(w http.ResponseWriter, r *http.Request, broker *realtim
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-lifetime.C:
 			return
 		case event, ok := <-subscription.Events():
 			if !ok {

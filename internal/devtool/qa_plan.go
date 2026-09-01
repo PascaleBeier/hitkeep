@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"hitkeep/jsonapi"
 )
 
 const (
@@ -79,6 +80,8 @@ func classifyChangedPath(path string) ([]string, bool) {
 	switch {
 	case path == "go.mod" || path == "go.sum":
 		return []string{changeDependencies}, true
+	case path == "hitkeep.example.yaml":
+		return []string{changeBackend, changeDocumentation}, true
 	case path == "frontend/dashboard/package.json" || path == "frontend/dashboard/package-lock.json":
 		return []string{changeDependencies, changeDashboard}, true
 	case strings.HasPrefix(path, "internal/database/"):
@@ -95,13 +98,24 @@ func classifyChangedPath(path string) ([]string, bool) {
 		return []string{changeDashboard}, true
 	case strings.HasPrefix(path, "docs/") || path == "README.md" || path == "CONTRIBUTING.md" || path == "AGENTS.md":
 		return []string{changeDocumentation}, true
-	case strings.HasPrefix(path, ".github/") || strings.HasPrefix(path, "charts/") || path == "Dockerfile" || strings.HasPrefix(path, "compose"):
+	case strings.HasPrefix(path, ".github/") || strings.HasPrefix(path, "charts/") || path == ".goreleaser.yaml" || path == "Dockerfile" || path == "scripts/docker-smoke.sh" || path == "scripts/compose-smoke.sh" || strings.HasPrefix(path, "compose"):
 		return []string{changeDelivery}, true
 	case strings.HasSuffix(path, ".go") || strings.HasSuffix(path, ".sql") || strings.HasPrefix(path, "cmd/") || strings.HasPrefix(path, "internal/"):
 		return []string{changeBackend}, true
 	default:
 		return nil, false
 	}
+}
+
+func (a *App) qaChangedPaths(baseRef string) ([]string, error) {
+	changed, err := changedPaths(a.workspace.Root, baseRef)
+	if err != nil {
+		changed, err = workingTreeChangedPaths(a.workspace.Root)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return changed, nil
 }
 
 func (a *App) buildQAPlan(ctx context.Context, profile, baseRef string) (QAPlan, error) {
@@ -120,12 +134,9 @@ func (a *App) buildQAPlan(ctx context.Context, profile, baseRef string) (QAPlan,
 		plan.GateIDs = profileGateIDs(profile)
 		plan.SourceSnapshot, err = qaSourceSnapshot(a.workspace.Root, workspace.Head, nil)
 	} else {
-		changed, changeErr := changedPaths(a.workspace.Root, baseRef)
-		if changeErr != nil {
-			changed, changeErr = workingTreeChangedPaths(a.workspace.Root)
-		}
-		if changeErr != nil {
-			return QAPlan{}, changeErr
+		changed, err := a.qaChangedPaths(baseRef)
+		if err != nil {
+			return QAPlan{}, err
 		}
 		plan.ChangedPathCount = len(changed)
 		plan.ChangedPaths, plan.ChangedPathsTruncated = boundedStrings(changed, maxStructuredPaths)
@@ -163,6 +174,9 @@ func (a *App) buildQAPlan(ctx context.Context, profile, baseRef string) (QAPlan,
 			}
 		}
 		plan.SourceSnapshot, err = qaSourceSnapshot(a.workspace.Root, workspace.Head, changed)
+		if err != nil {
+			return QAPlan{}, err
+		}
 	}
 	if err != nil {
 		return QAPlan{}, err
@@ -207,7 +221,7 @@ func (a *App) prepareQARequest(ctx context.Context, request RunRequest) (RunRequ
 		return RunRequest{}, fmt.Errorf("load QA plan: %w", err)
 	}
 	var plan QAPlan
-	if err := json.Unmarshal(raw, &plan); err != nil {
+	if err := jsonapi.Unmarshal(raw, &plan); err != nil {
 		return RunRequest{}, fmt.Errorf("decode QA plan: %w", err)
 	}
 	if plan.PlanID != request.PlanID || plan.PlannerVersion != qaPlannerVersion || plan.CatalogVersion != qaCatalogVersion {
@@ -220,7 +234,14 @@ func (a *App) prepareQARequest(ctx context.Context, request RunRequest) (RunRequ
 	if err != nil {
 		return RunRequest{}, err
 	}
-	current, err := qaSourceSnapshot(a.workspace.Root, workspace.Head, plan.ChangedPaths)
+	paths := plan.ChangedPaths
+	if plan.ChangedPathsTruncated {
+		paths, err = a.qaChangedPaths(plan.BaseRef)
+		if err != nil {
+			return RunRequest{}, err
+		}
+	}
+	current, err := qaSourceSnapshot(a.workspace.Root, workspace.Head, paths)
 	if err != nil {
 		return RunRequest{}, err
 	}

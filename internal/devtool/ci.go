@@ -13,7 +13,7 @@ import (
 	"slices"
 	"strings"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 var releaseValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,99}$`)
@@ -252,23 +252,30 @@ func (a *App) BuildReleaseBinaries(ctx context.Context, request ReleaseBuildRequ
 	if err := a.ValidateProductionBoundary(ctx); err != nil {
 		return ReleaseBuildResult{}, err
 	}
-	common, _ := VariantByID("self-hosted")
-	cloud, _ := VariantByID("cloud")
-	artifacts := []string{
-		filepath.Join(a.workspace.Root, "hitkeep-linux-"+request.GOARCH),
-		filepath.Join(a.workspace.Root, "hitkeep-cloud-linux-"+request.GOARCH),
+	builds := []struct {
+		id       string
+		artifact string
+	}{
+		{id: "self-hosted", artifact: filepath.Join(a.workspace.Root, "hitkeep-linux-"+request.GOARCH)},
+		{id: "cloud", artifact: filepath.Join(a.workspace.Root, "hitkeep-cloud-linux-"+request.GOARCH)},
 	}
-	environment := []string{"CGO_ENABLED=1", "GOOS=" + request.GOOS, "GOARCH=" + request.GOARCH}
-	for index, variant := range []Variant{common, cloud} {
-		args := append([]string{"go", "build"}, goBuildTagArgs(variant.BuildTags)...)
-		args = append(args,
-			"-ldflags", "-w -s -X hitkeep/cmd.Version="+request.Version,
-			"-o", artifacts[index],
-			"./cmd/hitkeep/main.go",
-		)
+	environment := []string{
+		"CGO_ENABLED=1",
+		"GOOS=" + request.GOOS,
+		"GOARCH=" + request.GOARCH,
+		"HITKEEP_VERSION=" + request.Version,
+	}
+	artifacts := make([]string, 0, len(builds))
+	for _, build := range builds {
+		args := []string{
+			"go", "run", "github.com/goreleaser/goreleaser/v2@v2.18.0",
+			"build", "--config", ".goreleaser.yaml", "--snapshot", "--clean", "--single-target",
+			"--id", build.id, "--output", build.artifact,
+		}
 		if err := a.runCommand(ctx, writer, commandSpec{Args: args, Env: environment}); err != nil {
 			return ReleaseBuildResult{}, err
 		}
+		artifacts = append(artifacts, build.artifact)
 	}
 	return ReleaseBuildResult{Artifacts: artifacts}, nil
 }

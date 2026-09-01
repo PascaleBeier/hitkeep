@@ -13,7 +13,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestRegisteredTrackingDomainRoutesAllowTeamAdminsAndOwners(t *testing.T) {

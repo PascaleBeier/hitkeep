@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/hklog"
 )
 
 // FindSiteByDomain resolves a site by its tracked domain. It runs once per
@@ -96,7 +96,24 @@ func (s *Store) GetSite(ctx context.Context, siteID uuid.UUID, userID uuid.UUID)
 	return &site, nil
 }
 
+var (
+	ErrSiteLimitReached    = errors.New("site limit reached")
+	ErrActiveTenantChanged = errors.New("active site tenant changed")
+)
+
 func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string) (*api.Site, error) {
+	return s.createSite(ctx, userID, uuid.Nil, domain, 0)
+}
+
+// CreateSiteWithQuota creates a site only when the specified active team
+// remains below maxSites. A non-positive maximum is unlimited.
+func (s *Store) CreateSiteWithQuota(ctx context.Context, userID, tenantID uuid.UUID, domain string, maxSites int) (*api.Site, error) {
+	s.siteQuotaMu.Lock()
+	defer s.siteQuotaMu.Unlock()
+	return s.createSite(ctx, userID, tenantID, domain, maxSites)
+}
+
+func (s *Store) createSite(ctx context.Context, userID, expectedTenantID uuid.UUID, domain string, maxSites int) (*api.Site, error) {
 	id := uuid.New()
 	now := time.Now()
 
@@ -113,6 +130,18 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 	tenantID, err := getActiveTenantID(ctx, tx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve site tenant: %w", err)
+	}
+	if expectedTenantID != uuid.Nil && tenantID != expectedTenantID {
+		return nil, ErrActiveTenantChanged
+	}
+	if maxSites > 0 {
+		var count int
+		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM site_tenants WHERE tenant_id = ?", tenantID).Scan(&count); err != nil {
+			return nil, fmt.Errorf("could not count tenant sites: %w", err)
+		}
+		if count >= maxSites {
+			return nil, ErrSiteLimitReached
+		}
 	}
 
 	if err := ensureTenantMemberTx(ctx, tx, tenantID, userID, TenantRoleOwner, userID); err != nil {
@@ -135,7 +164,6 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 		return nil, fmt.Errorf("could not create site tenant mapping: %w", err)
 	}
 
-	// Add creator as site owner
 	_, err = tx.ExecContext(ctx,
 		"INSERT INTO site_members (site_id, user_id, role, added_by) VALUES (?, ?, 'owner', ?)",
 		id, userID, userID,
@@ -149,12 +177,7 @@ func (s *Store) CreateSite(ctx context.Context, userID uuid.UUID, domain string)
 	}
 	s.invalidateSiteDomain(domain)
 
-	return &api.Site{
-		ID:        id,
-		UserID:    userID,
-		Domain:    domain,
-		CreatedAt: now,
-	}, nil
+	return &api.Site{ID: id, UserID: userID, Domain: domain, CreatedAt: now}, nil
 }
 
 func (s *Store) UpdateSiteTenant(ctx context.Context, siteID, tenantID uuid.UUID) error {

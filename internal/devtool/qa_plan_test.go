@@ -60,6 +60,25 @@ func TestUnknownPathRequiresDecision(t *testing.T) {
 	}
 }
 
+func TestExampleConfigurationSelectsBackendAndDocumentationAreas(t *testing.T) {
+	areas, known := classifyChangedPath("hitkeep.example.yaml")
+	if !known {
+		t.Fatal("hitkeep.example.yaml is not classified")
+	}
+	if len(areas) != 2 || areas[0] != changeBackend || areas[1] != changeDocumentation {
+		t.Fatalf("areas = %v, want backend and documentation", areas)
+	}
+}
+
+func TestReleaseFilesSelectDeliveryArea(t *testing.T) {
+	for _, path := range []string{"scripts/docker-smoke.sh", "scripts/compose-smoke.sh", ".goreleaser.yaml"} {
+		areas, known := classifyChangedPath(path)
+		if !known || len(areas) != 1 || areas[0] != changeDelivery {
+			t.Fatalf("%s areas = %v, known = %t, want delivery", path, areas, known)
+		}
+	}
+}
+
 func TestFrontendManifestsSelectDependencyAndDashboardAreas(t *testing.T) {
 	want := []string{changeDependencies, changeDashboard}
 	for _, path := range []string{"frontend/dashboard/package.json", "frontend/dashboard/package-lock.json"} {

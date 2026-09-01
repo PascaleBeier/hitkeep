@@ -18,13 +18,14 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
+	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	"hitkeep/internal/exportfmt"
-	json "hitkeep/internal/jsonapi"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 // setupTestEnv initializes an in-memory database and a handler instance.
@@ -235,6 +236,26 @@ func TestFaviconProxyErrorKindUsesStableCategories(t *testing.T) {
 	}
 }
 
+func TestWriteCreateSiteErrorMapsStableErrors(t *testing.T) {
+	tests := []struct {
+		err    error
+		status int
+		body   string
+	}{
+		{database.ErrSiteLimitReached, http.StatusForbidden, "Site limit reached\n"},
+		{database.ErrActiveTenantChanged, http.StatusConflict, "Active team changed; retry\n"},
+	}
+	for _, tc := range tests {
+		w := httptest.NewRecorder()
+		if !writeCreateSiteError(w, tc.err) {
+			t.Fatalf("expected handled error %v", tc.err)
+		}
+		if w.Code != tc.status || w.Body.String() != tc.body {
+			t.Fatalf("expected %d %q, got %d %q", tc.status, tc.body, w.Code, w.Body.String())
+		}
+	}
+}
+
 func TestHandleCreateSite(t *testing.T) {
 	h, store, userID := setupTestEnv(t)
 	defer store.Close()
@@ -382,6 +403,92 @@ func TestHandleCreateSite(t *testing.T) {
 				tc.checkResponse(t, w)
 			}
 		})
+	}
+}
+
+func TestHandleCreateSiteReturnsForbiddenAtLimit(t *testing.T) {
+	h, store, _ := setupTestEnv(t)
+	defer store.Close()
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{MaxSitesPerTeam: 1}, entitlements.PlanInfo{})
+
+	userID, err := store.CreateUser(context.Background(), "site-limit-http@test.dev", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	team, err := store.CreateTenant(context.Background(), userID, "Limited team", "")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if err := store.SetActiveTenantID(context.Background(), userID, team.ID); err != nil {
+		t.Fatalf("activate team: %v", err)
+	}
+	if _, err := store.CreateSite(context.Background(), userID, "site-limit-existing.test"); err != nil {
+		t.Fatalf("create existing site: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{"domain": "site-limit-denied.test"})
+	req := httptest.NewRequest(http.MethodPost, "/api/sites", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	w := httptest.NewRecorder()
+	h.handleCreateSite().ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden || strings.TrimSpace(w.Body.String()) != "Site limit reached" {
+		t.Fatalf("expected site limit 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleTransferSiteTeamReturnsForbiddenAtLimit(t *testing.T) {
+	h, store, tenantStores, _ := setupFileBackedTransferEnv(t)
+	defer store.Close()
+	defer tenantStores.Close()
+	h.ctx.Config.CloudHosted = true
+	h.ctx.Entitlements = entitlements.NewStaticProvider(entitlements.Entitlements{MaxSitesPerTeam: 1}, entitlements.PlanInfo{})
+
+	userID, err := store.CreateUser(context.Background(), "site-transfer-limit@test.dev", "hash")
+	if err != nil {
+		t.Fatalf("create regular user: %v", err)
+	}
+	source, err := store.CreateTenant(context.Background(), userID, "Limited source", "")
+	if err != nil {
+		t.Fatalf("create source team: %v", err)
+	}
+	if err := store.SetActiveTenantID(context.Background(), userID, source.ID); err != nil {
+		t.Fatalf("activate source team: %v", err)
+	}
+	site, err := store.CreateSite(context.Background(), userID, "site-transfer-denied-source.test")
+	if err != nil {
+		t.Fatalf("create source site: %v", err)
+	}
+	sourceTeamID, err := store.GetSiteTenantID(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("source team: %v", err)
+	}
+	destination, err := store.CreateTenant(context.Background(), userID, "Limited destination", "")
+	if err != nil {
+		t.Fatalf("create destination team: %v", err)
+	}
+	if err := store.SetActiveTenantID(context.Background(), userID, destination.ID); err != nil {
+		t.Fatalf("activate destination team: %v", err)
+	}
+	if _, err := store.CreateSite(context.Background(), userID, "site-transfer-denied-existing.test"); err != nil {
+		t.Fatalf("create destination site: %v", err)
+	}
+
+	body, _ := json.Marshal(map[string]string{"team_id": destination.ID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/transfer-team", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	req.SetPathValue("id", site.ID.String())
+	w := httptest.NewRecorder()
+	h.handleTransferSiteTeam().ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden || strings.TrimSpace(w.Body.String()) != "Site limit reached" {
+		t.Fatalf("expected site limit 403, got %d: %s", w.Code, w.Body.String())
+	}
+	teamID, err := store.GetSiteTenantID(context.Background(), site.ID)
+	if err != nil {
+		t.Fatalf("site team after denied transfer: %v", err)
+	}
+	if teamID != sourceTeamID {
+		t.Fatalf("denied transfer moved site to %s, expected %s", teamID, sourceTeamID)
 	}
 }
 

@@ -50,3 +50,25 @@ func TestArtifactIndexRejectsEscapesAndReconstructs(t *testing.T) {
 		t.Fatal("missing index was not reconstructed")
 	}
 }
+
+func TestRegisterArtifactPathsSkipsVirtualImageArtifacts(t *testing.T) {
+	stateDir := t.TempDir()
+	app := &App{workspace: Workspace{ID: "workspace", StateDir: stateDir}}
+	log := filepath.Join(stateDir, "runs", "build.log")
+	if err := os.MkdirAll(filepath.Dir(log), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(log, []byte("log"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.registerArtifactPaths("run", "build", "source", []string{log, "image://hitkeep:local"}); err != nil {
+		t.Fatal(err)
+	}
+	index, err := app.loadArtifactIndex()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(index.Entries) != 1 || index.Entries[0].Path != log {
+		t.Fatalf("unexpected indexed artifacts: %+v", index.Entries)
+	}
+}

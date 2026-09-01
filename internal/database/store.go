@@ -16,7 +16,7 @@ import (
 	duckdb "github.com/duckdb/duckdb-go/v2"
 	"github.com/google/uuid"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 const (
@@ -53,6 +53,7 @@ type Store struct {
 	closed                          bool
 	analyticsMu                     sync.Mutex
 	aiBudgetMu                      sync.Mutex
+	siteQuotaMu                     sync.Mutex
 	primaryAuthMu                   sync.Mutex
 	reportClaimMu                   sync.Mutex
 	analyticsStatements             *analyticsStatements

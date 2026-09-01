@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/server/shared"
 )
 

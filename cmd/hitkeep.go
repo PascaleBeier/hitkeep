@@ -8,20 +8,18 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/nsqio/go-nsq"
 	"github.com/nsqio/nsq/nsqd"
 	"golang.org/x/sync/errgroup"
 
+	"hitkeep/config"
+	"hitkeep/hklog"
 	"hitkeep/internal/cluster"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/ingest"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/realtime"
@@ -41,10 +39,23 @@ func check(err error) {
 }
 
 func Run(logger *slog.Logger) {
+	if err := run(logger, os.Args[1:], ""); err != nil {
+		panic(err)
+	}
+}
+
+func run(logger *slog.Logger, args []string, configFile string) error {
+	return runContext(context.Background(), logger, args, configFile)
+}
+
+func runContext(ctx context.Context, logger *slog.Logger, args []string, configFile string) error {
 	if logger == nil {
 		panic("hitkeepcmd: logger is required")
 	}
-	conf := config.Load(logger)
+	conf, err := config.LoadArgs(args, configFile, logger)
+	if err != nil {
+		return fmt.Errorf("load configuration: %w", err)
+	}
 	conf.Version = Version
 
 	logLevel, err := hklog.ParseLevel(conf.LogLevel)
@@ -58,11 +69,10 @@ func Run(logger *slog.Logger) {
 	}))
 
 	if conf.Healthcheck {
-		if err := runHealthcheck(conf); err != nil {
-			fmt.Fprintf(os.Stderr, "Healthcheck failed: %v\n", err)
-			os.Exit(1)
+		if err := runHealthcheck(ctx, conf); err != nil {
+			return &HealthcheckError{Err: err}
 		}
-		os.Exit(0)
+		return nil
 	}
 
 	defer func() {
@@ -74,8 +84,6 @@ func Run(logger *slog.Logger) {
 
 	logger.Info("Starting HitKeep", "version", Version, "log_level", logLevel.String(), "config", conf)
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	ctx = hklog.WithLogger(ctx, logger)
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -215,6 +223,7 @@ func Run(logger *slog.Logger) {
 	logger.Info("Application is running. Press Ctrl+C to exit.")
 
 	check(g.Wait())
+	return nil
 }
 
 func logMailerConfigurationError(logger *slog.Logger, conf *config.Config) {
@@ -439,7 +448,19 @@ func validateLiveDatabasePaths(conf *config.Config) error {
 	return nil
 }
 
-func runHealthcheck(conf *config.Config) error {
+type HealthcheckError struct {
+	Err error
+}
+
+func (err *HealthcheckError) Error() string {
+	return fmt.Sprintf("Healthcheck failed: %v", err.Err)
+}
+
+func (err *HealthcheckError) Unwrap() error {
+	return err.Err
+}
+
+func runHealthcheck(ctx context.Context, conf *config.Config) error {
 	_, port, err := net.SplitHostPort(conf.HTTPAddr)
 	if err != nil {
 		port = "8080"
@@ -457,14 +478,16 @@ func runHealthcheck(conf *config.Config) error {
 		Transport: transport,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
+	//nolint:gosec // The healthcheck target is trusted operator configuration.
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
 		return fmt.Errorf("build healthcheck request: %w", err)
 	}
 
+	//nolint:gosec // The healthcheck target is trusted operator configuration.
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("healthcheck request: %w", err)

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"os"
 
-	"hitkeep/internal/jsonapi"
+	"hitkeep/jsonapi"
 )
 
 const (

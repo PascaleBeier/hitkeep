@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
 )
 
@@ -111,6 +111,20 @@ func (s *Service) TeamEntitlements(ctx context.Context, teamID uuid.UUID) *Entit
 		AllowCustomBranding:           true,
 		AllowExternalReportRecipients: true,
 	}
+}
+
+// TeamSiteLimit returns the bounded site capacity for a managed-cloud team.
+// A non-positive result is unlimited, including self-hosted and operator-owned
+// teams. TeamEntitlements preserves cloud billing precedence.
+func (s *Service) TeamSiteLimit(ctx context.Context, teamID uuid.UUID) int {
+	if !s.cloudHosted() || s.TeamBypassesCloudLimits(ctx, teamID) {
+		return 0
+	}
+	ent := s.TeamEntitlements(ctx, teamID)
+	if ent == nil {
+		return 0
+	}
+	return ent.MaxSitesPerTeam
 }
 
 // AllowsCustomTrackingDomains reports whether the actor may manage custom

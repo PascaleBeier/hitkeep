@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 // toolVersionsJSON is the single source of truth for development tools which

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestDiscoveryOpenAPIAliases(t *testing.T) {

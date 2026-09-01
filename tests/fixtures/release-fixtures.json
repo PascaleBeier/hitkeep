@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "protocol": "upgrade-fixture-v1",
+  "supported_upgrade_floor": "2.12.0",
+  "fixtures": [
+    {
+      "previous_image": "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:4c1ece6cb9a953847e2e2ff1414a540b107a223d59d2ad2aab1cbe68de6fadde",
+      "previous_chart": "oci://ghcr.io/pascalebeier/charts/hitkeep:2.12.0",
+      "previous_chart_digest": "sha256:4fac3c9a02f7257f4290d8178272fe19b155068028333199cac923c36ab7db51",
+      "platform": "linux/amd64",
+      "previous_version": "2.12.0",
+      "fixture": {
+        "email": "fixture-288@example.invalid",
+        "password": "fixture-288-password",
+        "domain": "issue-288-upgrade-fixture.invalid",
+        "path": "/issue-288-upgrade-fixture",
+        "expected_hits": 1,
+        "session_id": "10000000-0000-4000-8000-000000000288",
+        "page_id": "20000000-0000-4000-8000-000000000288"
+      }
+    },
+    {
+      "previous_image": "ghcr.io/pascalebeier/hitkeep:2.12.0@sha256:4c1ece6cb9a953847e2e2ff1414a540b107a223d59d2ad2aab1cbe68de6fadde",
+      "previous_chart": "oci://ghcr.io/pascalebeier/charts/hitkeep:2.12.0",
+      "previous_chart_digest": "sha256:4fac3c9a02f7257f4290d8178272fe19b155068028333199cac923c36ab7db51",
+      "platform": "linux/arm64",
+      "previous_version": "2.12.0",
+      "fixture": {
+        "email": "fixture-288@example.invalid",
+        "password": "fixture-288-password",
+        "domain": "issue-288-upgrade-fixture.invalid",
+        "path": "/issue-288-upgrade-fixture",
+        "expected_hits": 1,
+        "session_id": "10000000-0000-4000-8000-000000000288",
+        "page_id": "20000000-0000-4000-8000-000000000288"
+      }
+    }
+  ]
+}

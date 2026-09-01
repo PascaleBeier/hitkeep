@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 	goaisdk "github.com/zendev-sh/goai"
 
-	"hitkeep/internal/analyticscatalog"
+	"hitkeep/analyticscatalog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type Config struct {

@@ -12,17 +12,17 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	appauth "hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil"
 	"hitkeep/internal/testutil/testdb"
+	json "hitkeep/jsonapi"
 )
 
 func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {

@@ -3,6 +3,7 @@ package devtool
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -16,6 +17,10 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/spf13/fileflow"
+
+	runtimeconfig "hitkeep/config"
 )
 
 const (
@@ -84,6 +89,7 @@ func (a *App) PreparePublicImageContext() (CIArtifactResult, error) {
 	if err := os.MkdirAll(quarantine, 0o700); err != nil {
 		return CIArtifactResult{}, err
 	}
+	flow := fileflow.Flow{NoCreateDirs: true}
 	for _, arch := range []string{"amd64", "arm64"} {
 		name := "hitkeep-cloud-linux-" + arch
 		source := filepath.Join(a.workspace.Root, name)
@@ -94,8 +100,12 @@ func (a *App) PreparePublicImageContext() (CIArtifactResult, error) {
 		}
 		destination := filepath.Join(quarantine, name)
 		_ = os.Remove(destination)
-		if err := os.Rename(source, destination); err != nil {
+		final, err := flow.Move(source, destination)
+		if err != nil {
 			return CIArtifactResult{}, fmt.Errorf("isolate cloud binary %s: %w", name, err)
+		}
+		if filepath.Dir(final) != quarantine {
+			return CIArtifactResult{}, fmt.Errorf("isolated cloud binary escaped quarantine: %s", name)
 		}
 	}
 	cloud, _ := filepath.Glob(filepath.Join(a.workspace.Root, "hitkeep-cloud-linux-*"))
@@ -110,6 +120,12 @@ func (a *App) GenerateReleaseChecksums() (CIArtifactResult, error) {
 	if err != nil {
 		return CIArtifactResult{}, err
 	}
+	releaseArchives, err := a.selfHostedReleaseArchives()
+	if err != nil {
+		return CIArtifactResult{}, err
+	}
+	artifacts = append(artifacts, releaseArchives...)
+	slices.Sort(artifacts)
 	checksumPath := filepath.Join(a.workspace.Root, "SHA256SUMS")
 	temporary, err := os.CreateTemp(a.workspace.Root, ".hk-checksums-*")
 	if err != nil {
@@ -142,6 +158,12 @@ func (a *App) VerifyReleaseArtifacts() (CIArtifactResult, error) {
 	if err != nil {
 		return CIArtifactResult{}, err
 	}
+	releaseArchives, err := a.selfHostedReleaseArchives()
+	if err != nil {
+		return CIArtifactResult{}, err
+	}
+	artifacts = append(artifacts, releaseArchives...)
+	slices.Sort(artifacts)
 	checksumPath := filepath.Join(a.workspace.Root, "SHA256SUMS")
 	file, err := os.Open(checksumPath)
 	if err != nil {
@@ -182,7 +204,9 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 	for _, name := range []string{
 		"hitkeep-cloud-linux-amd64", "hitkeep-cloud-linux-arm64",
 		"hitkeep-linux-amd64", "hitkeep-linux-arm64",
-		"hitkeep-configuration.json",
+		runtimeconfig.ConfigurationCatalogFilename,
+		runtimeconfig.ConfigurationExampleFilename,
+		runtimeconfig.ConfigurationReleaseManifestFilename,
 	} {
 		path := filepath.Join(a.workspace.Root, name)
 		info, err := os.Stat(path)
@@ -193,6 +217,123 @@ func (a *App) requiredReleaseArtifacts() ([]string, error) {
 	}
 	slices.Sort(artifacts)
 	return artifacts, nil
+}
+
+func verifySelfHostedReleaseArchive(path, version, arch string, catalog, example, manifest []byte) error {
+	name := fmt.Sprintf("hitkeep_%s_Linux_%s.tar.gz", version, arch)
+	if filepath.Base(path) != name {
+		return fmt.Errorf("unexpected release archive name %q", filepath.Base(path))
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		return err
+	}
+	defer gzipReader.Close()
+	expected := map[string]struct {
+		mode int64
+		data []byte
+	}{
+		"hitkeep-linux-" + arch: {mode: 0o755},
+		"LICENSE":               {mode: 0o644},
+		"README.md":             {mode: 0o644},
+		runtimeconfig.ConfigurationCatalogFilename:         {mode: 0o644, data: catalog},
+		runtimeconfig.ConfigurationExampleFilename:         {mode: 0o644, data: example},
+		runtimeconfig.ConfigurationReleaseManifestFilename: {mode: 0o644, data: manifest},
+	}
+	reader := tar.NewReader(gzipReader)
+	for {
+		header, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		member, ok := expected[header.Name]
+		if !ok || header.Typeflag != tar.TypeReg || header.Mode&0o777 != member.mode {
+			return fmt.Errorf("unexpected release archive member %q", header.Name)
+		}
+		if len(member.data) != 0 {
+			contents, err := io.ReadAll(reader)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(contents, member.data) {
+				return fmt.Errorf("release archive %s differs from the generated release input", header.Name)
+			}
+		}
+		delete(expected, header.Name)
+	}
+	if len(expected) != 0 {
+		return errors.New("release archive is missing required members")
+	}
+	if err := runtimeconfig.ValidateConfigurationReleaseManifest(manifest, catalog, example); err != nil {
+		return fmt.Errorf("validate release archive configuration manifest: %w", err)
+	}
+	return nil
+}
+
+func (a *App) selfHostedReleaseArchives() ([]string, error) {
+	paths, err := filepath.Glob(filepath.Join(a.workspace.Root, "hitkeep_*_Linux_*.tar.gz"))
+	if err != nil {
+		return nil, err
+	}
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	if len(paths) != 2 {
+		return nil, errors.New("expected exactly two self-hosted release archives")
+	}
+	catalog, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationCatalogFilename))
+	if err != nil {
+		return nil, err
+	}
+	example, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationExampleFilename))
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := os.ReadFile(filepath.Join(a.workspace.Root, runtimeconfig.ConfigurationReleaseManifestFilename))
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, path := range paths {
+		version, arch, err := releaseArchiveMetadata(filepath.Base(path))
+		if err != nil {
+			return nil, err
+		}
+		if seen[arch] {
+			return nil, fmt.Errorf("duplicate self-hosted release archive for %s", arch)
+		}
+		if err := verifySelfHostedReleaseArchive(path, version, arch, catalog, example, manifest); err != nil {
+			return nil, err
+		}
+		seen[arch] = true
+	}
+	if !seen["amd64"] || !seen["arm64"] {
+		return nil, errors.New("missing self-hosted release architecture")
+	}
+	slices.Sort(paths)
+	return paths, nil
+}
+
+func releaseArchiveMetadata(name string) (string, string, error) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		prefix := "hitkeep_"
+		suffix := "_Linux_" + arch + ".tar.gz"
+		if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) {
+			version := strings.TrimSuffix(strings.TrimPrefix(name, prefix), suffix)
+			if version != "" {
+				return version, arch, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("invalid self-hosted release archive %q", name)
 }
 
 func writeDeterministicTarGzip(source, destination string) (int, int64, error) {

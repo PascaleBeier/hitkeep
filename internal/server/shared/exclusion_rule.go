@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"hitkeep/internal/blocking"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const (

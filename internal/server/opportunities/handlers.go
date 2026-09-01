@@ -12,10 +12,10 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	opportunitysvc "hitkeep/internal/opportunities"
 	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {

@@ -16,7 +16,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol/webauthncose"
 	webauthnlib "github.com/go-webauthn/webauthn/webauthn"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type PasskeyFixture struct {

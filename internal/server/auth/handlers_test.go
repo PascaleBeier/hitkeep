@@ -14,17 +14,17 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil"
 	"hitkeep/internal/testutil/testdb"
+	json "hitkeep/jsonapi"
 )
 
 type authTestMailDriver struct {
@@ -715,14 +715,61 @@ func TestHandleForgotPasswordDoesNotLogRawMailError(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h.handleForgotPassword().ServeHTTP(w, req)
-	if w.Code != http.StatusBadGateway {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusBadGateway, w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, w.Code, w.Body.String())
 	}
 	if strings.Contains(logs.String(), rawMailError) || strings.Contains(w.Body.String(), rawMailError) {
 		t.Fatalf("raw password reset mail error leaked into logs or response: logs=%q body=%q", logs.String(), w.Body.String())
 	}
 	if !strings.Contains(logs.String(), "error_stage=transport") || !strings.Contains(logs.String(), "error_kind=transport") {
 		t.Fatalf("expected safe password reset mail diagnostics, got %q", logs.String())
+	}
+}
+
+func TestHandleForgotPasswordMailFailureMatchesUnknownEmail(t *testing.T) {
+	h, store := setupAuthTestEnv(t)
+	defer store.Close()
+
+	hashed, err := HashPassword("password123")
+	if err != nil {
+		t.Fatalf("failed to hash password: %v", err)
+	}
+	if _, err := store.CreateUser(context.Background(), "reset-mail-failure@example.com", hashed); err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	h.ctx.Mailer = mailer.NewWithDriver(&authTestMailDriver{sendErr: errors.New("mail transport unavailable")}, h.ctx.Config)
+
+	request := func(email string) *httptest.ResponseRecorder {
+		body, err := json.Marshal(map[string]string{"email": email})
+		if err != nil {
+			t.Fatalf("marshal request: %v", err)
+		}
+		w := httptest.NewRecorder()
+		h.handleForgotPassword().ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/auth/forgot-password", bytes.NewReader(body)))
+		return w
+	}
+
+	unknown := request("unknown@example.com")
+	failedDelivery := request("reset-mail-failure@example.com")
+
+	h.ctx.Mailer = nil
+	unavailable := request("reset-mail-failure@example.com")
+
+	const genericResponse = `{"message":"If an account exists, a reset link has been sent."}`
+	for _, response := range []struct {
+		name string
+		w    *httptest.ResponseRecorder
+	}{
+		{name: "unknown email", w: unknown},
+		{name: "mail delivery failure", w: failedDelivery},
+		{name: "unavailable mailer", w: unavailable},
+	} {
+		if response.w.Code != http.StatusOK {
+			t.Errorf("%s: expected status %d, got %d", response.name, http.StatusOK, response.w.Code)
+		}
+		if response.w.Body.String() != genericResponse {
+			t.Errorf("%s: expected generic response %q, got %q", response.name, genericResponse, response.w.Body.String())
+		}
 	}
 }
 

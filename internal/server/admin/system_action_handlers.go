@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/appurl"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
+	json "hitkeep/jsonapi"
 )
 
 // testMailable satisfies mailer.Mailable for sending a test email.

@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestImportAPIClientCancelsInFlightRequest(t *testing.T) {
@@ -154,7 +154,11 @@ func TestResolveImportAPIURLUsesExistingHitKeepConfig(t *testing.T) {
 	t.Setenv("HITKEEP_URL", "")
 	t.Setenv("HITKEEP_PUBLIC_URL", "https://analytics.example.com/")
 
-	if got := resolveImportAPIURL(); got != "https://analytics.example.com" {
+	command, err := newImportCommand(t.Context(), nil, nil, nil, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := command.apiURL; got != "https://analytics.example.com" {
 		t.Fatalf("expected public URL to drive import API URL, got %q", got)
 	}
 }
@@ -164,7 +168,11 @@ func TestResolveImportAPIURLPrecedence(t *testing.T) {
 	t.Setenv("HITKEEP_URL", "https://short.example.com/")
 	t.Setenv("HITKEEP_PUBLIC_URL", "https://public.example.com/")
 
-	if got := resolveImportAPIURL(); got != "https://api.example.com" {
+	command, err := newImportCommand(t.Context(), nil, nil, nil, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := command.apiURL; got != "https://api.example.com" {
 		t.Fatalf("expected HITKEEP_API_URL to win for compatibility, got %q", got)
 	}
 }

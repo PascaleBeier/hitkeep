@@ -2,16 +2,22 @@ package main
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
+	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
@@ -42,66 +48,221 @@ func (r *recordingRecorder) GetAIUsageSince(ctx context.Context, since time.Time
 	return r.base.GetAIUsageSince(ctx, since)
 }
 
+var errSmokeNotReleaseReady = errors.New("opportunities smoke gate did not pass")
+
+type smokeRunner func(context.Context, smokeConfig) (smokegate.Report, error)
+
 func main() {
-	var dbPath string
-	var outPath string
-	var domains string
-	var provider string
-	var model string
-	var region string
-	var baseURL string
-	var dataPath string
-	var aiEnabled bool
-	var windowDays int
-	var toValue string
-	flag.StringVar(&dbPath, "db", "", "restored shared HitKeep database path")
-	flag.StringVar(&outPath, "out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
-	flag.StringVar(&domains, "domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
-	flag.StringVar(&provider, "provider", envOrDefault("HITKEEP_AI_PROVIDER", "openai-compatible"), "AI provider")
-	flag.StringVar(&model, "model", envOrDefault("HITKEEP_AI_MODEL", "openai.gpt-oss-120b"), "AI model")
-	flag.StringVar(&region, "region", envOrDefault("HITKEEP_AI_REGION", "eu-central-1"), "AI provider region")
-	flag.StringVar(&baseURL, "base-url", strings.TrimSpace(os.Getenv("HITKEEP_AI_BASE_URL")), "AI provider base URL")
-	flag.StringVar(&dataPath, "data-path", envOrDefault("HITKEEP_DATA_PATH", "data"), "restored HitKeep data directory containing tenant databases")
-	flag.BoolVar(&aiEnabled, "ai", true, "enable AI provider calls")
-	flag.IntVar(&windowDays, "window-days", 30, "analysis window in days")
-	flag.StringVar(&toValue, "to", "2026-05-09T19:05:42Z", "analysis end timestamp")
-	flag.Parse()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	os.Exit(executeSmoke(ctx, os.Args[1:], os.Stdout, os.Stderr, runSmoke))
+}
 
-	if strings.TrimSpace(dbPath) == "" {
-		fatalf("-db is required")
-	}
-	to, err := time.Parse(time.RFC3339, toValue)
-	if err != nil {
-		fatalf("parse -to: %v", err)
-	}
-	baseURL = resolveSmokeAIBaseURL(provider, region, baseURL)
+type smokeSyntaxError struct{ err error }
 
-	report, err := runSmoke(context.Background(), smokeConfig{
-		DBPath:     dbPath,
-		OutPath:    outPath,
-		Domains:    splitCSV(domains),
-		Provider:   provider,
-		Model:      model,
-		Region:     region,
-		BaseURL:    baseURL,
-		DataPath:   dataPath,
-		AIEnabled:  aiEnabled,
-		WindowDays: windowDays,
-		To:         to,
+func (e *smokeSyntaxError) Error() string { return e.err.Error() }
+
+func executeSmoke(ctx context.Context, args []string, stdout, stderr io.Writer, run smokeRunner) int {
+	cmd := newSmokeCommand(run)
+	cmd.SetArgs(normalizeLegacySmokeArgs(args))
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
+	if err := cmd.ExecuteContext(ctx); err != nil {
+		if errors.Is(err, errSmokeNotReleaseReady) {
+			return 2
+		}
+		if syntaxError, ok := errors.AsType[*smokeSyntaxError](err); ok {
+			fmt.Fprintln(stderr, syntaxError)
+			writeSmokeUsage(stderr, cmd)
+			return 2
+		}
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func writeSmokeUsage(stderr io.Writer, cmd *cobra.Command) {
+	fmt.Fprint(stderr, cmd.UsageString())
+}
+
+func newSmokeCommand(run smokeRunner) *cobra.Command {
+	var v *viper.Viper
+	cmd := &cobra.Command{
+		Use:           "opportunities-smoke",
+		Short:         "Run the opportunities release smoke gate",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			conf, err := smokeConfigFromViper(v)
+			if err != nil {
+				return err
+			}
+			report, err := run(cmd.Context(), conf)
+			if err != nil {
+				return redactSmokeError(err, conf.APIKey)
+			}
+			if err := writeSmokeReport(conf.OutPath, report); err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), conf.OutPath)
+			if !smokegate.Evaluate(report).ReleaseReady {
+				return errSmokeNotReleaseReady
+			}
+			return nil
+		},
+	}
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &smokeSyntaxError{err: err}
 	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, _ []string) {
+		writeSmokeUsage(cmd.ErrOrStderr(), cmd)
+	})
+	flags := cmd.Flags()
+	flags.SetInterspersed(false)
+	flags.String("db", "", "restored shared HitKeep database path")
+	flags.String("out", "tmp/prod-eu-opportunities-smoke/release-hardening-smoke.md", "markdown report output path")
+	flags.String("domains", "hitkeep.com,cloud.hitkeep.eu", "comma-separated site domains to smoke")
+	flags.String("provider", "openai-compatible", "AI provider")
+	flags.String("model", "openai.gpt-oss-120b", "AI model")
+	flags.String("region", "eu-central-1", "AI provider region")
+	flags.String("base-url", smokeCatalogSetting("AIBaseURL").Default, "AI provider base URL")
+	flags.String("data-path", smokeCatalogSetting("DataPath").Default, "restored HitKeep data directory containing tenant databases")
+	flags.Bool("ai", true, "enable AI provider calls")
+	flags.Int("window-days", 30, "analysis window in days")
+	flags.String("to", "2026-05-09T19:05:42Z", "analysis end timestamp")
+	v = newSmokeViper(flags)
+	return cmd
+}
+
+type smokeCatalogBinding struct {
+	key   string
+	field string
+}
+
+var smokeCatalogBindings = []smokeCatalogBinding{
+	{key: "provider", field: "AIProvider"},
+	{key: "model", field: "AIModel"},
+	{key: "region", field: "AIRegion"},
+	{key: "base-url", field: "AIBaseURL"},
+	{key: "data-path", field: "DataPath"},
+	{key: "api-key", field: "AIAPIKey"},
+}
+
+func newSmokeViper(flags *pflag.FlagSet) *viper.Viper {
+	v := viper.New()
+	if err := v.BindPFlags(flags); err != nil {
+		panic(err)
+	}
+	for _, binding := range smokeCatalogBindings {
+		setting := smokeCatalogSetting(binding.field)
+		if err := v.BindEnv(binding.key, setting.Environment); err != nil {
+			panic(err)
+		}
+		if binding.key == "api-key" {
+			v.SetDefault(binding.key, setting.Default)
+		}
+	}
+	return v
+}
+
+func smokeCatalogSetting(field string) config.ConfigurationSetting {
+	for _, setting := range config.Catalog().Settings {
+		if setting.Field == field {
+			return setting
+		}
+	}
+	panic("missing configuration catalog setting " + field)
+}
+
+type smokeViperConfig struct {
+	DBPath     string `mapstructure:"db"`
+	OutPath    string `mapstructure:"out"`
+	Domains    string `mapstructure:"domains"`
+	Provider   string `mapstructure:"provider"`
+	Model      string `mapstructure:"model"`
+	Region     string `mapstructure:"region"`
+	BaseURL    string `mapstructure:"base-url"`
+	DataPath   string `mapstructure:"data-path"`
+	APIKey     string `mapstructure:"api-key"`
+	AIEnabled  bool   `mapstructure:"ai"`
+	WindowDays int    `mapstructure:"window-days"`
+	To         string `mapstructure:"to"`
+}
+
+func smokeConfigFromViper(v *viper.Viper) (smokeConfig, error) {
+	var values smokeViperConfig
+	if err := v.Unmarshal(&values); err != nil {
+		return smokeConfig{}, fmt.Errorf("decode command configuration: %w", err)
+	}
+	if strings.TrimSpace(values.DBPath) == "" {
+		return smokeConfig{}, errors.New("-db is required")
+	}
+	to, err := time.Parse(time.RFC3339, values.To)
 	if err != nil {
-		fatalf("%v", err)
+		return smokeConfig{}, fmt.Errorf("parse -to: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
-		fatalf("create output dir: %v", err)
+	return smokeConfig{
+		DBPath:     values.DBPath,
+		OutPath:    values.OutPath,
+		Domains:    splitCSV(values.Domains),
+		Provider:   values.Provider,
+		Model:      values.Model,
+		Region:     values.Region,
+		BaseURL:    resolveSmokeAIBaseURL(values.Provider, values.Region, values.BaseURL),
+		DataPath:   values.DataPath,
+		APIKey:     strings.TrimSpace(values.APIKey),
+		AIEnabled:  values.AIEnabled,
+		WindowDays: values.WindowDays,
+		To:         to,
+	}, nil
+}
+
+func redactSmokeError(err error, apiKey string) error {
+	apiKey = strings.TrimSpace(apiKey)
+	if apiKey == "" {
+		return err
 	}
-	if err := os.WriteFile(outPath, []byte(smokegate.RenderMarkdown(report)), 0o600); err != nil {
-		fatalf("write report: %v", err)
+	return errors.New(strings.ReplaceAll(err.Error(), apiKey, "[REDACTED]"))
+}
+
+func writeSmokeReport(path string, report smokegate.Report) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create output dir: %w", err)
 	}
-	fmt.Println(outPath)
-	if !smokegate.Evaluate(report).ReleaseReady {
-		os.Exit(2)
+	if err := os.WriteFile(path, []byte(smokegate.RenderMarkdown(report)), 0o600); err != nil {
+		return fmt.Errorf("write report: %w", err)
 	}
+	return nil
+}
+
+func normalizeLegacySmokeArgs(args []string) []string {
+	legacyLongFlags := map[string]bool{
+		"db": true, "out": true, "domains": true, "provider": true, "model": true, "region": true, "base-url": true, "data-path": true, "ai": false, "window-days": true, "to": true,
+	}
+	normalized := make([]string, 0, len(args))
+	expectsValue := false
+	for index, arg := range args {
+		if expectsValue {
+			normalized = append(normalized, arg)
+			expectsValue = false
+			continue
+		}
+		if arg == "--" || !strings.HasPrefix(arg, "-") {
+			return append(normalized, args[index:]...)
+		}
+		name, _, hasValue := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		if name == "h" || name == "help" {
+			return append(normalized, "--help")
+		}
+		takesValue, known := legacyLongFlags[name]
+		if !strings.HasPrefix(arg, "--") && known {
+			arg = "-" + arg
+		}
+		normalized = append(normalized, arg)
+		expectsValue = known && takesValue && !hasValue
+	}
+	return normalized
 }
 
 type smokeConfig struct {
@@ -113,6 +274,7 @@ type smokeConfig struct {
 	Region     string
 	BaseURL    string
 	DataPath   string
+	APIKey     string
 	AIEnabled  bool
 	WindowDays int
 	To         time.Time
@@ -150,7 +312,7 @@ func runSmoke(ctx context.Context, conf smokeConfig) (smokegate.Report, error) {
 			Model:               conf.Model,
 			BaseURL:             conf.BaseURL,
 			Region:              conf.Region,
-			APIKey:              strings.TrimSpace(os.Getenv("HITKEEP_AI_API_KEY")),
+			APIKey:              conf.APIKey,
 			Timeout:             45 * time.Second,
 			RequestLimit:        80,
 			TokenLimit:          240000,
@@ -275,13 +437,6 @@ func splitCSV(value string) []string {
 	return out
 }
 
-func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
-	}
-	return fallback
-}
-
 func resolveSmokeAIBaseURL(provider, region, baseURL string) string {
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL != "" || !strings.EqualFold(strings.TrimSpace(provider), "openai-compatible") {
@@ -330,9 +485,4 @@ func copyFile(source, target string) error {
 		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
-}
-
-func fatalf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
 }

@@ -10,10 +10,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/appurl"
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
-	"hitkeep/internal/appurl"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	opportunitysvc "hitkeep/internal/opportunities"

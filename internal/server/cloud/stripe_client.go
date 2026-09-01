@@ -12,7 +12,7 @@ import (
 	stripe "github.com/stripe/stripe-go/v86"
 	"github.com/stripe/stripe-go/v86/webhook"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func (c *stripeSDKClient) CreateCustomer(ctx context.Context, input createCustomerInput) (string, error) {

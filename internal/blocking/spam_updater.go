@@ -2,6 +2,7 @@ package blocking
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json/jsontext"
 	"errors"
@@ -14,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const maxFeedResponseBytes = 10 << 20 // 10 MB
@@ -253,9 +254,18 @@ func fetchURL(ctx context.Context, client httpDoer, sourceURL string) (io.ReadCl
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		defer resp.Body.Close()
 		return nil, fmt.Errorf("unexpected HTTP status %d", resp.StatusCode)
 	}
-	return io.NopCloser(io.LimitReader(resp.Body, maxFeedResponseBytes)), nil
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxFeedResponseBytes {
+		return nil, fmt.Errorf("response body exceeds %d bytes", maxFeedResponseBytes)
+	}
+	return io.NopCloser(bytes.NewReader(body)), nil
 }

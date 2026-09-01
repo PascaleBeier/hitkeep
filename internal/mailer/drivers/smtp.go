@@ -10,7 +10,7 @@ import (
 
 	"github.com/wneessen/go-mail"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 type SMTPDriver struct {

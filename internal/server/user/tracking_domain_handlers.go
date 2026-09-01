@@ -17,8 +17,8 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 var customTrackingHostnameRegex = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`)

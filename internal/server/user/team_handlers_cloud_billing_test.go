@@ -16,8 +16,8 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	json "hitkeep/internal/jsonapi"
 	serverauth "hitkeep/internal/server/auth"
+	json "hitkeep/jsonapi"
 )
 
 func TestHandleCreateTeamAllowsHostedCloudInstanceOwner(t *testing.T) {

@@ -2,6 +2,10 @@ name: Build Pipeline
 
 on:
   workflow_call:
+    outputs:
+      image_digest:
+        description: "Immutable digest of the exact-version candidate image"
+        value: ${{ jobs.build-and-push-image.outputs.image_digest }}
     inputs:
       version:
         required: true
@@ -16,6 +20,16 @@ on:
         type: string
         default: ""
         description: "Git ref or SHA to check out for build jobs (defaults to the workflow SHA)"
+      release_source_tag:
+        required: false
+        type: string
+        default: ""
+        description: "Existing immutable tag whose commit supplies a tagged release build"
+      release_source_sha:
+        required: false
+        type: string
+        default: ""
+        description: "Expected commit SHA for release_source_tag"
       upload_to_release:
         required: false
         type: boolean
@@ -147,7 +161,7 @@ jobs:
           test -n "$archive"
           ./hk ci restore-dashboard --archive "$archive"
 
-      - name: Build native Linux binaries on Ubuntu ${{ matrix.glibc_baseline }}
+      - name: Build native Linux binaries with GoReleaser on Ubuntu ${{ matrix.glibc_baseline }}
         shell: bash
         env:
           CGO_ENABLED: 1
@@ -161,10 +175,29 @@ jobs:
           export CC=gcc
           export CXX=g++
 
-          ./hk ci build-binaries \
-            --version "${HITKEEP_VERSION}" \
-            --goos "${{ matrix.goos }}" \
-            --goarch "${{ matrix.goarch }}"
+          HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+            --snapshot \
+            --clean \
+            --single-target \
+            --id self-hosted \
+            --output "hitkeep-${{ matrix.artifact_suffix }}"
+          HITKEEP_ARCHIVE_VERSION="${HITKEEP_VERSION#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 build \
+            --snapshot \
+            --clean \
+            --single-target \
+            --id cloud \
+            --output "hitkeep-cloud-${{ matrix.artifact_suffix }}"
+
+      - name: Verify native binary versions
+        env:
+          HITKEEP_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in "hitkeep-${{ matrix.artifact_suffix }}" "hitkeep-cloud-${{ matrix.artifact_suffix }}"; do
+            version_output="$("./$binary" --version)"
+            test "$version_output" = "$HITKEEP_VERSION"
+          done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -182,9 +215,169 @@ jobs:
             hitkeep-${{ matrix.artifact_suffix }}
             hitkeep-cloud-${{ matrix.artifact_suffix }}
 
+  build-release-archives:
+    name: Build multi-architecture release archives
+    needs: build-dashboard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ inputs.release_source_tag || inputs.checkout_ref || github.sha }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: public-assets-${{ inputs.version }}
+          path: ${{ runner.temp }}/public-assets
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Restore embedded public assets
+        env:
+          PUBLIC_ASSETS_DIR: ${{ runner.temp }}/public-assets
+          PUBLIC_ASSETS_ARCHIVE: public/.public-assets.tar.gz
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find "$PUBLIC_ASSETS_DIR" -name 'public-assets.tar.gz' -print -quit)"
+          test -n "$archive"
+          mkdir -p "$(dirname "$PUBLIC_ASSETS_ARCHIVE")"
+          cp "$archive" "$PUBLIC_ASSETS_ARCHIVE"
+          ./hk ci restore-dashboard --archive "$PUBLIC_ASSETS_ARCHIVE"
+          rm -f "$PUBLIC_ASSETS_ARCHIVE"
+
+      - name: Install Linux arm64 cross compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Generate release configuration inputs
+        env:
+          RELEASE_INPUTS_DIR: ${{ runner.temp }}/hitkeep-release-inputs
+          RELEASE_TAG_NAME: ${{ inputs.release_tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_version="${RELEASE_TAG_NAME#v}"
+          release_inputs="${RELEASE_INPUTS_DIR:?}"
+          mkdir -p "$release_inputs"
+          ./hk catalog configuration --output json \
+            | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
+              '.data + {release_tag: $tag, release_version: $version}' \
+            > "$release_inputs/hitkeep-configuration.json"
+          env -u GOROOT go run ./cmd/hitkeep config init --output "$release_inputs/hitkeep.example.yaml"
+          cmp "$release_inputs/hitkeep.example.yaml" hitkeep.example.yaml
+          ./hk catalog configuration-manifest \
+            --catalog "$release_inputs/hitkeep-configuration.json" \
+            --example "$release_inputs/hitkeep.example.yaml" \
+            --output json \
+            | jq -c '.data' > "$release_inputs/hitkeep-configuration-manifest.json"
+          cp "$release_inputs/hitkeep-configuration.json" .
+          cp "$release_inputs/hitkeep.example.yaml" .
+          cp "$release_inputs/hitkeep-configuration-manifest.json" .
+
+      - name: Build and verify GoReleaser release archives
+        id: release-artifacts
+        env:
+          HITKEEP_VERSION: ${{ inputs.version }}
+          RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/hitkeep-release-archives
+          RELEASE_SOURCE_SHA: ${{ inputs.release_source_sha }}
+          RELEASE_SOURCE_TAG: ${{ inputs.release_source_tag }}
+          RELEASE_TAG_NAME: ${{ inputs.release_tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_dir="${RELEASE_ARTIFACT_DIR:?}"
+          mkdir -p "$release_dir"
+          if [[ -n "$RELEASE_SOURCE_TAG" ]]; then
+            test -n "$RELEASE_SOURCE_SHA"
+            tag_commit="$(git rev-parse --verify "refs/tags/${RELEASE_SOURCE_TAG}^{commit}")"
+            test "$tag_commit" = "$RELEASE_SOURCE_SHA"
+            test "$tag_commit" = "$(git rev-parse HEAD)"
+            test "$RELEASE_SOURCE_TAG" = "$RELEASE_TAG_NAME"
+            release_version="${RELEASE_SOURCE_TAG#v}"
+            env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish --config .goreleaser.yaml
+          else
+            test -n "$RELEASE_TAG_NAME"
+            release_version="${RELEASE_TAG_NAME#v}"
+            HITKEEP_ARCHIVE_VERSION="${RELEASE_TAG_NAME#v}" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --snapshot --clean --skip=publish --config .goreleaser.yaml
+          fi
+          for arch in amd64 arm64; do
+            if [[ -n "$RELEASE_TAG_NAME" ]]; then
+              archive="hitkeep_${release_version}_Linux_${arch}.tar.gz"
+              source="$(find dist -type f -name "$archive" -print -quit)"
+            else
+              source="$(find dist -type f -name "hitkeep_*_Linux_${arch}.tar.gz" -print -quit)"
+              archive="$(basename "$source")"
+            fi
+            test -n "$source"
+            cp "$source" "$release_dir/$archive"
+            archive="$release_dir/$archive"
+            diff -u <(printf '%s\n' LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
+            test "$(tar -tvzf "$archive" "hitkeep-linux-${arch}" | awk '{print $1}')" = "-rwxr-xr-x"
+            for file in LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
+              test "$(tar -tvzf "$archive" "$file" | awk '{print $1}')" = "-rw-r--r--"
+              cmp <(tar -xOzf "$archive" "$file") "$file"
+            done
+            binary_dir="$(mktemp -d)"
+            tar -xzf "$archive" -C "$binary_dir" "hitkeep-linux-${arch}"
+            binary="$binary_dir/hitkeep-linux-${arch}"
+            build_metadata="$(go version -m "$binary")"
+            for setting in "GOOS=linux" "GOARCH=${arch}"; do
+              if ! grep -Fq "$setting" <<<"$build_metadata"; then
+                echo "binary build metadata is missing expected target setting: ${setting}" >&2
+                printf '%s\n' "$build_metadata" | grep -E '^[[:space:]]*(path|build.*(GOOS|GOARCH))' >&2 || true
+                exit 1
+              fi
+            done
+            case "$arch" in
+              amd64)
+                version_output="$("$binary" --version)"
+                if [[ "$version_output" != "$HITKEEP_VERSION" ]]; then
+                  printf 'binary version mismatch for %s: got %q, want %q\n' "$arch" "$version_output" "$HITKEEP_VERSION" >&2
+                  exit 1
+                fi
+                ;;
+              arm64)
+                if ! strings "$binary" | grep -Fxq "$HITKEEP_VERSION"; then
+                  echo "arm64 archive binary does not embed expected HitKeep version: ${HITKEEP_VERSION}" >&2
+                  exit 1
+                fi
+                ;;
+              *) echo "unsupported release archive architecture: ${arch}" >&2; exit 1 ;;
+            esac
+            if tar -tzf "$archive" | grep -q 'cloud'; then
+              exit 1
+            fi
+          done
+          mv dist/SHA256SUMS "$release_dir/goreleaser-SHA256SUMS"
+          (cd "$release_dir" && sha256sum --check goreleaser-SHA256SUMS)
+          echo "release_dir=$release_dir" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-archives-${{ inputs.version }}
+          path: |
+            ${{ steps.release-artifacts.outputs.release_dir }}/*.tar.gz
+            ${{ steps.release-artifacts.outputs.release_dir }}/goreleaser-SHA256SUMS
+          retention-days: 5
+          compression-level: 0
+
   upload-release-binaries:
     name: Upload release binaries
-    needs: build-binaries
+    needs:
+      - build-binaries
+      - build-release-archives
     if: ${{ inputs.upload_to_release && inputs.release_tag_name != '' }}
     runs-on: ubuntu-24.04
     permissions:
@@ -199,6 +392,12 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: binaries-*
+          path: .
+          merge-multiple: true
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-archives-${{ inputs.version }}
           path: .
           merge-multiple: true
 
@@ -218,9 +417,15 @@ jobs:
             | jq --arg tag "$RELEASE_TAG_NAME" --arg version "$release_version" \
               '.data + {release_tag: $tag, release_version: $version}' \
             > hitkeep-configuration.json
+          ./hk catalog configuration-manifest \
+            --catalog hitkeep-configuration.json \
+            --example hitkeep.example.yaml \
+            --output json \
+            | jq -c '.data' > hitkeep-configuration-manifest.json
 
       - name: Generate and verify release checksums
         run: |
+          sha256sum --check goreleaser-SHA256SUMS
           ./hk ci release-checksums
           ./hk ci verify-release
 
@@ -237,9 +442,22 @@ jobs:
           RELEASE_TITLE: ${{ inputs.release_title }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(find . -maxdepth 1 -type f -name 'hitkeep*' -print | sort)
-          test "${#files[@]}" -gt 0
-          files+=(SHA256SUMS)
+          release_version="${RELEASE_TAG_NAME#v}"
+          files=(
+            hitkeep-cloud-linux-amd64
+            hitkeep-cloud-linux-arm64
+            hitkeep-linux-amd64
+            hitkeep-linux-arm64
+            "hitkeep_${release_version}_Linux_amd64.tar.gz"
+            "hitkeep_${release_version}_Linux_arm64.tar.gz"
+            hitkeep-configuration.json
+            hitkeep.example.yaml
+            hitkeep-configuration-manifest.json
+            SHA256SUMS
+          )
+          for file in "${files[@]}"; do
+            test -f "$file"
+          done
 
           if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
             short_sha="${RELEASE_TARGET_SHA::7}"
@@ -277,6 +495,7 @@ jobs:
             fi
 
             if gh release view "${RELEASE_TAG_NAME}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG_NAME}" -f sha="${RELEASE_TARGET_SHA}" -F force=true
               gh release edit "${RELEASE_TAG_NAME}" \
                 --prerelease \
                 --target "${RELEASE_TARGET_SHA}" \
@@ -299,6 +518,8 @@ jobs:
 
   build-and-push-image:
     name: Build and push Docker image
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
     needs:
       - build-dashboard
       - build-binaries

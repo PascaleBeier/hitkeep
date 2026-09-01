@@ -15,10 +15,10 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/cluster"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
@@ -273,6 +273,9 @@ func (s *Server) ImportStageCleanupStatus() *database.ImportStageCleanupStatusTr
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Info("HTTP server shutting down.")
+	if s.ctx.Realtime != nil {
+		s.ctx.Realtime.Close()
+	}
 
 	if s.importRunnerStop != nil {
 		if err := s.importRunnerStop(ctx); err != nil {

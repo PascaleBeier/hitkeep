@@ -6,7 +6,7 @@ import (
 
 	"hitkeep/internal/aianalytics"
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 // aiAgentCatalog derives the dashboard-facing catalog from the embedded AI

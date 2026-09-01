@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/ipmeta"
 	"hitkeep/internal/server/shared"
 )

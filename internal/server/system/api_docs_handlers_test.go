@@ -10,8 +10,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"hitkeep/internal/config"
-	"hitkeep/internal/exportfmt"
+	"hitkeep/config"
+	"hitkeep/exportfmt"
 	"hitkeep/internal/server/shared"
 )
 

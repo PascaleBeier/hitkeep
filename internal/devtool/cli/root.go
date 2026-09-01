@@ -15,10 +15,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	runtimeconfig "hitkeep/internal/config"
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/devtool"
 	"hitkeep/internal/devtool/devmcp"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type options struct {
@@ -175,7 +175,24 @@ func catalogCommand(options *options) *cobra.Command {
 	configuration.RunE = withApp(options, "catalog configuration", func(_ context.Context, _ *devtool.App) (any, error) {
 		return runtimeconfig.Catalog(), nil
 	})
-	command.AddCommand(commands, configuration)
+	var catalogPath, examplePath string
+	configurationManifest := &cobra.Command{Use: "configuration-manifest", Short: "Render the release digest manifest for exact configuration artifacts", Args: cobra.NoArgs}
+	configurationManifest.Flags().StringVar(&catalogPath, "catalog", "", "path to the generated configuration catalog")
+	configurationManifest.Flags().StringVar(&examplePath, "example", "", "path to the canonical example configuration")
+	_ = configurationManifest.MarkFlagRequired("catalog")
+	_ = configurationManifest.MarkFlagRequired("example")
+	configurationManifest.RunE = withApp(options, "catalog configuration-manifest", func(_ context.Context, _ *devtool.App) (any, error) {
+		catalog, err := os.ReadFile(catalogPath)
+		if err != nil {
+			return nil, fmt.Errorf("read configuration catalog: %w", err)
+		}
+		example, err := os.ReadFile(examplePath)
+		if err != nil {
+			return nil, fmt.Errorf("read configuration example: %w", err)
+		}
+		return runtimeconfig.ConfigurationReleaseManifestFor(catalog, example), nil
+	})
+	command.AddCommand(commands, configuration, configurationManifest)
 	return command
 }
 

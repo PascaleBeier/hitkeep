@@ -18,14 +18,14 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/ipmeta"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func TestGeoNetworkFromVisitorIPLooksUpMetadataOnce(t *testing.T) {

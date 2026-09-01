@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type ecommerceEventRecord struct {

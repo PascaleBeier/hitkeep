@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 )
 
 type qrCampaignSeedFixture struct {

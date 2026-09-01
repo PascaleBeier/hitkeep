@@ -13,8 +13,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"

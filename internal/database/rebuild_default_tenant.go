@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/hklog"
+	"hitkeep/hklog"
 )
 
 // RebuildDefaultTenantFile recreates the default tenant's database file after

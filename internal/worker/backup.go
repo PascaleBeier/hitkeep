@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"hitkeep/hklog"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 )
 
 // BackupWorker periodically exports all DuckDB databases to Parquet snapshots.

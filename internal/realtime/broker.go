@@ -38,6 +38,7 @@ type Event struct {
 
 type Broker struct {
 	mu           sync.Mutex
+	closed       bool
 	nextID       uint64
 	historyLimit int
 	bufferSize   int
@@ -49,7 +50,7 @@ type Subscription struct {
 	siteID uuid.UUID
 	ch     chan Event
 	broker *Broker
-	once   sync.Once
+	closed bool
 }
 
 func NewBroker() *Broker {
@@ -58,6 +59,26 @@ func NewBroker() *Broker {
 		bufferSize:   defaultBufferSize,
 		history:      map[uuid.UUID][]Event{},
 		subscribers:  map[uuid.UUID]map[*Subscription]struct{}{},
+	}
+}
+
+func (b *Broker) Close() {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return
+	}
+	b.closed = true
+	for siteID, subs := range b.subscribers {
+		for sub := range subs {
+			sub.closed = true
+			close(sub.ch)
+		}
+		delete(b.subscribers, siteID)
+		delete(b.history, siteID)
 	}
 }
 
@@ -70,6 +91,9 @@ func (b *Broker) Subscribe(siteID uuid.UUID, lastEventID string) (*Subscription,
 
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.closed {
+		return nil, nil, false
+	}
 
 	sub := &Subscription{
 		siteID: siteID,
@@ -81,6 +105,9 @@ func (b *Broker) Subscribe(siteID uuid.UUID, lastEventID string) (*Subscription,
 	}
 	b.subscribers[siteID][sub] = struct{}{}
 
+	if lastEventID != "" && !hasLastID {
+		return sub, nil, true
+	}
 	if !hasLastID {
 		return sub, nil, false
 	}
@@ -90,7 +117,8 @@ func (b *Broker) Subscribe(siteID uuid.UUID, lastEventID string) (*Subscription,
 		return sub, nil, true
 	}
 	oldest := history[0].ID
-	if lastID < oldest {
+	newest := history[len(history)-1].ID
+	if lastID < oldest || lastID > newest {
 		return sub, nil, true
 	}
 
@@ -118,13 +146,16 @@ func (b *Broker) Publish(event Event) {
 	}
 
 	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed || len(b.subscribers[event.SiteID]) == 0 {
+		return
+	}
 	b.nextID++
 	event.ID = b.nextID
 	b.appendHistoryLocked(event)
 	for sub := range b.subscribers[event.SiteID] {
 		sub.enqueue(event)
 	}
-	b.mu.Unlock()
 }
 
 func (b *Broker) SubscriberCount(siteID uuid.UUID) int {
@@ -155,17 +186,20 @@ func (s *Subscription) Close() {
 	if s == nil || s.broker == nil {
 		return
 	}
-	s.once.Do(func() {
-		s.broker.mu.Lock()
-		defer s.broker.mu.Unlock()
-		if subs := s.broker.subscribers[s.siteID]; subs != nil {
-			delete(subs, s)
-			if len(subs) == 0 {
-				delete(s.broker.subscribers, s.siteID)
-			}
+	s.broker.mu.Lock()
+	defer s.broker.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.closed = true
+	if subs := s.broker.subscribers[s.siteID]; subs != nil {
+		delete(subs, s)
+		if len(subs) == 0 {
+			delete(s.broker.subscribers, s.siteID)
+			delete(s.broker.history, s.siteID)
 		}
-		close(s.ch)
-	})
+	}
+	close(s.ch)
 }
 
 func (s *Subscription) enqueue(event Event) {

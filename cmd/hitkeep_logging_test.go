@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 func TestLogMailerConfigurationErrorDoesNotLogRawConfiguration(t *testing.T) {

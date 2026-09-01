@@ -268,7 +268,19 @@ func (c *GoogleClient) AuthCodeURL(state string, redirectURL string) (string, er
 	return oauthConfig.AuthCodeURL(strings.TrimSpace(state), oauth2.AccessTypeOffline, oauth2.ApprovalForce), nil
 }
 
+var (
+	googleOperationTimeout  = time.Minute
+	maxSearchAnalyticsPages = 100
+	maxSearchAnalyticsRows  = 250000
+)
+
+func googleOperationContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, googleOperationTimeout)
+}
+
 func (c *GoogleClient) ExchangeCode(ctx context.Context, code string, redirectURL string) (Token, error) {
+	ctx, cancel := googleOperationContext(ctx)
+	defer cancel()
 	oauthConfig, err := c.oauthConfig(redirectURL)
 	if err != nil {
 		return Token{}, err
@@ -287,6 +299,8 @@ func (c *GoogleClient) ExchangeCode(ctx context.Context, code string, redirectUR
 }
 
 func (c *GoogleClient) ListProperties(ctx context.Context, token Token) ([]Property, error) {
+	ctx, cancel := googleOperationContext(ctx)
+	defer cancel()
 	httpClient, err := c.httpClient(ctx, token)
 	if err != nil {
 		return nil, err
@@ -313,6 +327,8 @@ func (c *GoogleClient) ListProperties(ctx context.Context, token Token) ([]Prope
 }
 
 func (c *GoogleClient) QuerySearchAnalytics(ctx context.Context, token Token, query SearchAnalyticsQuery) ([]SearchAnalyticsRow, error) {
+	ctx, cancel := googleOperationContext(ctx)
+	defer cancel()
 	httpClient, err := c.httpClient(ctx, token)
 	if err != nil {
 		return nil, err
@@ -325,12 +341,12 @@ func (c *GoogleClient) QuerySearchAnalytics(ctx context.Context, token Token, qu
 	dataState := strings.ToUpper(defaultString(query.DataState, DataStateFinal))
 	aggregationType := strings.ToUpper(defaultString(query.AggregationType, "auto"))
 	rowLimit := query.RowLimit
-	if rowLimit <= 0 {
+	if rowLimit <= 0 || rowLimit > 25000 {
 		rowLimit = 25000
 	}
 	var rows []SearchAnalyticsRow
 	startRow := int64(0)
-	for {
+	for page := 0; page < maxSearchAnalyticsPages; page++ {
 		request := &searchconsoleapi.SearchAnalyticsQueryRequest{
 			StartDate:       searchConsoleDateString(query.StartDate),
 			EndDate:         searchConsoleDateString(query.EndDate),
@@ -345,6 +361,9 @@ func (c *GoogleClient) QuerySearchAnalytics(ctx context.Context, token Token, qu
 		if err != nil {
 			return nil, fmt.Errorf("query Google Search Console search analytics: %w", err)
 		}
+		if len(rows)+len(response.Rows) > maxSearchAnalyticsRows {
+			return nil, fmt.Errorf("query Google Search Console search analytics exceeds %d rows", maxSearchAnalyticsRows)
+		}
 		for _, row := range response.Rows {
 			if row == nil {
 				continue
@@ -352,11 +371,11 @@ func (c *GoogleClient) QuerySearchAnalytics(ctx context.Context, token Token, qu
 			rows = append(rows, searchAnalyticsRowFromAPI(row, dimensions, response.ResponseAggregationType, dataState))
 		}
 		if int64(len(response.Rows)) < rowLimit {
-			break
+			return rows, nil
 		}
 		startRow += int64(len(response.Rows))
 	}
-	return rows, nil
+	return nil, fmt.Errorf("query Google Search Console search analytics exceeds %d pages", maxSearchAnalyticsPages)
 }
 
 func searchAnalyticsRowFromAPI(row *searchconsoleapi.ApiDataRow, dimensions []string, aggregationType, dataState string) SearchAnalyticsRow {

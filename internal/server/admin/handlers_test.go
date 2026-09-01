@@ -15,15 +15,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type adminRecordingWebhookEmitter struct {

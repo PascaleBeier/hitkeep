@@ -317,7 +317,7 @@ export const routes: Routes = [
                     },
                     {
                         path: 'import',
-                        loadComponent: () => import('@pages/imports/imports').then((m) => m.ImportsPage),
+                        loadComponent: () => import('@pages/import-export/import/import').then((m) => m.ImportPage),
                         data: titleData('importExport.import.title', 'site')
                     },
                     {

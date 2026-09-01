@@ -522,12 +522,33 @@ func TestDeprecatedFlagsStillWork(t *testing.T) {
 	}
 }
 
-func TestNewFlagsOverrideDeprecated(t *testing.T) {
-	conf := load([]string{"--http", ":3000", "--http-addr", ":4000"}, func(key, fallback string) string {
-		return fallback
-	})
-	if conf.HTTPAddr != ":4000" {
-		t.Fatalf("expected --http-addr to override --http, got %q", conf.HTTPAddr)
+func TestNewAndDeprecatedFlagsFollowArgumentOrder(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "canonical follows deprecated",
+			args: []string{"--http", ":3000", "--http-addr", ":4000"},
+			want: ":4000",
+		},
+		{
+			name: "deprecated follows canonical",
+			args: []string{"--http-addr", ":4000", "--http", ":3000"},
+			want: ":3000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			conf := load(tt.args, func(key, fallback string) string {
+				return fallback
+			})
+			if conf.HTTPAddr != tt.want {
+				t.Fatalf("HTTPAddr = %q, want %q", conf.HTTPAddr, tt.want)
+			}
+		})
 	}
 }
 

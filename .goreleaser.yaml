@@ -1,0 +1,75 @@
+version: 2
+
+project_name: hitkeep
+
+builds:
+  - id: self-hosted
+    main: ./cmd/hitkeep/main.go
+    binary: hitkeep-linux-{{ .Arch }}
+    env:
+      - CGO_ENABLED=1
+      - CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}
+      - CXX={{ if eq .Arch "arm64" }}aarch64-linux-gnu-g++{{ else }}g++{{ end }}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - hashicorpmetrics
+      - timetzdata
+    flags:
+      - -trimpath
+    ldflags:
+      - -w -s -X hitkeep/cmd.Version={{ .Env.HITKEEP_VERSION }}
+  - id: cloud
+    main: ./cmd/hitkeep/main.go
+    binary: hitkeep-cloud-linux-{{ .Arch }}
+    env:
+      - CGO_ENABLED=1
+      - CC={{ if eq .Arch "arm64" }}aarch64-linux-gnu-gcc{{ else }}gcc{{ end }}
+      - CXX={{ if eq .Arch "arm64" }}aarch64-linux-gnu-g++{{ else }}g++{{ end }}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - hashicorpmetrics
+      - timetzdata
+      - s3
+      - billing
+      - tenancy
+    flags:
+      - -trimpath
+    ldflags:
+      - -w -s -X hitkeep/cmd.Version={{ .Env.HITKEEP_VERSION }}
+
+archives:
+  - id: self-hosted
+    ids:
+      - self-hosted
+    formats:
+      - tar.gz
+    name_template: "hitkeep_{{ .Version }}_Linux_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - hitkeep-configuration.json
+      - hitkeep.example.yaml
+      - hitkeep-configuration-manifest.json
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+  ids:
+    - self-hosted
+
+snapshot:
+  version_template: "{{ .Env.HITKEEP_ARCHIVE_VERSION }}"
+
+changelog:
+  disable: true
+
+release:
+  disable: true

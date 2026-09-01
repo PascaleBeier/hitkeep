@@ -10,7 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestRegisteredTeamExclusionRoutesEnforceSettingsCapabilityAndEffectiveMetadata(t *testing.T) {

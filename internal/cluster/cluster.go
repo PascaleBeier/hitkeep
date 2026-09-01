@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -12,8 +13,8 @@ import (
 
 	"github.com/hashicorp/memberlist"
 
-	"hitkeep/internal/config"
-	"hitkeep/internal/hklog"
+	"hitkeep/config"
+	"hitkeep/hklog"
 )
 
 type Manager struct {
@@ -30,15 +31,19 @@ type eventDelegate struct {
 }
 
 func (d *eventDelegate) NotifyJoin(node *memberlist.Node) {
+	d.m.lock.Lock()
+	defer d.m.lock.Unlock()
 	d.m.logger.Debug("Node joined cluster", "name", node.Name, "addr", node.Address())
 	d.m.peers[node.Name] = node.Address()
-	d.m.reElectLeader()
+	d.m.reElectLeaderLocked()
 }
 
 func (d *eventDelegate) NotifyLeave(node *memberlist.Node) {
+	d.m.lock.Lock()
+	defer d.m.lock.Unlock()
 	d.m.logger.Warn("Node left cluster", "name", node.Name)
 	delete(d.m.peers, node.Name)
-	d.m.reElectLeader()
+	d.m.reElectLeaderLocked()
 }
 
 func (d *eventDelegate) NotifyUpdate(node *memberlist.Node) {}
@@ -87,7 +92,7 @@ func NewManager(conf *config.Config, logger *slog.Logger) (*Manager, error) {
 
 	if conf.JoinAddr != "" {
 		if _, err := list.Join([]string{conf.JoinAddr}); err != nil {
-			return nil, err
+			return nil, errors.Join(err, list.Shutdown())
 		}
 	}
 
@@ -115,13 +120,19 @@ func (m *Manager) HasPeers() bool {
 }
 
 func (m *Manager) Shutdown() error {
-	return m.list.Leave(1 * time.Second)
+	if m == nil || m.list == nil {
+		return nil
+	}
+	return errors.Join(m.list.Leave(1*time.Second), m.list.Shutdown())
 }
 
 func (m *Manager) reElectLeader() {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	m.reElectLeaderLocked()
+}
 
+func (m *Manager) reElectLeaderLocked() {
 	// Pre-allocate slice to avoid unnecessary allocations (prealloc)
 	members := make([]string, 0, len(m.peers))
 	for name := range m.peers {

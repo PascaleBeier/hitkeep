@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"hitkeep/internal/appurl"
-	"hitkeep/internal/config"
+	"hitkeep/appurl"
+	"hitkeep/config"
+	"hitkeep/hklog"
 	"hitkeep/internal/database"
-	"hitkeep/internal/hklog"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 )

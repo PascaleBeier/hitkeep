@@ -22,11 +22,11 @@ import (
 	"github.com/stripe/stripe-go/v86/webhook"
 	"golang.org/x/time/rate"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 type fakeStripeClient struct {

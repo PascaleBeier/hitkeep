@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (s *Server) databaseAvailabilityMiddleware(next http.Handler) http.Handler {

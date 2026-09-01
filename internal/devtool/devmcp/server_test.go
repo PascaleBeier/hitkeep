@@ -18,8 +18,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
-	json "hitkeep/internal/jsonapi"
-	"hitkeep/internal/mcptest"
+	json "hitkeep/jsonapi"
+	"hitkeep/mcptest"
 )
 
 func TestDelegatedEnvelopeRejectsMismatchedResults(t *testing.T) {

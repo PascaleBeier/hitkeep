@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/internal/config"
+	"hitkeep/config"
 )
 
 func TestValidateLiveDatabasePathsRejectsS3(t *testing.T) {

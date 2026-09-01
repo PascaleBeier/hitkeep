@@ -16,7 +16,7 @@ import (
 	goaisdk "github.com/zendev-sh/goai"
 	"github.com/zendev-sh/goai/provider"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 type AskAIRequest struct {

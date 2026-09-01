@@ -6,9 +6,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,8 +18,9 @@ import (
 	"strings"
 	"time"
 
+	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const importCLIChunkSize = 8 << 20
@@ -34,35 +37,64 @@ func (r *repeatedStrings) Set(value string) error {
 	return nil
 }
 
-func Import(ctx context.Context, args []string) {
+type importCommand struct {
+	ctx    context.Context
+	in     io.Reader
+	out    io.Writer
+	errOut io.Writer
+	apiURL string
+	token  string
+}
+
+func Import(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) error {
+	command, err := newImportCommand(ctx, in, out, errOut, configFile, logger)
+	if err != nil {
+		return err
+	}
+	return command.run(args)
+}
+
+func newImportCommand(ctx context.Context, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) (importCommand, error) {
+	conf, err := runtimeconfig.LoadArgs(nil, configFile, logger)
+	if err != nil {
+		return importCommand{}, fmt.Errorf("load import configuration: %w", err)
+	}
+	apiURL := conf.ImportAPIURL
+	if apiURL == "" {
+		apiURL = conf.PublicURL
+	}
+	return importCommand{ctx: ctx, in: in, out: out, errOut: errOut, apiURL: normalizeImportAPIURL(apiURL), token: conf.ImportAPIToken}, nil
+}
+
+func (c importCommand) run(args []string) error {
 	if len(args) == 0 {
-		printImportUsage()
-		os.Exit(2)
+		printImportUsage(c.errOut)
+		return &ExitError{Code: 2}
 	}
 
 	switch args[0] {
 	case "validate":
-		runImportValidate(ctx, args[1:])
+		return c.runValidate(args[1:])
 	case "plausible":
-		runImportProvider(ctx, "plausible", args[1:])
+		return c.runProvider("plausible", args[1:])
 	case "simpleanalytics":
-		runImportProvider(ctx, "simpleanalytics", args[1:])
+		return c.runProvider("simpleanalytics", args[1:])
 	case "start":
-		runImportStart(ctx, args[1:])
+		return c.runStart(args[1:])
 	case "status":
-		runImportStatus(ctx, args[1:])
+		return c.runStatus(args[1:])
 	case "list":
-		runImportList(ctx, args[1:])
+		return c.runList(args[1:])
 	case "delete":
-		runImportDelete(ctx, args[1:])
+		return c.runDelete(args[1:])
 	default:
-		printImportUsage()
-		os.Exit(2)
+		printImportUsage(c.errOut)
+		return &ExitError{Code: 2}
 	}
 }
 
-func printImportUsage() {
-	fmt.Fprintln(os.Stderr, `Usage:
+func printImportUsage(errOut io.Writer) {
+	_, _ = fmt.Fprintln(errOut, `Usage:
   hitkeep import validate plausible --site <site-id> --file export.zip
   hitkeep import validate plausible --site <site-id> --file imported_visitors.csv --file imported_custom_events.csv
   hitkeep import validate plausible --site <site-id> --dir ./plausible-export
@@ -80,85 +112,131 @@ Environment:
   HITKEEP_API_URL    optional compatibility override for remote API targets`)
 }
 
-func runImportValidate(ctx context.Context, args []string) {
+func (c importCommand) runValidate(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "validate requires an importer")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "validate requires an importer")
+		return &ExitError{Code: 2}
 	}
 	provider := args[0]
-	opts := parseImportOptions(args[1:])
-	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.uploadAndValidate(ctx, provider, opts.siteID, opts.paths())
-	checkCLI(err)
-	printImportJob(job)
+	opts, err := c.parseOptions(args[1:])
+	if err != nil || opts.help {
+		return err
+	}
+	paths, err := c.paths(opts)
+	if err != nil {
+		return err
+	}
+	job, err := newImportAPIClient(opts.apiURL, opts.token).uploadAndValidate(c.ctx, provider, opts.siteID, paths)
+	if err := c.check(err); err != nil {
+		return err
+	}
+	printImportJob(c.out, job)
+	return nil
 }
 
-func runImportProvider(ctx context.Context, provider string, args []string) {
-	opts := parseImportOptions(args)
-	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.uploadAndValidate(ctx, provider, opts.siteID, opts.paths())
-	checkCLI(err)
-	printImportJob(job)
-	if !opts.yes && !confirmImport() {
-		fmt.Fprintln(os.Stderr, "Import left validated but not started.")
-		return
+func (c importCommand) runProvider(provider string, args []string) error {
+	opts, err := c.parseOptions(args)
+	if err != nil || opts.help {
+		return err
 	}
-	job, err = client.start(ctx, opts.siteID, job.ID.String())
-	checkCLI(err)
+	client := newImportAPIClient(opts.apiURL, opts.token)
+	paths, err := c.paths(opts)
+	if err != nil {
+		return err
+	}
+	job, err := client.uploadAndValidate(c.ctx, provider, opts.siteID, paths)
+	if err := c.check(err); err != nil {
+		return err
+	}
+	printImportJob(c.out, job)
+	if !opts.yes && !confirmImport(c.in, c.out) {
+		_, _ = fmt.Fprintln(c.errOut, "Import left validated but not started.")
+		return nil
+	}
+	job, err = client.start(c.ctx, opts.siteID, job.ID.String())
+	if err := c.check(err); err != nil {
+		return err
+	}
 	if opts.wait {
-		job, err = client.wait(ctx, opts.siteID, job.ID.String())
-		checkCLI(err)
+		job, err = client.wait(c.ctx, opts.siteID, job.ID.String())
+		if err := c.check(err); err != nil {
+			return err
+		}
 	}
-	printImportJob(job)
+	printImportJob(c.out, job)
+	return nil
 }
 
-func runImportStart(ctx context.Context, args []string) {
-	opts := parseImportOptions(args)
+func (c importCommand) runStart(args []string) error {
+	opts, err := c.parseOptions(args)
+	if err != nil || opts.help {
+		return err
+	}
 	if opts.importID == "" {
-		fmt.Fprintln(os.Stderr, "--import-id is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
+		return &ExitError{Code: 2}
 	}
 	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.start(ctx, opts.siteID, opts.importID)
-	checkCLI(err)
+	job, err := client.start(c.ctx, opts.siteID, opts.importID)
+	if err := c.check(err); err != nil {
+		return err
+	}
 	if opts.wait {
-		job, err = client.wait(ctx, opts.siteID, opts.importID)
-		checkCLI(err)
+		job, err = client.wait(c.ctx, opts.siteID, opts.importID)
+		if err := c.check(err); err != nil {
+			return err
+		}
 	}
-	printImportJob(job)
+	printImportJob(c.out, job)
+	return nil
 }
 
-func runImportStatus(ctx context.Context, args []string) {
-	opts := parseImportOptions(args)
+func (c importCommand) runStatus(args []string) error {
+	opts, err := c.parseOptions(args)
+	if err != nil || opts.help {
+		return err
+	}
 	if opts.importID == "" {
-		fmt.Fprintln(os.Stderr, "--import-id is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
+		return &ExitError{Code: 2}
 	}
-	client := newImportAPIClient(opts.apiURL, opts.token)
-	job, err := client.get(ctx, opts.siteID, opts.importID)
-	checkCLI(err)
-	printImportJob(job)
+	job, err := newImportAPIClient(opts.apiURL, opts.token).get(c.ctx, opts.siteID, opts.importID)
+	if err := c.check(err); err != nil {
+		return err
+	}
+	printImportJob(c.out, job)
+	return nil
 }
 
-func runImportList(ctx context.Context, args []string) {
-	opts := parseImportOptions(args)
-	client := newImportAPIClient(opts.apiURL, opts.token)
-	list, err := client.list(ctx, opts.siteID)
-	checkCLI(err)
+func (c importCommand) runList(args []string) error {
+	opts, err := c.parseOptions(args)
+	if err != nil || opts.help {
+		return err
+	}
+	list, err := newImportAPIClient(opts.apiURL, opts.token).list(c.ctx, opts.siteID)
+	if err := c.check(err); err != nil {
+		return err
+	}
 	for _, job := range list.Imports {
-		fmt.Printf("%s  %-16s  %-10s  %s\n", job.ID, job.Provider, job.Status, job.CreatedAt.Format(time.RFC3339))
+		_, _ = fmt.Fprintf(c.out, "%s  %-16s  %-10s  %s\n", job.ID, job.Provider, job.Status, job.CreatedAt.Format(time.RFC3339))
 	}
+	return nil
 }
 
-func runImportDelete(ctx context.Context, args []string) {
-	opts := parseImportOptions(args)
-	if opts.importID == "" {
-		fmt.Fprintln(os.Stderr, "--import-id is required")
-		os.Exit(2)
+func (c importCommand) runDelete(args []string) error {
+	opts, err := c.parseOptions(args)
+	if err != nil || opts.help {
+		return err
 	}
-	client := newImportAPIClient(opts.apiURL, opts.token)
-	checkCLI(client.delete(ctx, opts.siteID, opts.importID))
-	fmt.Println("Import deleted.")
+	if opts.importID == "" {
+		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
+		return &ExitError{Code: 2}
+	}
+	if err := c.check(newImportAPIClient(opts.apiURL, opts.token).delete(c.ctx, opts.siteID, opts.importID)); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintln(c.out, "Import deleted.")
+	return nil
 }
 
 type importCLIOptions struct {
@@ -170,14 +248,14 @@ type importCLIOptions struct {
 	token    string
 	wait     bool
 	yes      bool
+	help     bool
 }
 
-func parseImportOptions(args []string) importCLIOptions {
-	var opts importCLIOptions
-	opts.apiURL = resolveImportAPIURL()
-	opts.token = os.Getenv("HITKEEP_API_TOKEN")
+func (c importCommand) parseOptions(args []string) (importCLIOptions, error) {
+	opts := importCLIOptions{apiURL: c.apiURL, token: c.token}
 
-	fs := flag.NewFlagSet("import", flag.ExitOnError)
+	fs := flag.NewFlagSet("import", flag.ContinueOnError)
+	fs.SetOutput(c.errOut)
 	fs.StringVar(&opts.siteID, "site", "", "Site ID")
 	fs.StringVar(&opts.importID, "import-id", "", "Import ID")
 	fs.Var(&opts.files, "file", "ZIP or CSV file (repeatable)")
@@ -187,25 +265,33 @@ func parseImportOptions(args []string) importCLIOptions {
 	fs.StringVar(&opts.token, "token", opts.token, "API client token")
 	fs.BoolVar(&opts.wait, "wait", false, "Wait for import completion")
 	fs.BoolVar(&opts.yes, "yes", false, "Start without confirmation")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			opts.help = true
+			return opts, nil
+		}
+		return opts, &ExitError{Code: 2}
+	}
 	opts.apiURL = normalizeImportAPIURL(opts.apiURL)
 
 	if opts.siteID == "" {
-		fmt.Fprintln(os.Stderr, "--site is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "--site is required")
+		return opts, &ExitError{Code: 2}
 	}
 	if opts.token == "" {
-		fmt.Fprintln(os.Stderr, "--token or HITKEEP_API_TOKEN is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "--token or HITKEEP_API_TOKEN is required")
+		return opts, &ExitError{Code: 2}
 	}
-	return opts
+	return opts, nil
 }
 
-func (o importCLIOptions) paths() []string {
+func (c importCommand) paths(o importCLIOptions) ([]string, error) {
 	paths := append([]string{}, o.files...)
 	if o.dir != "" {
 		entries, err := os.ReadDir(o.dir)
-		checkCLI(err)
+		if err := c.check(err); err != nil {
+			return nil, err
+		}
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
@@ -218,10 +304,10 @@ func (o importCLIOptions) paths() []string {
 		}
 	}
 	if len(paths) == 0 {
-		fmt.Fprintln(os.Stderr, "At least one --file or --dir is required")
-		os.Exit(2)
+		_, _ = fmt.Fprintln(c.errOut, "At least one --file or --dir is required")
+		return nil, &ExitError{Code: 2}
 	}
-	return paths
+	return paths, nil
 }
 
 type importAPIClient struct {
@@ -406,57 +492,48 @@ func checkResponse(resp *http.Response) error {
 	return fmt.Errorf("request failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 }
 
-func printImportJob(job *api.ImportJob) {
+func printImportJob(out io.Writer, job *api.ImportJob) {
 	if job == nil {
 		return
 	}
-	fmt.Printf("Import %s (%s): %s\n", job.ID, job.Provider, job.Status)
+	_, _ = fmt.Fprintf(out, "Import %s (%s): %s\n", job.ID, job.Provider, job.Status)
 	if job.Error != "" {
-		fmt.Printf("Error: %s\n", job.Error)
+		_, _ = fmt.Fprintf(out, "Error: %s\n", job.Error)
 	}
 	if job.Manifest != nil {
 		m := job.Manifest
-		fmt.Printf("Rows: scanned=%d accepted=%d skipped=%d\n", m.RowsScanned, m.RowsAccepted, m.RowsSkipped)
+		_, _ = fmt.Fprintf(out, "Rows: scanned=%d accepted=%d skipped=%d\n", m.RowsScanned, m.RowsAccepted, m.RowsSkipped)
 		if m.DateStart != nil && m.DateEnd != nil {
-			fmt.Printf("Date range: %s to %s\n", m.DateStart.Format(time.DateOnly), m.DateEnd.Format(time.DateOnly))
+			_, _ = fmt.Fprintf(out, "Date range: %s to %s\n", m.DateStart.Format(time.DateOnly), m.DateEnd.Format(time.DateOnly))
 		}
 		if len(m.EventCoverage.EventNames) > 0 || m.EventCoverage.Events > 0 {
-			fmt.Printf("Events: rows=%d events=%d names=%s\n", m.EventCoverage.RowsAccepted, m.EventCoverage.Events, strings.Join(m.EventCoverage.EventNames, ", "))
+			_, _ = fmt.Fprintf(out, "Events: rows=%d events=%d names=%s\n", m.EventCoverage.RowsAccepted, m.EventCoverage.Events, strings.Join(m.EventCoverage.EventNames, ", "))
 		}
 		if m.EventPropertyCoverage.UnattributedRows > 0 || m.EventPropertyCoverage.AttributedRows > 0 {
-			fmt.Printf("Event properties: attributed_rows=%d unattributed_rows=%d unattributed_events=%d\n", m.EventPropertyCoverage.AttributedRows, m.EventPropertyCoverage.UnattributedRows, m.EventPropertyCoverage.UnattributedEvents)
+			_, _ = fmt.Fprintf(out, "Event properties: attributed_rows=%d unattributed_rows=%d unattributed_events=%d\n", m.EventPropertyCoverage.AttributedRows, m.EventPropertyCoverage.UnattributedRows, m.EventPropertyCoverage.UnattributedEvents)
 		}
 		if len(m.EventDimensionCoverage.Unavailable) > 0 {
-			fmt.Printf("Unavailable event dimensions: %s\n", strings.Join(m.EventDimensionCoverage.Unavailable, ", "))
+			_, _ = fmt.Fprintf(out, "Unavailable event dimensions: %s\n", strings.Join(m.EventDimensionCoverage.Unavailable, ", "))
 		}
 		if m.Overlap.Policy != "" && (m.Overlap.NativeTrafficDays > 0 || m.Overlap.NativeEventDays > 0 || m.Overlap.EstimatedSkippedRows > 0) {
-			fmt.Printf("Overlap policy: %s skipped_rows=%d skipped_pageviews=%d skipped_events=%d\n", m.Overlap.Policy, m.Overlap.EstimatedSkippedRows, m.Overlap.EstimatedSkippedPageviews, m.Overlap.EstimatedSkippedEvents)
+			_, _ = fmt.Fprintf(out, "Overlap policy: %s skipped_rows=%d skipped_pageviews=%d skipped_events=%d\n", m.Overlap.Policy, m.Overlap.EstimatedSkippedRows, m.Overlap.EstimatedSkippedPageviews, m.Overlap.EstimatedSkippedEvents)
 		}
 		for _, warning := range m.Warnings {
 			if warning.File != "" {
-				fmt.Printf("Warning [%s] %s: %s\n", warning.Code, warning.File, warning.Message)
+				_, _ = fmt.Fprintf(out, "Warning [%s] %s: %s\n", warning.Code, warning.File, warning.Message)
 			} else {
-				fmt.Printf("Warning [%s]: %s\n", warning.Code, warning.Message)
+				_, _ = fmt.Fprintf(out, "Warning [%s]: %s\n", warning.Code, warning.Message)
 			}
 		}
 	}
 }
 
-func confirmImport() bool {
-	fmt.Print("Start this import now? [y/N] ")
-	reader := bufio.NewReader(os.Stdin)
+func confirmImport(in io.Reader, out io.Writer) bool {
+	_, _ = fmt.Fprint(out, "Start this import now? [y/N] ")
+	reader := bufio.NewReader(in)
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 	return answer == "y" || answer == "yes"
-}
-
-func resolveImportAPIURL() string {
-	for _, key := range []string{"HITKEEP_API_URL", "HITKEEP_URL", "HITKEEP_PUBLIC_URL"} {
-		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-			return normalizeImportAPIURL(value)
-		}
-	}
-	return defaultImportAPIURL
 }
 
 func normalizeImportAPIURL(value string) string {
@@ -486,9 +563,10 @@ func isLocalImportHost(value string) bool {
 		strings.HasPrefix(host, "[::1]")
 }
 
-func checkCLI(err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+func (c importCommand) check(err error) error {
+	if err == nil {
+		return nil
 	}
+	_, _ = fmt.Fprintln(c.errOut, err)
+	return &ExitError{Code: 1}
 }

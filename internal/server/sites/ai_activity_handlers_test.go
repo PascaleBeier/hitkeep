@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func setupAIActivityHandlerEnv(t *testing.T) (*handler, uuid.UUID, uuid.UUID, time.Time) {

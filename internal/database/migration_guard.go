@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/hklog"
-	json "hitkeep/internal/jsonapi"
+	"hitkeep/hklog"
+	json "hitkeep/jsonapi"
 )
 
 const migrationWALGuardVersion = 1

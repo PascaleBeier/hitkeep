@@ -20,8 +20,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/security"
+	json "hitkeep/jsonapi"
 )
 
 type PasskeyCredential struct {

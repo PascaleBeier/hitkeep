@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 func TestGetCurrentIPIPv4(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2/expirable"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const (
@@ -407,12 +407,33 @@ func (m *TenantStoreManager) PurgeArchivedTenant(ctx context.Context, tenantID u
 // updates the shared site->tenant mapping, and removes stale analytics from the
 // previous tenant's data plane.
 func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinationTenantID uuid.UUID, auditEntries ...AuditEntryParams) error {
+	return m.transferSite(ctx, siteID, destinationTenantID, 0, auditEntries...)
+}
+
+// TransferSiteWithQuota holds site quota serialization through the full data
+// move so a denied transfer cannot copy or delete analytics.
+func (m *TenantStoreManager) TransferSiteWithQuota(ctx context.Context, siteID, destinationTenantID uuid.UUID, maxSites int, auditEntries ...AuditEntryParams) error {
+	m.shared.siteQuotaMu.Lock()
+	defer m.shared.siteQuotaMu.Unlock()
+	return m.transferSite(ctx, siteID, destinationTenantID, maxSites, auditEntries...)
+}
+
+func (m *TenantStoreManager) transferSite(ctx context.Context, siteID, destinationTenantID uuid.UUID, maxSites int, auditEntries ...AuditEntryParams) error {
 	sourceTenantID, err := m.shared.GetSiteTenantID(ctx, siteID)
 	if err != nil {
 		return fmt.Errorf("resolve source tenant for site %s: %w", siteID, err)
 	}
 	if sourceTenantID == destinationTenantID {
 		return nil
+	}
+	if maxSites > 0 {
+		count, err := m.shared.CountTeamSites(ctx, destinationTenantID)
+		if err != nil {
+			return err
+		}
+		if count >= maxSites {
+			return ErrSiteLimitReached
+		}
 	}
 
 	site, err := m.shared.GetSiteByID(ctx, siteID)
@@ -442,9 +463,6 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 		return fmt.Errorf("search console transfer audit is required")
 	}
 
-	// Mirror the site into the destination before copying analytics: tenant
-	// schemas keep foreign keys on sites (e.g. ai_fetches), so the parent row
-	// must exist first.
 	if destinationStore != m.shared {
 		if err := destinationStore.UpsertSiteMirror(ctx, site); err != nil {
 			return fmt.Errorf("upsert destination site mirror: %w", err)
@@ -467,11 +485,7 @@ func (m *TenantStoreManager) TransferSite(ctx context.Context, siteID, destinati
 	if err := m.shared.TransferSiteTeamWithAudit(ctx, siteID, destinationTenantID, searchConsoleMapping != nil, auditEntries); err != nil {
 		return fmt.Errorf("update shared site transfer records: %w", err)
 	}
-	if err := m.SyncSite(ctx, siteID); err != nil {
-		return err
-	}
-
-	return nil
+	return m.SyncSite(ctx, siteID)
 }
 
 func siteTransferDataMovePreparedAudit(site *api.Site, sourceTenantID, destinationTenantID uuid.UUID, audits []AuditEntryParams) AuditEntryParams {

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
 	"hitkeep/internal/webhooks"
 )

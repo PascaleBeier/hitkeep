@@ -17,11 +17,11 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 
-	"hitkeep/internal/appurl"
-	"hitkeep/internal/config"
-	json "hitkeep/internal/jsonapi"
+	"hitkeep/appurl"
+	"hitkeep/config"
 	"hitkeep/internal/security"
 	"hitkeep/internal/sso"
+	json "hitkeep/jsonapi"
 )
 
 const (

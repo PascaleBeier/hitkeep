@@ -14,7 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const (

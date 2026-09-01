@@ -36,7 +36,7 @@ spec:
       containers:
         - name: hitkeep
           {{- $imageTag := .Values.image.tag | default (trimPrefix "v" .Chart.AppVersion) }}
-          image: "{{ .Values.image.repository }}:{{ $imageTag }}"
+          image: "{{ .Values.image.repository }}{{ if .Values.image.digest }}@{{ .Values.image.digest }}{{ else }}:{{ $imageTag }}{{ end }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -105,7 +105,7 @@ spec:
             - name: HITKEEP_DB_PATH
               value: {{ printf "%s/hitkeep.db" .Values.persistence.mountPath | quote }}
             {{- end }}
-            {{- if not (hasKey $env "HITKEEP_DATA_PATH") }}
+{{- if not (hasKey $env "HITKEEP_DATA_PATH") }}
             - name: HITKEEP_DATA_PATH
               value: {{ .Values.persistence.mountPath | quote }}
             {{- end }}

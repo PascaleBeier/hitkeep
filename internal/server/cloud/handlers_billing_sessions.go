@@ -11,11 +11,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/appurl"
-	"hitkeep/internal/config"
+	"hitkeep/appurl"
+	"hitkeep/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleStripeWebhook() http.HandlerFunc {

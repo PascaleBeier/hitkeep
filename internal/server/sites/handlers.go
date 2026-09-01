@@ -1,6 +1,7 @@
 package sites
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -14,9 +15,9 @@ import (
 	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
+	json "hitkeep/jsonapi"
 )
 
 type handler struct {
@@ -263,8 +264,17 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			return
 		}
 
-		site, err := h.ctx.Store.CreateSite(r.Context(), userID, domain)
+		teamID, err := h.ctx.Store.GetActiveTenantID(r.Context(), userID)
 		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve active team for site creation", "error", err, "user_id", userID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		site, err := h.ctx.Store.CreateSiteWithQuota(r.Context(), userID, teamID, domain, h.ctx.Limits().TeamSiteLimit(r.Context(), teamID))
+		if err != nil {
+			if writeCreateSiteError(w, err) {
+				return
+			}
 			shared.LoggerFromContext(r.Context()).Error("Failed to create site", "error", err, "domain", domain)
 			http.Error(w, "Failed to create site (domain might already exist)", http.StatusConflict)
 			return
@@ -315,6 +325,18 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
+}
+
+func writeCreateSiteError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, database.ErrSiteLimitReached):
+		http.Error(w, "Site limit reached", http.StatusForbidden)
+	case errors.Is(err, database.ErrActiveTenantChanged):
+		http.Error(w, "Active team changed; retry", http.StatusConflict)
+	default:
+		return false
+	}
+	return true
 }
 
 func (h *handler) handleDeleteSite() http.HandlerFunc {
@@ -693,7 +715,11 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			return
 		}
 
-		if err := h.ctx.TenantStores.TransferSite(r.Context(), siteID, destinationTeamID, auditEntries...); err != nil {
+		if err := h.ctx.TenantStores.TransferSiteWithQuota(r.Context(), siteID, destinationTeamID, h.ctx.Limits().TeamSiteLimit(r.Context(), destinationTeamID), auditEntries...); err != nil {
+			if errors.Is(err, database.ErrSiteLimitReached) {
+				http.Error(w, "Site limit reached", http.StatusForbidden)
+				return
+			}
 			shared.LoggerFromContext(r.Context()).Error("Failed to transfer site to team", "error", err, "site_id", siteID, "source_team_id", sourceTeamID, "destination_team_id", destinationTeamID, "user_id", userID)
 			http.Error(w, "Failed to transfer site", http.StatusInternalServerError)
 			return

@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/internal/api"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/server/shared"
+	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetUserOnboarding() http.HandlerFunc {

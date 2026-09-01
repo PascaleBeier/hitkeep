@@ -46,8 +46,15 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
+COPY analyticscatalog ./analyticscatalog
+COPY appurl ./appurl
 COPY cmd ./cmd
+COPY config ./config
+COPY exportfmt ./exportfmt
+COPY hklog ./hklog
 COPY internal ./internal
+COPY jsonapi ./jsonapi
+COPY localization ./localization
 COPY skills ./skills
 COPY public/embed.go ./public/embed.go
 COPY --from=frontend-builder /workspace/public/ ./public/

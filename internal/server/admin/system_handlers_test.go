@@ -17,15 +17,15 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/config"
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/config"
 	"hitkeep/internal/database"
-	json "hitkeep/internal/jsonapi"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/testutil/testdb"
+	json "hitkeep/jsonapi"
 )
 
 func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID, uuid.UUID, uuid.UUID) {
@@ -911,7 +911,18 @@ func TestHandleGetMail(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if status.Configured {
-		t.Fatal("expected mail not configured in test")
+		t.Fatal("expected default SMTP configuration without a host to be unavailable")
+	}
+
+	h.ctx.Config.MailHost = "smtp.example.com"
+	h.ctx.Mailer = nil
+	w = httptest.NewRecorder()
+	h.handleGetMail().ServeHTTP(w, req)
+	if err := json.UnmarshalRead(w.Body, &status); err != nil {
+		t.Fatalf("decode unavailable mailer status: %v", err)
+	}
+	if status.Configured {
+		t.Fatal("expected rejected or unavailable mailer configuration to be unavailable")
 	}
 }
 
@@ -1336,6 +1347,7 @@ func TestSystemMailRedaction(t *testing.T) {
 	h.ctx.Config.MailPassword = "super-secret-password"
 	h.ctx.Config.MailHost = "smtp.example.com"
 	h.ctx.Config.MailPort = 587
+	h.ctx.Mailer = mailer.NewWithDriver(&adminTestMailDriver{}, h.ctx.Config)
 
 	req := withAdminTestUser(httptest.NewRequest(http.MethodGet, "/api/admin/system/mail", nil), ownerID)
 	w := httptest.NewRecorder()
@@ -1344,8 +1356,9 @@ func TestSystemMailRedaction(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
+	responseBody := w.Body.String()
 	var status api.SystemMailStatus
-	if err := json.UnmarshalRead(w.Body, &status); err != nil {
+	if err := json.UnmarshalRead(strings.NewReader(responseBody), &status); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if !status.Configured {
@@ -1360,9 +1373,8 @@ func TestSystemMailRedaction(t *testing.T) {
 	if !status.PasswordSet {
 		t.Fatal("expected password_set true")
 	}
-	// Full password should not appear in response
-	if strings.Contains(status.Username, "super-secret") {
-		t.Fatal("username should not leak full value")
+	if strings.Contains(responseBody, "super-secret-password") {
+		t.Fatal("response should not leak the password")
 	}
 }
 

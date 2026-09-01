@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	json "hitkeep/internal/jsonapi"
+	json "hitkeep/jsonapi"
 )
 
 const doctorCommandTimeout = 15 * time.Second
@@ -208,7 +208,28 @@ func (a *App) SharedCacheEnvironment() []string {
 }
 
 func (a *App) commandEnvironment(overrides []string) []string {
-	return mergedCommandEnvironment(append(a.SharedCacheEnvironment(), overrides...))
+	environment := a.SharedCacheEnvironment()
+	if root := os.Getenv("HK_RUN_TEMP_ROOT"); a.isRunTempRoot(root) {
+		environment = append(environment, runTempEnvironment(root)...)
+	}
+	return mergedCommandEnvironment(append(environment, overrides...))
+}
+
+func (a *App) isRunTempRoot(root string) bool {
+	if root == "" {
+		return false
+	}
+	runID := filepath.Base(root)
+	if err := validateRunID(runID); err != nil || filepath.Clean(root) != a.runTempRoot(runID) {
+		return false
+	}
+	base, err := os.OpenRoot(a.runTempBase())
+	if err != nil {
+		return false
+	}
+	defer base.Close()
+	info, err := base.Stat(runID)
+	return err == nil && info.IsDir()
 }
 
 func (a *App) ComposeEnvironment(variant Variant) []string {
