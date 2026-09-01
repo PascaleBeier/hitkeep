@@ -334,7 +334,7 @@ jobs:
         run: |
           set -euo pipefail
           metadata="$(npm pack --json)"
-          tarball="$(jq -r '.[0].filename' <<< "$metadata")"
+          tarball="$(jq -r 'to_entries | first | .value.filename' <<< "$metadata")"
           test -n "$tarball"
           test -f "$tarball"
           mv "$tarball" verified-tracker.tgz

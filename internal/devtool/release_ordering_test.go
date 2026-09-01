@@ -58,7 +58,9 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
           plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
           ./hk qa pr --plan-id "$plan_id" --gate tracker-package
       - name: Pack verified tracker artifact
-        run: npm pack --json
+        run: |
+          metadata="$(npm pack --json)"
+          tarball="$(jq -r 'to_entries | first | .value.filename' <<< "$metadata")"
       - name: Upload verified tracker artifact
   link-release-blog:
     needs: release-please
@@ -205,6 +207,11 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 	missingTrackerPlan := strings.Replace(workflow, `--plan-id "$plan_id"`, "", 1)
 	if err := validateReleaseWorkflowGraph([]byte(missingTrackerPlan)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted tracker QA without its persisted plan ID")
+	}
+
+	arrayOnlyPackMetadata := strings.Replace(workflow, "to_entries | first | .value.filename", ".[0].filename", 1)
+	if err := validateReleaseWorkflowGraph([]byte(arrayOnlyPackMetadata)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted the obsolete array-only npm pack metadata parser")
 	}
 
 	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate", "      - name: candidate-placeholder", 1)

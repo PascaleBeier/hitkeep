@@ -364,7 +364,9 @@ jobs:
           plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
           ./hk qa pr --plan-id "$plan_id" --gate tracker-package
       - name: Pack verified tracker artifact
-        run: npm pack --json
+        run: |
+          metadata="$(npm pack --json)"
+          tarball="$(jq -r 'to_entries | first | .value.filename' <<< "$metadata")"
       - name: Upload verified tracker artifact
   docs-attestation:
     needs:
