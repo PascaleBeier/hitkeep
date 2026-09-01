@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.18](https://github.com/PascaleBeier/hitkeep/compare/v2.13.17...v2.13.18) (2026-09-01)
+
+
+### Bug Fixes
+
+* **release:** keep migration acceptance manual ([#326](https://github.com/PascaleBeier/hitkeep/issues/326)) ([9a82688](https://github.com/PascaleBeier/hitkeep/commit/9a826887bc567f1626fb3fcaf4ff070094689c11))
+
 ## [2.13.17](https://github.com/PascaleBeier/hitkeep/compare/v2.13.16...v2.13.17) (2026-09-01)
 
 
