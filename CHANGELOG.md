@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.15](https://github.com/PascaleBeier/hitkeep/compare/v2.13.14...v2.13.15) (2026-09-01)
+
+
+### Bug Fixes
+
+* **release:** make draft candidates retry-safe ([ec423f3](https://github.com/PascaleBeier/hitkeep/commit/ec423f379030659701c2b90087e5958ddb829e6c))
+
 ## [2.13.14](https://github.com/PascaleBeier/hitkeep/compare/v2.13.13...v2.13.14) (2026-09-01)
 
 
