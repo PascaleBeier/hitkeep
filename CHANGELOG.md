@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.14](https://github.com/PascaleBeier/hitkeep/compare/v2.13.13...v2.13.14) (2026-09-01)
+
+
+### Bug Fixes
+
+* **release:** stage candidates as prereleases ([#318](https://github.com/PascaleBeier/hitkeep/issues/318)) ([22c59da](https://github.com/PascaleBeier/hitkeep/commit/22c59da5ff47c76f16e3593592218e5892b0aa48))
+
 ## [2.13.13](https://github.com/PascaleBeier/hitkeep/compare/v2.13.12...v2.13.13) (2026-09-01)
 
 
