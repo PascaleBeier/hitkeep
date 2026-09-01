@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.13.13](https://github.com/PascaleBeier/hitkeep/compare/v2.13.12...v2.13.13) (2026-09-01)
+
+
+### Bug Fixes
+
+* **config:** simplify configuration and release validation ([cd45596](https://github.com/PascaleBeier/hitkeep/commit/cd45596a32f6cad478e0e33555a55393c9ccd0c2))
+* **deps:** migrate to Vitest and update dependencies for consistency ([bf4c55c](https://github.com/PascaleBeier/hitkeep/commit/bf4c55c28cfd622bcf0d7ef59491f2135687ea08))
+* **devtool:** cover frontend manifests in QA planning ([a04a571](https://github.com/PascaleBeier/hitkeep/commit/a04a571deb41074cd646786cdf839d29d9029873))
+* **devtool:** harden and streamline CI QA ([9f5b8e4](https://github.com/PascaleBeier/hitkeep/commit/9f5b8e4439cd6e083b3f28f1c51b96c95837107b))
+* **docs:** update skills ([fda8e6b](https://github.com/PascaleBeier/hitkeep/commit/fda8e6b38443d640fd5124a7fa40d72f0b67b63e))
+
 ## [2.13.12](https://github.com/PascaleBeier/hitkeep/compare/v2.13.11...v2.13.12) (2026-08-22)
 
 
