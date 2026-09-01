@@ -489,7 +489,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tarball="tracker-package/verified-tracker.tgz"
+          tarball="./tracker-package/verified-tracker.tgz"
           test -f "$tarball"
           integrity="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 | tr -d '\n')"
           existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
