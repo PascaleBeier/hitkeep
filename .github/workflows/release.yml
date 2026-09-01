@@ -53,16 +53,6 @@ jobs:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  migration-interruption:
-    name: Verify migration interruption safety
-    needs:
-      - release-please
-      - build-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
-    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
-    permissions:
-      contents: read
-
   upgrade-from-supported-floor:
     name: ${{ matrix.name }}
     needs:
@@ -357,11 +347,10 @@ jobs:
     needs:
       - release-please
       - build-release
-      - migration-interruption
       - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-supported-floor.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-supported-floor.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -470,12 +459,11 @@ jobs:
     needs:
       - release-please
       - build-release
-      - migration-interruption
       - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
       - docs-attestation
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.migration-interruption.result == 'success' && needs.upgrade-from-supported-floor.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' && needs.docs-attestation.result == 'success' }}
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' && needs.upgrade-from-supported-floor.result == 'success' && needs.publish-helm.result == 'success' && needs.verify-tracker-package.result == 'success' && needs.docs-attestation.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -26,11 +26,11 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
-	t.Run("migration workflow is not reusable", func(t *testing.T) {
+	t.Run("reusable migration workflow is rejected", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", "on:\n  workflow_dispatch:\njobs: {}\n")
+		writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", "on:\n  workflow_call:\njobs: {}\n")
 		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "must support workflow_call") {
+		if err == nil || !strings.Contains(err.Error(), "must not support workflow_call") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -315,12 +315,6 @@ jobs:
   release-please: {}
   build-release:
     needs: release-please
-  migration-interruption:
-    needs:
-      - release-please
-      - build-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.build-release.result == 'success' }}
-    uses: ./.github/workflows/default-tenant-migration-acceptance.yml
   upgrade-from-supported-floor:
     needs: build-release
     strategy:
@@ -372,7 +366,6 @@ jobs:
     needs:
       - release-please
       - build-release
-      - migration-interruption
       - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
@@ -400,7 +393,6 @@ jobs:
     needs:
       - release-please
       - build-release
-      - migration-interruption
       - upgrade-from-supported-floor
       - publish-helm
       - verify-tracker-package
@@ -440,7 +432,7 @@ jobs:
     needs: finalize-release
 `)
 	writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", `on:
-  workflow_call:
+  workflow_dispatch:
 jobs: {}
 `)
 	return root
