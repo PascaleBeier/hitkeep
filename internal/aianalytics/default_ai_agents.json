@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T20:54:25.829542Z",
+  "generated_at": "2026-09-01T22:30:45.786343428Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -2264,8 +2264,8 @@
     },
     {
       "token": "webzio-extended",
-      "name": "webzio-extended",
-      "family": "webzio-extended",
+      "name": "Webzio-Extended",
+      "family": "Webzio-Extended",
       "category": "ai_training_crawler",
       "respects_robots_txt": "unclear",
       "url": "https://docs.webz.io/reference/how-it-works-video",
