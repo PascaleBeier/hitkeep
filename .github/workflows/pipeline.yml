@@ -285,6 +285,7 @@ jobs:
           cp "$release_inputs/hitkeep-configuration.json" .
           cp "$release_inputs/hitkeep.example.yaml" .
           cp "$release_inputs/hitkeep-configuration-manifest.json" .
+          printf '%s\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude
 
       - name: Build and verify GoReleaser release archives
         id: release-artifacts

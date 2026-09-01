@@ -558,11 +558,11 @@ jobs:
               "$source"
           done
 
-      - name: Publish draft GitHub release
+      - name: Promote GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG" --draft=false --latest
+        run: gh release edit "$TAG" --prerelease=false --latest
 
   sync-docs-release:
     name: Publish release and configuration metadata to docs
