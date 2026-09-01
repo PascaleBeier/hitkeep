@@ -20,8 +20,15 @@ permissions: {}
 
 jobs:
   homebrew-candidate:
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--main')
-    runs-on: macos-14
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--branches--main'))
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-14
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     env:
@@ -30,19 +37,47 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Prepare candidate formula
-        env:
-          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Configure Homebrew
+        if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
-          [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          printf '%s\n' "$HOMEBREW_PREFIX/bin" >> "$GITHUB_PATH"
+          printf 'HOMEBREW_PREFIX=%s\n' "$HOMEBREW_PREFIX" >> "$GITHUB_ENV"
+          printf 'HOMEBREW_CELLAR=%s\n' "$HOMEBREW_CELLAR" >> "$GITHUB_ENV"
+          printf 'HOMEBREW_REPOSITORY=%s\n' "$HOMEBREW_REPOSITORY" >> "$GITHUB_ENV"
+      - name: Install current stable formula
+        run: |
+          set -euo pipefail
+          brew tap PascaleBeier/hitkeep
+          stable_version="$(brew info --json=v2 PascaleBeier/hitkeep/hitkeep | jq -er '.formulae[0].versions.stable')"
+          [[ "$stable_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          brew install --build-from-source PascaleBeier/hitkeep/hitkeep
+          test "$(hitkeep --version)" = "$stable_version"
+          printf 'STABLE_VERSION=%s\n' "$stable_version" >> "$GITHUB_ENV"
+      - name: Resolve candidate
+        env:
+          CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            candidate_version="$(jq -er '."."' .release-please-manifest.json)"
+            [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          else
+            candidate_version="$(ruby -e 'parts = ARGV[0].split(".").map(&:to_i); puts "#{parts[0]}.#{parts[1]}.#{parts[2] + 1}-validation.#{ARGV[1]}.#{ARGV[2]}"' "$STABLE_VERSION" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          fi
+          ruby -e 'require "rubygems"; abort unless Gem::Version.new(ARGV[1]) > Gem::Version.new(ARGV[0])' \
+            "$STABLE_VERSION" "$candidate_version"
+          printf 'CANDIDATE_SHA=%s\n' "$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          printf 'CANDIDATE_VERSION=%s\n' "$candidate_version" >> "$GITHUB_ENV"
+      - name: Prepare candidate formula
+        run: |
+          set -euo pipefail
           candidate_url="https://github.com/PascaleBeier/hitkeep/archive/${CANDIDATE_SHA}.tar.gz"
           candidate_checksum="$(curl --fail --silent --show-error --location "$candidate_url" | shasum -a 256 | awk '{print $1}')"
-          brew tap PascaleBeier/hitkeep
           formula="$(brew --repository PascaleBeier/hitkeep)/Formula/hitkeep.rb"
           candidate_formula="$(mktemp)"
-          awk -v version="$candidate_version" -v url="$candidate_url" -v checksum="$candidate_checksum" '
+          awk -v version="$CANDIDATE_VERSION" -v url="$candidate_url" -v checksum="$candidate_checksum" '
             /^  version "/ { print "  version \"" version "\""; versions++; next }
             /^  url "/ {
               if (versions == 0) { print "  version \"" version "\""; versions++ }
@@ -54,14 +89,15 @@ jobs:
           ' "$formula" > "$candidate_formula"
           mv "$candidate_formula" "$formula"
           ruby -c "$formula"
-      - name: Install and test candidate
+      - name: Upgrade to and test candidate
         run: |
           set -euo pipefail
-          candidate_version="$(jq -er '."."' .release-please-manifest.json)"
-          brew install --build-from-source PascaleBeier/hitkeep/hitkeep
-          test "$(hitkeep --version)" = "$candidate_version"
+          test "$(hitkeep --version)" = "$STABLE_VERSION"
+          brew upgrade --build-from-source PascaleBeier/hitkeep/hitkeep
+          test "$(hitkeep --version)" = "$CANDIDATE_VERSION"
           brew test PascaleBeier/hitkeep/hitkeep
           brew uninstall hitkeep
+          ! command -v hitkeep
 
   cross-cgo:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
