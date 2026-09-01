@@ -168,7 +168,14 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	trackerArtifact := map[string]bool{}
 	trackerPlanBound := false
 	for _, step := range workflow.Jobs["verify-tracker-package"].Steps {
-		trackerArtifact[step.Name] = true
+		if step.Name == "Pack verified tracker artifact" &&
+			strings.Contains(step.Run, "npm pack --json") &&
+			strings.Contains(step.Run, "to_entries | first | .value.filename") {
+			trackerArtifact[step.Name] = true
+		}
+		if step.Name == "Upload verified tracker artifact" {
+			trackerArtifact[step.Name] = true
+		}
 		if strings.Contains(step.Run, `plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"`) &&
 			strings.Contains(step.Run, `./hk qa pr --plan-id "$plan_id" --gate tracker-package`) {
 			trackerPlanBound = true
