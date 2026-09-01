@@ -102,7 +102,8 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
           npm view @hitkeep/tracker dist.integrity
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
-      - name: Publish draft GitHub release
+      - name: Promote GitHub release
+        run: gh release edit "$TAG" --prerelease=false --latest
   sync-docs-release:
     needs:
       - finalize-release
@@ -180,9 +181,14 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer without the verified tracker artifact")
 	}
 
-	earlyPublish := strings.Replace(workflow, "      - name: Promote immutable image to mutable tags\n      - name: Publish draft GitHub release", "      - name: Publish draft GitHub release\n      - name: Promote immutable image to mutable tags", 1)
+	earlyPublish := strings.Replace(workflow, "      - name: Promote immutable image to mutable tags\n      - name: Promote GitHub release", "      - name: Promote GitHub release\n      - name: Promote immutable image to mutable tags", 1)
 	if err := validateReleaseWorkflowGraph([]byte(earlyPublish)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a draft publication before mutable tag promotion")
+	}
+
+	missingPrereleasePromotion := strings.Replace(workflow, "--prerelease=false", "--draft=false", 1)
+	if err := validateReleaseWorkflowGraph([]byte(missingPrereleasePromotion)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted a finalizer that does not promote the prerelease")
 	}
 
 	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate", "      - name: candidate-placeholder", 1)
@@ -192,7 +198,7 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted a latest dist-tag promotion before retry-safe candidate publication")
 	}
 
-	patFinalizer := strings.Replace(workflow, "      - name: Publish draft GitHub release", "      - name: Publish draft GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GHT }}", 1)
+	patFinalizer := strings.Replace(workflow, "      - name: Promote GitHub release", "      - name: Promote GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GHT }}", 1)
 	if err := validateReleaseWorkflowGraph([]byte(patFinalizer)); err == nil {
 		t.Fatal("validateReleaseWorkflowGraph() accepted secrets.GHT in the finalizer")
 	}

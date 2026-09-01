@@ -24,9 +24,11 @@ var dockerfileVolumePattern = regexp.MustCompile(`(?m)^\s*VOLUME\s+(.+)$`)
 var dockerfileQuotedPathPattern = regexp.MustCompile(`"([^"]+)"`)
 
 type releasePleaseConfig struct {
-	Draft    bool `json:"draft"`
-	Packages map[string]struct {
+	Draft      bool `json:"draft"`
+	Prerelease bool `json:"prerelease"`
+	Packages   map[string]struct {
 		Draft      *bool                    `json:"draft"`
+		Prerelease *bool                    `json:"prerelease"`
 		ExtraFiles []releasePleaseExtraFile `json:"extra-files"`
 	} `json:"packages"`
 }
@@ -185,6 +187,15 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	if !trackerDownload || !trackerPublish {
 		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact with npm integrity verification")
 	}
+	prereleasePromotion := false
+	for _, step := range finalizer.Steps {
+		if step.Name == "Promote GitHub release" && strings.Contains(step.Run, `gh release edit "$TAG" --prerelease=false --latest`) {
+			prereleasePromotion = true
+		}
+	}
+	if !prereleasePromotion {
+		return fmt.Errorf("release workflow finalizer must promote the prerelease to latest")
+	}
 	for _, step := range finalizer.Steps {
 		for _, values := range []map[string]string{step.Env, step.With} {
 			for _, value := range values {
@@ -202,7 +213,7 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		"Publish immutable tracker candidate",
 		"Promote tracker latest dist-tag",
 		"Promote immutable image to mutable tags",
-		"Publish draft GitHub release",
+		"Promote GitHub release",
 	}
 	previous := -1
 	previousName := ""
@@ -700,8 +711,15 @@ func validateReleaseMetadata(root string) error {
 	if rootPackageConfig.Draft != nil {
 		effectiveDraft = *rootPackageConfig.Draft
 	}
-	if !effectiveDraft {
-		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be true")
+	if effectiveDraft {
+		return fmt.Errorf("release-please-config.json effective packages['.'].draft must be false")
+	}
+	effectivePrerelease := config.Prerelease
+	if rootPackageConfig.Prerelease != nil {
+		effectivePrerelease = *rootPackageConfig.Prerelease
+	}
+	if !effectivePrerelease {
+		return fmt.Errorf("release-please-config.json effective packages['.'].prerelease must be true")
 	}
 	expectedFiles := []releasePleaseExtraFile{
 		{Type: "json", Path: "server.json", JSONPath: "$.version"},
@@ -733,6 +751,8 @@ func validateReleaseMetadata(root string) error {
 			"hitkeep-configuration-manifest.json",
 			"release_tag: $tag",
 			"release_version: $version",
+			"printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude",
+			"github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish",
 		},
 		".github/workflows/release.yml": {
 			"finalize-release:",
@@ -752,6 +772,18 @@ func validateReleaseMetadata(root string) error {
 		if name == ".github/workflows/pipeline.yml" && bytes.Contains(raw, []byte("./hk ci build-binaries")) {
 			return fmt.Errorf(".github/workflows/pipeline.yml must not run ./hk ci build-binaries")
 		}
+	}
+	pipelineRaw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
+	if err != nil {
+		return err
+	}
+	pipeline := string(pipelineRaw)
+	const runnerLocalExclude = "printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude"
+	if strings.Count(pipeline, ".git/info/exclude") != 1 || !strings.Contains(pipeline, runnerLocalExclude) {
+		return fmt.Errorf(".github/workflows/pipeline.yml must write exactly the generated configuration JSON inputs to .git/info/exclude")
+	}
+	if strings.Index(pipeline, runnerLocalExclude) >= strings.Index(pipeline, "github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish") {
+		return fmt.Errorf(".github/workflows/pipeline.yml must write generated configuration JSON inputs to .git/info/exclude before tagged GoReleaser")
 	}
 	goreleaserManifest, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
 	if err != nil {

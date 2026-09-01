@@ -64,12 +64,12 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
-	t.Run("root package draft override", func(t *testing.T) {
+	t.Run("draft candidate is rejected", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		config := strings.Replace(fixtureReleasePleaseConfig(), `".":{`, `".":{"draft":false,`, 1)
+		config := strings.Replace(fixtureReleasePleaseConfig(), `".":{"draft":false`, `".":{"draft":true`, 1)
 		writeFixtureFile(t, root, "release-please-config.json", config)
 		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "effective packages['.'].draft must be true") {
+		if err == nil || !strings.Contains(err.Error(), "effective packages['.'].draft must be false") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -83,9 +83,61 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
+	t.Run("generated configuration inputs must remain runner-local ignores", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", strings.Replace(string(workflow), " >> .git/info/exclude", "", 1))
+		err = validateReleaseMetadata(root)
+		if err == nil || !strings.Contains(err.Error(), ".git/info/exclude") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("runner-local configuration excludes reject missing paths", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		invalid := strings.Replace(string(workflow), "hitkeep-configuration.json hitkeep-configuration-manifest.json", "hitkeep-configuration-manifest.json", 1)
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", invalid)
+		if err := validateReleaseMetadata(root); err == nil {
+			t.Fatal("validateReleaseMetadata() accepted a missing runner-local configuration exclude")
+		}
+	})
+
+	t.Run("runner-local configuration excludes reject additional paths", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", string(workflow)+"\nprintf '%s\\n' unrelated-path >> .git/info/exclude\n")
+		if err := validateReleaseMetadata(root); err == nil {
+			t.Fatal("validateReleaseMetadata() accepted an additional runner-local configuration exclude")
+		}
+	})
+
+	t.Run("runner-local configuration excludes precede tagged release", func(t *testing.T) {
+		root := releaseMetadataFixture(t)
+		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		const exclude = "printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude"
+		invalid := strings.Replace(string(workflow), exclude, "", 1) + "\n" + exclude + "\n"
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", invalid)
+		if err := validateReleaseMetadata(root); err == nil {
+			t.Fatal("validateReleaseMetadata() accepted a late runner-local configuration exclude")
+		}
+	})
+
 	t.Run("manual release build is rejected", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\n./hk ci build-binaries\n")
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n./hk ci build-binaries\n")
 		err := validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), ".github/workflows/pipeline.yml must not run ./hk ci build-binaries") {
 			t.Fatalf("unexpected error: %v", err)
@@ -94,7 +146,7 @@ func TestValidateReleaseMetadata(t *testing.T) {
 
 	t.Run("missing example configuration release asset", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\n")
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n")
 		err := validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "hitkeep.example.yaml"`) {
 			t.Fatalf("unexpected error: %v", err)
@@ -247,7 +299,7 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, "charts/hitkeep/README.md", "tag: 2.12.0 # x-release-please-version\n")
 	writeFixtureFile(t, root, "release-please-config.json", fixtureReleasePleaseConfig())
 	writeFixtureFile(t, root, ".goreleaser.yaml", "files:\n  - hitkeep-configuration.json\n  - hitkeep.example.yaml\n  - hitkeep-configuration-manifest.json\n")
-	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\n")
+	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n")
 	writeFixtureFile(t, root, ".github/workflows/release.yml", `# sync-hitkeep-release.yml
 jobs:
   release-please: {}
@@ -344,7 +396,8 @@ jobs:
           npm view @hitkeep/tracker dist.integrity
       - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
-      - name: Publish draft GitHub release
+      - name: Promote GitHub release
+        run: gh release edit "$TAG" --prerelease=false --latest
   sync-docs-release:
     needs:
       - finalize-release
@@ -376,7 +429,7 @@ jobs: {}
 }
 
 func fixtureReleasePleaseConfig() string {
-	return `{"draft":true,"packages":{".":{"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
+	return `{"draft":false,"prerelease":true,"packages":{".":{"draft":false,"prerelease":true,"extra-files":[{"type":"json","path":"server.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package.json","jsonpath":"$.version"},{"type":"json","path":"frontend/dashboard/package-lock.json","jsonpath":"$['packages']['']['version']"},{"type":"json","path":"frontend/tracker/package.json","jsonpath":"$.version"},{"type":"generic","path":"frontend/dashboard/src/tracker/version.ts"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.version"},{"type":"yaml","path":"charts/hitkeep/Chart.yaml","jsonpath":"$.appVersion"},{"type":"generic","path":"charts/hitkeep/README.md"}]}}}`
 }
 
 func writeFixtureFile(t *testing.T, root, name, contents string) {
