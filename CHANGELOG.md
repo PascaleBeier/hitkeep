@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.16](https://github.com/PascaleBeier/hitkeep/compare/v2.13.15...v2.13.16) (2026-09-01)
+
+
+### Bug Fixes
+
+* **release:** parse canonical npm pack output ([fe6d4a1](https://github.com/PascaleBeier/hitkeep/commit/fe6d4a19870535e6a58c5a8acdc958548de29742))
+
 ## [2.13.15](https://github.com/PascaleBeier/hitkeep/compare/v2.13.14...v2.13.15) (2026-09-01)
 
 
