@@ -198,15 +198,30 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		if step.Name == "Download verified tracker artifact" {
 			trackerDownload = true
 		}
-		if step.Name == "Publish immutable tracker candidate" &&
-			strings.Contains(step.Run, "npm publish \"$tarball\"") &&
-			strings.Contains(step.Run, "dist.integrity") &&
-			strings.Contains(step.Run, "openssl dgst -sha512") {
-			trackerPublish = true
+		if step.Name != "Publish verified tracker" {
+			continue
 		}
+		for _, fragment := range []string{
+			`npm publish "$tarball" --tag latest || true`,
+			"dist.integrity",
+			"dist-tags.latest",
+			"for attempt in {1..6}",
+			`[[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]]`,
+			`[[ "$existing" != "$integrity" ]]`,
+			`[[ "$latest" != "$VERSION" ]]`,
+			"openssl dgst -sha512",
+		} {
+			if !strings.Contains(step.Run, fragment) {
+				return fmt.Errorf("release workflow tracker publication is missing %q", fragment)
+			}
+		}
+		trackerPublish = true
 	}
-	if !trackerDownload || !trackerPublish {
-		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact with npm integrity verification")
+	if !trackerDownload {
+		return fmt.Errorf("release workflow finalizer must download the verified tracker artifact")
+	}
+	if !trackerPublish {
+		return fmt.Errorf("release workflow finalizer must publish the verified tracker artifact as latest with npm integrity verification")
 	}
 	draftPublication := false
 	for _, step := range finalizer.Steps {
@@ -231,8 +246,7 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 		positions[step.Name] = index
 	}
 	orderedSteps := []string{
-		"Publish immutable tracker candidate",
-		"Promote tracker latest dist-tag",
+		"Publish verified tracker",
 		"Promote immutable image to mutable tags",
 		"Promote GitHub release",
 	}
@@ -892,7 +906,7 @@ func validateCIWorkflowContract(root string) error {
 		if bytes.Contains(raw, []byte("actions/setup-node@")) {
 			return fmt.Errorf(".github/workflows/%s bypasses the canonical Node and npm setup action", entry.Name())
 		}
-		if bytes.Contains(raw, []byte("npm ")) && !bytes.Contains(raw, []byte("./.github/actions/setup-node-npm")) {
+		if bytes.Contains(raw, []byte("npm ")) && !bytes.Contains(raw, []byte("$/.github/actions/setup-node-npm")) {
 			return fmt.Errorf(".github/workflows/%s runs npm without the canonical Node and npm setup action", entry.Name())
 		}
 		workflows = append(workflows, raw...)

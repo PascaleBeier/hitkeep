@@ -132,7 +132,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - uses: ./.github/actions/setup-node-npm
+      - uses: $/.github/actions/setup-node-npm
       - name: Run canonical MCP contract gates
         run: |
           gates="$(./hk ci qa-matrix --profile pr --group production-mcp --output json | jq -r '.data.gate_ids | join(",")')"
@@ -152,7 +152,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - uses: ./.github/actions/setup-node-npm
+      - uses: $/.github/actions/setup-node-npm
       - name: Install dependencies
         working-directory: frontend/dashboard
         run: npm ci --no-audit --no-fund
@@ -175,7 +175,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - uses: ./.github/actions/setup-node-npm
+      - uses: $/.github/actions/setup-node-npm
       - name: Restore Playwright browser cache
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -211,7 +211,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - uses: ./.github/actions/setup-node-npm
+      - uses: $/.github/actions/setup-node-npm
       - name: Restore Playwright browser cache
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

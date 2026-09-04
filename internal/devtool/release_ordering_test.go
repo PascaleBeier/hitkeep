@@ -95,12 +95,17 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
       - docs-attestation
     steps:
       - name: Download verified tracker artifact
-      - name: Publish immutable tracker candidate
+      - name: Publish verified tracker
         run: |
           integrity="$(openssl dgst -sha512 -binary \"$tarball\")"
-          npm publish "$tarball"
+          npm publish "$tarball" --tag latest || true
           npm view @hitkeep/tracker dist.integrity
-      - name: Promote tracker latest dist-tag
+          npm view @hitkeep/tracker dist-tags.latest
+          for attempt in {1..6}; do
+            [[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]] && break
+          done
+          [[ "$existing" != "$integrity" ]]
+          [[ "$latest" != "$VERSION" ]]
       - name: Promote immutable image to mutable tags
       - name: Promote GitHub release
         run: gh release edit "$TAG" --draft=false --latest
@@ -196,11 +201,29 @@ func TestValidateReleaseWorkflowGraph(t *testing.T) {
 		t.Fatal("validateReleaseWorkflowGraph() accepted the obsolete array-only npm pack metadata parser")
 	}
 
-	latestBeforeCandidate := strings.Replace(workflow, "      - name: Publish immutable tracker candidate", "      - name: candidate-placeholder", 1)
-	latestBeforeCandidate = strings.Replace(latestBeforeCandidate, "      - name: Promote tracker latest dist-tag", "      - name: Publish immutable tracker candidate", 1)
-	latestBeforeCandidate = strings.Replace(latestBeforeCandidate, "      - name: candidate-placeholder", "      - name: Promote tracker latest dist-tag", 1)
-	if err := validateReleaseWorkflowGraph([]byte(latestBeforeCandidate)); err == nil {
-		t.Fatal("validateReleaseWorkflowGraph() accepted a latest dist-tag promotion before retry-safe candidate publication")
+	withoutLatestTag := strings.Replace(workflow, `npm publish "$tarball" --tag latest || true`, `npm publish "$tarball" || true`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(withoutLatestTag)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker publication without the latest dist-tag")
+	}
+
+	withoutPublishRecovery := strings.Replace(workflow, `npm publish "$tarball" --tag latest || true`, `npm publish "$tarball" --tag latest`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(withoutPublishRecovery)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker publication without ambiguous-failure recovery")
+	}
+
+	withoutLatestVerification := strings.Replace(workflow, "npm view @hitkeep/tracker dist-tags.latest", "echo skipped latest verification", 1)
+	if err := validateReleaseWorkflowGraph([]byte(withoutLatestVerification)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker publication without latest dist-tag verification")
+	}
+
+	withoutIntegrityCheck := strings.Replace(workflow, `[[ "$existing" != "$integrity" ]]`, `[[ -z "$existing" ]]`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(withoutIntegrityCheck)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker publication without exact integrity enforcement")
+	}
+
+	withoutLatestCheck := strings.Replace(workflow, `[[ "$latest" != "$VERSION" ]]`, `[[ -z "$latest" ]]`, 1)
+	if err := validateReleaseWorkflowGraph([]byte(withoutLatestCheck)); err == nil {
+		t.Fatal("validateReleaseWorkflowGraph() accepted tracker publication without exact latest-version enforcement")
 	}
 
 	patFinalizer := strings.Replace(workflow, "      - name: Promote GitHub release", "      - name: Promote GitHub release\n        env:\n          GH_TOKEN: ${{ secrets.GHT }}", 1)

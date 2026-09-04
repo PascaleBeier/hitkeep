@@ -399,12 +399,17 @@ jobs:
       - docs-attestation
     steps:
       - name: Download verified tracker artifact
-      - name: Publish immutable tracker candidate
+      - name: Publish verified tracker
         run: |
           integrity="$(openssl dgst -sha512 -binary \"$tarball\")"
-          npm publish "$tarball"
+          npm publish "$tarball" --tag latest || true
+          npm view @hitkeep/tracker dist-tags.latest
+          for attempt in {1..6}; do
+            [[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]] && break
+          done
+          [[ "$existing" != "$integrity" ]]
+          [[ "$latest" != "$VERSION" ]]
           npm view @hitkeep/tracker dist.integrity
-      - name: Promote tracker latest dist-tag
       - name: Promote immutable image to mutable tags
       - name: Promote GitHub release
         run: gh release edit "$TAG" --draft=false --latest
