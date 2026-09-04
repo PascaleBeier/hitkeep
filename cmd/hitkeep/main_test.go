@@ -10,9 +10,9 @@ import (
 	"os/exec"
 	"testing"
 
-	hitkeepcmd "hitkeep/cmd"
-
 	"github.com/spf13/cobra"
+
+	hitkeepcmd "hitkeep/cmd"
 )
 
 func TestExecuteHealthcheckSubprocess(t *testing.T) {

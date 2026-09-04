@@ -36,7 +36,7 @@ func TestWorkspacePropagatesCallerContextToDevProbe(t *testing.T) {
 func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	root := initTestRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.27.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test\n\ngo 1.27.1\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dashboard := filepath.Join(root, "frontend", "dashboard")
@@ -56,7 +56,7 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	fakeBin := t.TempDir()
 	commands := map[string]string{
 		"git":  "git version 2.50.0",
-		"go":   "go version go1.27.0 test/arch",
+		"go":   "go version go1.27.1 test/arch",
 		"node": "v24.19.0",
 		"npm":  "12.0.2",
 		"cc":   "cc 1.0",
@@ -227,7 +227,7 @@ func TestCommandEnvironmentPrefersManagedToolchains(t *testing.T) {
 func writeTestToolchainConfig(t *testing.T, root string) {
 	t.Helper()
 	for path, content := range map[string]string{
-		"go.mod":                           "module example.test\n\ngo 1.27.0\n",
+		"go.mod":                           "module example.test\n\ngo 1.27.1\n",
 		"frontend/dashboard/.node-version": "24.19.0\n",
 		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.0.2"}`,
 	} {
