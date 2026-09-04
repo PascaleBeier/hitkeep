@@ -43,7 +43,16 @@ HitKeep is web-focused. It favors aggregate traffic and conversion evidence over
 
 ## Quick Start
 
-Download the Docker Compose file and environment template:
+On Apple silicon macOS or x86_64 Linux, install HitKeep with Homebrew:
+
+```bash
+brew install PascaleBeier/hitkeep/hitkeep
+hitkeep --version
+```
+
+Follow the [Homebrew installation guide](https://hitkeep.com/guides/installation/homebrew/) to configure and start HitKeep. On Linux ARM64, use the published ARM64 binary or Docker instead.
+
+For a production-oriented self-hosted setup, download the Docker Compose file and environment template:
 
 ```bash
 mkdir hitkeep && cd hitkeep
@@ -59,7 +68,7 @@ docker compose up -d
 
 Open [http://localhost:8080](http://localhost:8080) and create the first account. Keep `.env` private and retain the same secret across restarts.
 
-Before exposing an instance publicly, follow the [Docker Compose guide](https://hitkeep.com/guides/installation/docker-compose/) for HTTPS and trusted proxies, then review [backups](https://hitkeep.com/guides/data/backups-and-restore/) and the [configuration reference](https://hitkeep.com/reference/configuration/). Prefer a native service? Download the Linux AMD64 or ARM64 binary from [GitHub Releases](https://github.com/PascaleBeier/hitkeep/releases) and follow the [binary installation guide](https://hitkeep.com/guides/installation/binary/).
+Before exposing an instance publicly, follow the [Docker Compose guide](https://hitkeep.com/guides/installation/docker-compose/) for HTTPS and trusted proxies, then review [backups](https://hitkeep.com/guides/data/backups-and-restore/) and the [configuration reference](https://hitkeep.com/reference/configuration/). For a native Linux service, download an AMD64 or ARM64 binary from [GitHub Releases](https://github.com/PascaleBeier/hitkeep/releases) and follow the [binary installation guide](https://hitkeep.com/guides/installation/binary/).
 
 ## Track Your First Site
 

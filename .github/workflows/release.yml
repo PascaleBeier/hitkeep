@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions: {}
 
@@ -13,67 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  recover-release-2-13-18:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-      packages: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-node-npm
-      - name: Configure npm trusted publishing
-        shell: bash
-        run: |
-          set -euo pipefail
-          id_token="$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" | jq -er .value)"
-          npm_token="$(curl --fail-with-body --silent --show-error --request POST \
-            --header "Authorization: Bearer ${id_token}" \
-            'https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@hitkeep%2ftracker' | jq -er .token)"
-          echo "::add-mask::${npm_token}"
-          printf '%s\n' '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$RUNNER_TEMP/hitkeep-npmrc"
-          printf 'NODE_AUTH_TOKEN=%s\nNPM_CONFIG_USERCONFIG=%s\n' \
-            "$npm_token" "$RUNNER_TEMP/hitkeep-npmrc" >> "$GITHUB_ENV"
-      - name: Promote tracker latest dist-tag
-        run: npm dist-tag add '@hitkeep/tracker@2.13.18' latest
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Login to Docker Hub
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Promote verified release image
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          source='ghcr.io/pascalebeier/hitkeep@sha256:7068eeef0bb349d35ae6de087bc10f82c36627ff6ba304dadca3de30e049a423'
-          for base in 'ghcr.io/pascalebeier/hitkeep' "${DOCKERHUB_USERNAME}/hitkeep"; do
-            docker buildx imagetools create \
-              --tag "${base}:latest" \
-              --tag "${base}:2" \
-              --tag "${base}:2.13" \
-              "$source"
-          done
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release edit v2.13.18 --draft=false --latest
-
   release-please:
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -538,28 +477,13 @@ jobs:
 
       - uses: ./.github/actions/setup-node-npm
 
-      - name: Configure npm trusted publishing
-        shell: bash
-        run: |
-          set -euo pipefail
-          id_token="$(curl --fail-with-body --silent --show-error \
-            --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" | jq -er .value)"
-          npm_token="$(curl --fail-with-body --silent --show-error --request POST \
-            --header "Authorization: Bearer ${id_token}" \
-            'https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/@hitkeep%2ftracker' | jq -er .token)"
-          echo "::add-mask::${npm_token}"
-          printf '%s\n' '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$RUNNER_TEMP/hitkeep-npmrc"
-          printf 'NODE_AUTH_TOKEN=%s\nNPM_CONFIG_USERCONFIG=%s\n' \
-            "$npm_token" "$RUNNER_TEMP/hitkeep-npmrc" >> "$GITHUB_ENV"
-
       - name: Download verified tracker artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: tracker-package-${{ needs.release-please.outputs.version }}
           path: tracker-package
 
-      - name: Publish immutable tracker candidate
+      - name: Publish verified tracker
         env:
           VERSION: ${{ needs.release-please.outputs.version }}
         shell: bash
@@ -570,22 +494,23 @@ jobs:
           integrity="sha512-$(openssl dgst -sha512 -binary "$tarball" | base64 | tr -d '\n')"
           existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
           if [[ -z "$existing" ]]; then
-            npm publish "$tarball" --tag "release-${VERSION}" || true
-            for attempt in {1..6}; do
-              existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
-              [[ -n "$existing" ]] && break
-              sleep 2
-            done
+            npm publish "$tarball" --tag latest || true
           fi
+          latest=""
+          for attempt in {1..6}; do
+            existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
+            latest="$(npm view @hitkeep/tracker dist-tags.latest 2>/dev/null || true)"
+            [[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]] && break
+            sleep 2
+          done
           if [[ "$existing" != "$integrity" ]]; then
             echo "published @hitkeep/tracker@${VERSION} does not match the verified artifact" >&2
             exit 1
           fi
-
-      - name: Promote tracker latest dist-tag
-        env:
-          VERSION: ${{ needs.release-please.outputs.version }}
-        run: npm dist-tag add "@hitkeep/tracker@${VERSION}" latest
+          if [[ "$latest" != "$VERSION" ]]; then
+            echo "@hitkeep/tracker latest is $latest; want $VERSION" >&2
+            exit 1
+          fi
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
