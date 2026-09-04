@@ -14,7 +14,7 @@ concurrency:
 jobs:
   main-snapshot:
     if: "${{ github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
-    uses: ./.github/workflows/pipeline.yml
+    uses: $/.github/workflows/pipeline.yml
     permissions:
       contents: write
       packages: write
@@ -48,7 +48,7 @@ jobs:
 
   pr-snapshot:
     if: "${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association) }}"
-    uses: ./.github/workflows/pipeline.yml
+    uses: $/.github/workflows/pipeline.yml
     permissions:
       contents: write
       packages: write

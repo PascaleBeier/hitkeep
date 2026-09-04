@@ -95,7 +95,7 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - uses: ./.github/actions/setup-node-npm
+      - uses: $/.github/actions/setup-node-npm
 
       - name: Build deterministic dashboard archive
         run: ./hk ci build-dashboard

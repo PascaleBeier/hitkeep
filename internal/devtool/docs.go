@@ -906,7 +906,7 @@ func validateCIWorkflowContract(root string) error {
 		if bytes.Contains(raw, []byte("actions/setup-node@")) {
 			return fmt.Errorf(".github/workflows/%s bypasses the canonical Node and npm setup action", entry.Name())
 		}
-		if bytes.Contains(raw, []byte("npm ")) && !bytes.Contains(raw, []byte("./.github/actions/setup-node-npm")) {
+		if bytes.Contains(raw, []byte("npm ")) && !bytes.Contains(raw, []byte("$/.github/actions/setup-node-npm")) {
 			return fmt.Errorf(".github/workflows/%s runs npm without the canonical Node and npm setup action", entry.Name())
 		}
 		workflows = append(workflows, raw...)
