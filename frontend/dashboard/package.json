@@ -61,7 +61,7 @@
         "@jsverse/transloco": "^8.4.0",
         "@jsverse/transloco-optimize": "^8.4.0",
         "@playwright/test": "^1.62.1",
-        "@vitest/browser-playwright": "^4.1.11",
+        "@vitest/browser-playwright": "^5.0.0",
         "@vitest/coverage-v8": "^4.1.11",
         "angular-eslint": "22.2.0",
         "baseline-browser-mapping": "^2.11.21",
