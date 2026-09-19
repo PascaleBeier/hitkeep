@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T22:30:45.786343428Z",
+  "generated_at": "2026-09-15T22:47:17.390880729Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -729,6 +729,27 @@
       ]
     },
     {
+      "token": "diffbot-user",
+      "name": "Diffbot-User",
+      "family": "Diffbot",
+      "category": "ai_assistant",
+      "respects_robots_txt": "yes",
+      "url": "https://www.diffbot.com/",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "doubaobot",
+      "name": "DoubaoBot",
+      "family": "ByteDance",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "doximity-diffbot",
       "name": "Doximity-Diffbot",
       "family": "Diffbot Technologies Corp.",
@@ -769,6 +790,16 @@
       "category": "other_ai",
       "respects_robots_txt": "unclear",
       "url": "https://echobox.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "erniebot",
+      "name": "ERNIEBot",
+      "family": "Baidu",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
       "sources": [
         "ai_robots_txt"
       ]
@@ -1318,11 +1349,12 @@
     {
       "token": "kimi-searchbot",
       "name": "Kimi-SearchBot",
-      "family": "Moonshot AI Pte. Ltd.",
+      "family": "Moonshot AI",
       "category": "ai_search_indexer",
-      "respects_robots_txt": "unclear",
-      "url": "https://www.kimi.com/policies/kimi-crawlers",
+      "respects_robots_txt": "yes",
+      "url": "https://www.moonshot.ai",
       "sources": [
+        "ai_robots_txt",
         "device_detector_bots"
       ]
     },
@@ -1341,11 +1373,12 @@
     {
       "token": "kimibot",
       "name": "KimiBot",
-      "family": "Moonshot AI Pte. Ltd.",
+      "family": "Moonshot AI",
       "category": "ai_training_crawler",
-      "respects_robots_txt": "unclear",
-      "url": "https://www.kimi.com/policies/kimi-crawlers",
+      "respects_robots_txt": "yes",
+      "url": "https://www.moonshot.ai",
       "sources": [
+        "ai_robots_txt",
         "device_detector_bots"
       ]
     },
@@ -1526,10 +1559,22 @@
       "name": "MistralAI-Index",
       "family": "Mistral AI",
       "category": "ai_search_indexer",
-      "respects_robots_txt": "unclear",
+      "respects_robots_txt": "yes",
       "url": "https://docs.mistral.ai/robots",
       "sources": [
+        "ai_robots_txt",
         "device_detector_bots"
+      ]
+    },
+    {
+      "token": "mistralai-training",
+      "name": "MistralAI-Training",
+      "family": "Mistral AI",
+      "category": "ai_training_crawler",
+      "respects_robots_txt": "yes",
+      "url": "https://mistral.ai",
+      "sources": [
+        "ai_robots_txt"
       ]
     },
     {
@@ -1647,6 +1692,17 @@
       "url": "https://crawl.corp.novellum.ai/docs",
       "sources": [
         "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "oai-adsbot",
+      "name": "OAI-AdsBot",
+      "family": "OpenAI",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "url": "https://openai.com",
+      "sources": [
+        "ai_robots_txt"
       ]
     },
     {
@@ -1906,6 +1962,16 @@
       "category": "other_ai",
       "respects_robots_txt": "unclear",
       "url": "https://quillbot.com",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "qwenbot",
+      "name": "QwenBot",
+      "family": "Alibaba",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
       "sources": [
         "ai_robots_txt"
       ]
