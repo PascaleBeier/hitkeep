@@ -2,10 +2,42 @@ import type { EChartsCoreOption } from 'echarts/core';
 
 export type HitkeepChartDesign = 'area' | 'line' | 'bar';
 
+/**
+ * Maps the series colors used across the dashboard to OptimusUI design
+ * tokens, so charts follow the active theme. Unknown colors pass through
+ * unchanged; an unset token falls back to the original hex.
+ */
+const CHART_TOKEN_COLORS: Record<string, string> = {
+    '#6366f1': '--p-primary-500',
+    '#14b8a6': '--p-teal-500',
+    '#0ea5b7': '--p-cyan-500',
+    '#2563eb': '--p-blue-500',
+    '#0f9d58': '--p-green-500',
+    '#059669': '--p-emerald-500',
+    '#0f766e': '--p-teal-700',
+    '#dc2626': '--p-red-500',
+    '#a16207': '--p-amber-600'
+};
+
+export function resolveChartColor(color: string): string {
+    const token = CHART_TOKEN_COLORS[color.trim().toLowerCase()];
+    if (!token || typeof window === 'undefined') {
+        return color;
+    }
+    const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    return value || color;
+}
+
 export const HITKEEP_CHART_PALETTE = {
-    primary: '#6366f1',
-    secondary: '#14b8a6',
-    warning: '#d97706'
+    get primary() {
+        return resolveChartColor('#6366f1');
+    },
+    get secondary() {
+        return resolveChartColor('#14b8a6');
+    },
+    get warning() {
+        return resolveChartColor('#a16207');
+    }
 } as const;
 
 export interface HitkeepChartTheme {

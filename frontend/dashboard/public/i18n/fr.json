@@ -2855,6 +2855,28 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":   {
+    "dialogTitle": "Apparence",
+    "subtitle": "Choisissez un thème, personnalisez-le ci-dessous et enregistrez-le pour le réutiliser à tout moment.",
+    "openDialogAria": "Personnaliser le thème",
+    "fields": {
+      "name": "Nom du thème",
+      "primary": "Couleur principale",
+      "surface": "Couleur de surface",
+      "surfaceHint": "Optionnel. Laissez vide pour conserver les surfaces par défaut.",
+      "fontFamily": "Police de caractères",
+      "fontFamilyPlaceholder": "p. ex. Inter, sans-serif",
+      "fontFamilyHint": "Optionnel. Une valeur CSS font-family. Les polices non incluses dans le tableau de bord doivent être installées sur votre système.",
+      "customCss": "CSS personnalisé",
+      "customCssPlaceholder": "/* Remplacements CSS facultatifs */",
+      "customCssHint": "Optionnel. S’applique par-dessus le thème sélectionné, en mode clair comme en mode sombre."
+    },
+    "actions": {
+      "saveTheme": "Enregistrer le thème",
+      "deleteTheme": "Supprimer le thème",
+      "resetDefaults": "Rétablir les valeurs par défaut"
+    }
+  },
   "comparison": {
     "vsLabel": "c/a",
     "pageviewsLabel": "Pages vues (préc.)",

@@ -2852,6 +2852,28 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":   {
+    "dialogTitle": "Aspetto",
+    "subtitle": "Scegli un tema, personalizzalo qui sotto e salvatelo per riutilizzarlo quando vuoi.",
+    "openDialogAria": "Personalizza tema",
+    "fields": {
+      "name": "Nome del tema",
+      "primary": "Colore primario",
+      "surface": "Colore di superficie",
+      "surfaceHint": "Opzionale. Lascia vuoto per mantenere le superfici predefinite.",
+      "fontFamily": "Famiglia di caratteri",
+      "fontFamilyPlaceholder": "es. Inter, sans-serif",
+      "fontFamilyHint": "Opzionale. Un valore CSS font-family. I caratteri non inclusi nella dashboard devono essere installati sul sistema.",
+      "customCss": "CSS personalizzato",
+      "customCssPlaceholder": "/* Override CSS opzionali */",
+      "customCssHint": "Opzionale. Viene applicato sopra il tema selezionato, sia in modalità chiara che scura."
+    },
+    "actions": {
+      "saveTheme": "Salva tema",
+      "deleteTheme": "Elimina tema",
+      "resetDefaults": "Ripristina valori predefiniti"
+    }
+  },
   "comparison": {
     "vsLabel": "vs.",
     "pageviewsLabel": "Visualizzazioni (prec.)",

@@ -2838,6 +2838,28 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":   {
+    "dialogTitle": "Weergave",
+    "subtitle": "Kies een thema, pas het hieronder aan en sla het op om het later opnieuw te gebruiken.",
+    "openDialogAria": "Thema aanpassen",
+    "fields": {
+      "name": "Themanaam",
+      "primary": "Primaire kleur",
+      "surface": "Oppervlakkleur",
+      "surfaceHint": "Optioneel. Leeg laten om de standaardoppervlakken te behouden.",
+      "fontFamily": "Lettertypefamilie",
+      "fontFamilyPlaceholder": "bijv. Inter, sans-serif",
+      "fontFamilyHint": "Optioneel. Een CSS font-family-waarde. Lettertypen die niet in het dashboard zijn opgenomen, moeten op je systeem geïnstalleerd zijn.",
+      "customCss": "Aangepaste CSS",
+      "customCssPlaceholder": "/* Optionele CSS-overrides */",
+      "customCssHint": "Optioneel. Wordt bovenop het geselecteerde thema toegepast, in zowel lichte als donkere modus."
+    },
+    "actions": {
+      "saveTheme": "Thema opslaan",
+      "deleteTheme": "Thema verwijderen",
+      "resetDefaults": "Standaardwaarden herstellen"
+    }
+  },
   "comparison": {
     "vsLabel": "vs.",
     "pageviewsLabel": "Pageviews (vorige periode)",

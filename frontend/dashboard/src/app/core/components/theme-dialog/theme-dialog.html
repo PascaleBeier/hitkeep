@@ -1,0 +1,98 @@
+<app-dialog-shell
+    [visible]="visible()"
+    (visibleChange)="onVisibleChange($event)"
+    [title]="'theme.dialogTitle' | transloco"
+    [width]="'46rem'"
+>
+    <div class="flex flex-col gap-5">
+        <p class="m-0 text-sm text-muted-color">{{ 'theme.subtitle' | transloco }}</p>
+
+        <div class="flex flex-wrap gap-2" role="listbox" [attr.aria-label]="'theme.dialogTitle' | transloco">
+            @for (theme of themes(); track theme.id) {
+                <button
+                    type="button"
+                    role="option"
+                    [attr.aria-selected]="theme.id === activeThemeId()"
+                    (click)="selectTheme(theme)"
+                    class="hk-theme-chip"
+                    [class.hk-theme-chip--active]="theme.id === activeThemeId()"
+                >
+                    <span class="hk-theme-chip__swatch" [style.background]="theme.primary" aria-hidden="true"></span>
+                    <span class="text-sm font-medium">{{ theme.name }}</span>
+                    @if (theme.id === activeThemeId()) {
+                        <i class="pi pi-check text-xs" aria-hidden="true"></i>
+                    }
+                </button>
+            }
+        </div>
+
+        <form class="grid grid-cols-1 gap-4 md:grid-cols-2" [formGroup]="form" (ngSubmit)="save()">
+            <div class="flex flex-col gap-2 md:col-span-2">
+                <label for="hk-theme-name" class="text-sm font-medium">{{ 'theme.fields.name' | transloco }}</label>
+                <input pInputText id="hk-theme-name" formControlName="name" />
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-primary" class="text-sm font-medium">{{ 'theme.fields.primary' | transloco }}</label>
+                <p-colorpicker inputId="hk-theme-primary" formControlName="primary" />
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-surface" class="text-sm font-medium">{{ 'theme.fields.surface' | transloco }}</label>
+                <p-colorpicker inputId="hk-theme-surface" formControlName="surface" />
+                <small class="text-muted-color">{{ 'theme.fields.surfaceHint' | transloco }}</small>
+            </div>
+
+            <div class="flex flex-col gap-2 md:col-span-2">
+                <label for="hk-theme-font" class="text-sm font-medium">{{ 'theme.fields.fontFamily' | transloco }}</label>
+                <input pInputText id="hk-theme-font" formControlName="fontFamily" [placeholder]="'theme.fields.fontFamilyPlaceholder' | transloco" />
+                <small class="text-muted-color">{{ 'theme.fields.fontFamilyHint' | transloco }}</small>
+            </div>
+
+            <div class="flex flex-col gap-2 md:col-span-2">
+                <label for="hk-theme-css" class="text-sm font-medium">{{ 'theme.fields.customCss' | transloco }}</label>
+                <textarea
+                    pTextarea
+                    id="hk-theme-css"
+                    formControlName="customCss"
+                    rows="6"
+                    class="font-mono"
+                    [placeholder]="'theme.fields.customCssPlaceholder' | transloco"
+                ></textarea>
+                <small class="text-muted-color">{{ 'theme.fields.customCssHint' | transloco }}</small>
+            </div>
+        </form>
+
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex gap-2">
+                @if (draftIsCustom()) {
+                    <p-button
+                        [label]="'theme.actions.deleteTheme' | transloco"
+                        icon="pi pi-trash"
+                        severity="danger"
+                        [text]="true"
+                        size="small"
+                        type="button"
+                        (onClick)="deleteDraft()"
+                    />
+                }
+                <p-button
+                    [label]="'theme.actions.resetDefaults' | transloco"
+                    icon="pi pi-refresh"
+                    severity="secondary"
+                    [text]="true"
+                    size="small"
+                    type="button"
+                    (onClick)="resetDefaults()"
+                />
+            </div>
+            <p-button
+                [label]="'theme.actions.saveTheme' | transloco"
+                icon="pi pi-check"
+                type="button"
+                [disabled]="form.invalid"
+                (onClick)="save()"
+            />
+        </div>
+    </div>
+</app-dialog-shell>

@@ -16,6 +16,7 @@ import { OptimusLocaleSyncService } from '@core/i18n/optimus-locale-sync.service
 import { DASHBOARD_LANGUAGE_CODES, DASHBOARD_LOCALE_MAPPING, DEFAULT_DASHBOARD_LANGUAGE, SOURCE_LOCALE } from '@core/i18n/supported-locales';
 import { DashboardTitleService } from '@services/dashboard-title.service';
 import { PreferencesService } from '@services/preferences.service';
+import { ThemeManagerService } from '@services/theme-manager.service';
 import { HitKeepPreset } from '@core/theme/hitkeep-preset';
 import { ApplicationErrorNavigationService } from '@services/application-error-navigation.service';
 import { SelectivePreloadingStrategy } from '@services/selective-preloading-strategy';
@@ -58,6 +59,7 @@ export const appConfig: ApplicationConfig = {
         provideEnvironmentInitializer(() => inject(OptimusLocaleSyncService)),
         provideEnvironmentInitializer(() => inject(DashboardTitleService)),
         provideEnvironmentInitializer(() => inject(PreferencesService)),
+        provideEnvironmentInitializer(() => inject(ThemeManagerService)),
         providePreloadUserLang()
     ]
 };
