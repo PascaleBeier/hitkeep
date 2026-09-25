@@ -16,6 +16,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	opportunitysvc "hitkeep/internal/opportunities"
+	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
 )
@@ -277,7 +278,7 @@ func (h *handler) handleGetShareSiteStats() http.HandlerFunc {
 		}
 
 		q := r.URL.Query()
-		start, end := parseStatsRange(q)
+		start, end := filterparams.ParseLenientAnalyticsRange(q)
 
 		filters, err := parseFilters(q)
 		if err != nil {

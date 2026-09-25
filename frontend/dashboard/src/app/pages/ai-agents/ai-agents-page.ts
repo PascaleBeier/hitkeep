@@ -14,6 +14,7 @@ import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header'
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { StatGroup, StatGroups } from '@components/stat-groups/stat-groups';
+import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { calcDelta, safeRate } from '@core/analytics/delta-utils';
 import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
 import { injectActiveLang } from '@core/i18n/active-lang';
@@ -426,15 +427,7 @@ export class AIAgentsPage {
 
     /** Replaces an existing filter of the same dimension; the same value toggles off. */
     private applyFilter(type: AIActivityFilterType, value: string): void {
-        if (!value) return;
-        this.pageFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex < 0) return [...filters, { type, value }];
-            if (filters[existingIndex].value === value) return filters.filter((_, index) => index !== existingIndex);
-            const next = [...filters];
-            next[existingIndex] = { type, value };
-            return next;
-        });
+        this.pageFilters.update((filters) => toggleDimensionFilter(filters, type, value));
     }
 
     private removeFilter(type: AIActivityFilterType, value: string): void {
