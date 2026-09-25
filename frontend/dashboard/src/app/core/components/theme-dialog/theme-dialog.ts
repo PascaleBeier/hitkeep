@@ -36,22 +36,23 @@ export class ThemeDialog {
     });
 
     constructor() {
-        // Open: seed the editor from the active theme. Close: drop any
-        // unsaved preview and restore the persisted theme.
+        // Open: seed the editor from the active theme.
         effect(() => {
             if (this.visible()) {
                 this.loadTheme(this.themeManager.activeTheme());
-            } else {
-                this.themeManager.restoreActiveTheme();
             }
         });
         // Live preview: every edit reaches the design tokens immediately so
-        // the dashboard behind the dialog shows the result in real time.
+        // the dashboard behind the dialog shows the result in real time. The
+        // valueChanges stream fires inside change detection, where signal
+        // writes (design tokens, version bump) are rejected (NG0103), so the
+        // apply is deferred to a microtask after the current pass.
         this.form.valueChanges.subscribe(() => {
             if (!this.visible()) {
                 return;
             }
-            this.themeManager.previewTheme(this.draftFromForm());
+            const draft = this.draftFromForm();
+            queueMicrotask(() => this.themeManager.previewTheme(draft));
         });
     }
 
@@ -88,6 +89,10 @@ export class ThemeDialog {
     }
 
     protected onVisibleChange(visible: boolean): void {
+        if (!visible) {
+            // Dialog dismissed without saving: drop the unsaved preview.
+            this.themeManager.restoreActiveTheme();
+        }
         this.visible.set(visible);
     }
 

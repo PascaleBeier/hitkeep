@@ -54,11 +54,6 @@ describe('ThemeManagerService', () => {
         expect(service.activeTheme().builtin).toBe(true);
     });
 
-    it('applies the active theme on construction', () => {
-        expect(palette).toHaveBeenCalledWith(BUILT_IN_THEMES[0].primary);
-        expect(updatePrimaryPalette).toHaveBeenCalled();
-    });
-
     it('saves a custom theme, persists it and selects it', () => {
         service.saveTheme(customTheme);
 

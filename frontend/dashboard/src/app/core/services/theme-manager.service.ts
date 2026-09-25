@@ -1,4 +1,4 @@
-import { Service, computed, effect, signal } from '@angular/core';
+import { Service, afterNextRender, computed, signal } from '@angular/core';
 import { palette, updatePrimaryPalette, updateSurfacePalette } from '@openng/optimus-ui-themes';
 import { BUILT_IN_THEMES, DEFAULT_THEME_ID, type HitkeepTheme } from '@core/theme/theme.model';
 
@@ -38,7 +38,10 @@ export class ThemeManagerService {
         if (typeof window === 'undefined') {
             return;
         }
-        effect(() => this.apply(this.activeTheme()));
+        // Writing design tokens registers as a signal write, which Angular
+        // rejects inside effect/computed contexts (NG0103) - including the
+        // environment-initializer pass. Defer to the first render instead.
+        afterNextRender(() => this.apply(this.activeTheme()));
     }
 
     setActiveTheme(id: string): void {
@@ -47,6 +50,7 @@ export class ThemeManagerService {
         }
         this.activeThemeId.set(id);
         localStorage.setItem(ACTIVE_THEME_STORAGE_KEY, id);
+        this.apply(this.activeTheme());
     }
 
     /** Persist a theme (built-in ids are stored as a custom copy under a new id). */
@@ -74,6 +78,8 @@ export class ThemeManagerService {
         this.persistCustomThemes();
         if (this.activeThemeId() === id) {
             this.setActiveTheme(DEFAULT_THEME_ID);
+        } else {
+            this.apply(this.activeTheme());
         }
     }
 
