@@ -249,6 +249,9 @@ func (a *App) BuildReleaseBinaries(ctx context.Context, request ReleaseBuildRequ
 	if !slices.Contains([]string{"amd64", "arm64"}, request.GOARCH) {
 		return ReleaseBuildResult{}, fmt.Errorf("unsupported release GOARCH %q", request.GOARCH)
 	}
+	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"go", "run", "./internal/duckdbextensions/update", "-check"}}); err != nil {
+		return ReleaseBuildResult{}, err
+	}
 	if err := a.ValidateProductionBoundary(ctx); err != nil {
 		return ReleaseBuildResult{}, err
 	}

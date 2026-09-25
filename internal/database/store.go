@@ -297,9 +297,6 @@ func (s *Store) Connect() error {
 	s.closed = false
 	s.closeMu.Unlock()
 	s.recoveredOnConnect = recoveryTimestampChanged(recoveryBeforeConnect, s.DatabaseStatus().LastRecoveryAt)
-	if err := s.bootstrapCoreExtensions(); err != nil {
-		s.logger.Warn("DuckDB core extension bootstrap incomplete; XLSX exports and S3-backed flows may fail", "error", err)
-	}
 	s.logger.Debug("Database connection established successfully.")
 	return nil
 }
@@ -406,14 +403,6 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 	if _, err := execer.ExecContext(context.Background(), "SET TimeZone = 'UTC';", nil); err != nil {
 		return fmt.Errorf("set database timezone: %w", err)
 	}
-	// Everything HitKeep needs is statically linked or installed explicitly
-	// at bootstrap; implicit extension fetching would mean silent network
-	// egress to the DuckDB extension repository at query time. Community
-	// extensions are never used, so that repository is locked out entirely
-	// (the setting is one-way until restart by design).
-	if _, err := execer.ExecContext(context.Background(), "SET autoinstall_known_extensions=false; SET autoload_known_extensions=false; SET allow_community_extensions=false;", nil); err != nil {
-		return fmt.Errorf("disable implicit extension fetching: %w", err)
-	}
 	// Insertion-order preservation buffers whole results and parallel insert
 	// batches in memory; every user-visible ordering in HitKeep is an
 	// explicit ORDER BY, so trade the implicit order for lower memory use.
@@ -439,8 +428,8 @@ func (s *Store) initConnection(execer driver.ExecerContext) error {
 			return fmt.Errorf("set database threads %d: %w", s.threads, err)
 		}
 	}
-	for _, extension := range duckDBCoreExtensions {
-		s.loadInstalledExtension(context.Background(), execer, extension)
+	if err := initializeCoreExtensions(context.Background(), execer); err != nil {
+		return err
 	}
 	if s.catalog != "" {
 		if _, err := execer.ExecContext(context.Background(), "USE "+safeCatalogIdentifier(s.catalog)+";", nil); err != nil {
@@ -455,27 +444,6 @@ func safeCatalogIdentifier(catalog string) string {
 		panic("unsafe DuckDB catalog identifier")
 	}
 	return catalog
-}
-
-func (s *Store) bootstrapCoreExtensions() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	return s.WithDuckDBSession(ctx, DuckDBSessionOptions{}, func(conn *sql.Conn) error {
-		for _, extension := range duckDBCoreExtensions {
-			if err := EnsureCoreExtension(ctx, conn, extension); err != nil {
-				return fmt.Errorf("bootstrap %s extension: %w", extension, err)
-			}
-		}
-		return nil
-	})
-}
-
-func (s *Store) loadInstalledExtension(ctx context.Context, execer driver.ExecerContext, name string) {
-	query := fmt.Sprintf("LOAD %s;", name)
-	if _, err := execer.ExecContext(ctx, query, nil); err != nil {
-		hklog.LoggerFromContextOr(ctx, s.logger).Debug("DuckDB core extension not yet available on new connection", "extension", name, "error", err)
-	}
 }
 
 func (s *Store) StartMaintenance(ctx context.Context) {

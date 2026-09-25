@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"hitkeep/hklog"
 	"hitkeep/internal/cluster"
 	"hitkeep/internal/database"
+	"hitkeep/internal/duckdbextensions"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/ingest"
 	"hitkeep/internal/mailer"
@@ -81,6 +83,10 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 			os.Exit(1)
 		}
 	}()
+
+	if err := duckdbextensions.Configure(filepath.Join(conf.DataPath, ".duckdb", "extensions")); err != nil {
+		return fmt.Errorf("configure bundled DuckDB extensions: %w", err)
+	}
 
 	logger.Info("Starting HitKeep", "version", Version, "log_level", logLevel.String(), "config", conf)
 

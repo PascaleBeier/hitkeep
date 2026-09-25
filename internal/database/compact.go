@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -469,7 +470,9 @@ func listCatalogFKEdges(ctx context.Context, db *sql.DB, catalog string) ([]fkEd
 }
 
 func openDuckDBFile(path string) (*sql.DB, error) {
-	connector, err := duckdb.NewConnector(path, nil)
+	connector, err := duckdb.NewConnector(path, func(exec driver.ExecerContext) error {
+		return initializeCoreExtensions(context.Background(), exec)
+	})
 	if err != nil {
 		return nil, err
 	}
