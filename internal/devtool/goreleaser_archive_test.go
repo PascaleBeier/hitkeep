@@ -72,6 +72,9 @@ func releaseArchiveMembers(arch string, catalog, example, manifest []byte) []arc
 		{name: "README.md", mode: 0o644, data: []byte("readme")},
 		{name: runtimeconfig.ConfigurationCatalogFilename, mode: 0o644, data: catalog},
 		{name: runtimeconfig.ConfigurationExampleFilename, mode: 0o644, data: example},
+		{name: "internal/duckdbextensions/LICENSE.aws", mode: 0o644, data: []byte("license")},
+		{name: "internal/duckdbextensions/LICENSE.excel", mode: 0o644, data: []byte("license")},
+		{name: "internal/duckdbextensions/LICENSE.httpfs", mode: 0o644, data: []byte("license")},
 		{name: runtimeconfig.ConfigurationReleaseManifestFilename, mode: 0o644, data: manifest},
 	}
 }
