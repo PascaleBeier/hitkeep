@@ -324,9 +324,9 @@ jobs:
             test -n "$source"
             cp "$source" "$release_dir/$archive"
             archive="$release_dir/$archive"
-            diff -u <(printf '%s\n' LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
+            diff -u <(printf '%s\n' LICENSE README.md internal/duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
             test "$(tar -tvzf "$archive" "hitkeep-linux-${arch}" | awk '{print $1}')" = "-rwxr-xr-x"
-            for file in LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
+            for file in LICENSE README.md internal/duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
               test "$(tar -tvzf "$archive" "$file" | awk '{print $1}')" = "-rw-r--r--"
               cmp <(tar -xOzf "$archive" "$file") "$file"
             done

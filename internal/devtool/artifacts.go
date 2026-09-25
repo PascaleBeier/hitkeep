@@ -238,9 +238,12 @@ func verifySelfHostedReleaseArchive(path, version, arch string, catalog, example
 		mode int64
 		data []byte
 	}{
-		"hitkeep-linux-" + arch: {mode: 0o755},
-		"LICENSE":               {mode: 0o644},
-		"README.md":             {mode: 0o644},
+		"hitkeep-linux-" + arch:                            {mode: 0o755},
+		"LICENSE":                                          {mode: 0o644},
+		"README.md":                                        {mode: 0o644},
+		"internal/duckdbextensions/LICENSE.aws":            {mode: 0o644},
+		"internal/duckdbextensions/LICENSE.excel":          {mode: 0o644},
+		"internal/duckdbextensions/LICENSE.httpfs":         {mode: 0o644},
 		runtimeconfig.ConfigurationCatalogFilename:         {mode: 0o644, data: catalog},
 		runtimeconfig.ConfigurationExampleFilename:         {mode: 0o644, data: example},
 		runtimeconfig.ConfigurationReleaseManifestFilename: {mode: 0o644, data: manifest},

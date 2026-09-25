@@ -54,6 +54,7 @@ archives:
     name_template: "hitkeep_{{ .Version }}_Linux_{{ .Arch }}"
     files:
       - LICENSE
+      - internal/duckdbextensions/LICENSE.*
       - README.md
       - hitkeep-configuration.json
       - hitkeep.example.yaml

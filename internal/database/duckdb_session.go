@@ -41,21 +41,14 @@ func WithDuckDBSession(ctx context.Context, db *sql.DB, opts DuckDBSessionOption
 }
 
 func prepareDuckDBSession(ctx context.Context, conn *sql.Conn, opts DuckDBSessionOptions) error {
-	if opts.Excel {
-		if err := LoadInstalledCoreExtension(ctx, conn, "excel"); err != nil {
-			return fmt.Errorf("load excel extension: %w", err)
-		}
-	}
-
-	if opts.S3 != nil {
-		if err := LoadInstalledCoreExtension(ctx, conn, "httpfs"); err != nil {
-			return fmt.Errorf("load httpfs extension: %w", err)
-		}
-		if err := ConfigureS3Secret(ctx, conn, opts.S3); err != nil {
+	if opts.Excel || opts.S3 != nil {
+		if err := initializeSessionExtensions(ctx, conn); err != nil {
 			return err
 		}
 	}
-
+	if opts.S3 != nil {
+		return ConfigureS3Secret(ctx, conn, opts.S3)
+	}
 	return nil
 }
 

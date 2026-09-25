@@ -692,6 +692,9 @@ func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Wr
 	if err != nil {
 		return err
 	}
+	if err := a.runCommand(ctx, writer, commandSpec{Args: []string{"go", "run", "./internal/duckdbextensions/update", "-check"}}); err != nil {
+		return err
+	}
 	if err := a.ValidateProductionBoundary(ctx); err != nil {
 		return err
 	}
