@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
+import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { calcDelta } from '@core/analytics/delta-utils';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -273,20 +274,7 @@ export class UtmDashboard {
     protected readonly calcDelta = calcDelta;
 
     protected applyMetricFilter(type: MetricFilterType, metric: { name: string }) {
-        if (!metric.name) return;
-        this.activeFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex >= 0) {
-                const existing = filters[existingIndex];
-                if (existing.value === metric.name) {
-                    return filters.filter((_, idx) => idx !== existingIndex);
-                }
-                const next = [...filters];
-                next[existingIndex] = { type, value: metric.name };
-                return next;
-            }
-            return [...filters, { type, value: metric.name }];
-        });
+        this.activeFilters.update((filters) => toggleDimensionFilter(filters, type, metric.name));
     }
 
     protected onMetricCardClick(event: MetricCardGroupRowClick): void {

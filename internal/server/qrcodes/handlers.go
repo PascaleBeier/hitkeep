@@ -29,6 +29,7 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/ipmeta"
+	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
 )
@@ -522,7 +523,7 @@ func (h *handler) summaryHandler(load loadQRFunc) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		start, end := parseRange(r)
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 		stats, opens, ok := h.loadQRStats(w, r, qr, start, end)
 		if !ok {
 			return
@@ -547,7 +548,7 @@ func (h *handler) openSeriesHandler(load loadQRFunc) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		start, end := parseRange(r)
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 		store, err := h.ctx.AnalyticsStore(r.Context(), qr.SiteID)
 		if err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to resolve QR analytics store", "error", err, "site_id", qr.SiteID)
@@ -1103,24 +1104,6 @@ func parseUUIDPath(w http.ResponseWriter, r *http.Request, key, message string) 
 		return uuid.Nil, false
 	}
 	return id, true
-}
-
-func parseRange(r *http.Request) (time.Time, time.Time) {
-	now := time.Now().UTC()
-	end := now.AddDate(0, 0, 1)
-	start := end.AddDate(0, 0, -30)
-	q := r.URL.Query()
-	if raw := q.Get("from"); raw != "" {
-		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
-			start = parsed
-		}
-	}
-	if raw := q.Get("to"); raw != "" {
-		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
-			end = parsed
-		}
-	}
-	return start, end
 }
 
 func normalizeCustomParams(params map[string]string) map[string]string {

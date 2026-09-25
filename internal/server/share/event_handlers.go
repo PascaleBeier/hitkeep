@@ -26,7 +26,7 @@ func (h *handler) handleGetShareEventNames() http.HandlerFunc {
 			return
 		}
 
-		start, end := parseTimeseriesRange(r.URL.Query())
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
@@ -70,7 +70,7 @@ func (h *handler) handleGetShareEventPropertyKeys() http.HandlerFunc {
 			return
 		}
 
-		start, end := parseTimeseriesRange(q)
+		start, end := filterparams.ParseLenientAnalyticsRange(q)
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
@@ -115,7 +115,7 @@ func (h *handler) handleGetShareEventPropertyBreakdown() http.HandlerFunc {
 			return
 		}
 
-		start, end := parseTimeseriesRange(q)
+		start, end := filterparams.ParseLenientAnalyticsRange(q)
 
 		analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), site.ID)
 		if err != nil {
@@ -182,7 +182,7 @@ func (h *handler) parseShareEventQueryParams(w http.ResponseWriter, r *http.Requ
 		return nil, shareEventQueryParams{}, false
 	}
 
-	start, end := parseTimeseriesRange(q)
+	start, end := filterparams.ParseLenientAnalyticsRange(q)
 
 	return site, shareEventQueryParams{
 		SiteID:        site.ID,
@@ -262,7 +262,7 @@ func (h *handler) shareEventQueryHandler(
 
 func (h *handler) parseShareEcommerceParams(w http.ResponseWriter, r *http.Request, site *api.Site, defaultLimit int) (api.EcommerceParams, bool) {
 	q := r.URL.Query()
-	start, end := parseTimeseriesRange(q)
+	start, end := filterparams.ParseLenientAnalyticsRange(q)
 
 	filters, err := parseFilters(q)
 	if err != nil {

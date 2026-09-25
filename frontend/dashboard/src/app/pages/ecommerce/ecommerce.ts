@@ -3,6 +3,7 @@ import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from '@openng/optimus-ui/button';
@@ -358,22 +359,7 @@ export class EcommercePage {
     }
 
     protected applyMetricFilter(type: MetricFilterType, metric: MetricStat) {
-        if (!metric.name) {
-            return;
-        }
-        this.activeFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex >= 0) {
-                const existing = filters[existingIndex];
-                if (existing.value === metric.name) {
-                    return filters.filter((_, index) => index !== existingIndex);
-                }
-                const next = [...filters];
-                next[existingIndex] = { type, value: metric.name };
-                return next;
-            }
-            return [...filters, { type, value: metric.name }];
-        });
+        this.activeFilters.update((filters) => toggleDimensionFilter(filters, type, metric.name));
     }
 
     protected onMetricCardClick(event: MetricCardGroupRowClick): void {

@@ -42,7 +42,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 			return
 		}
 
-		start, end := parseOverviewStatsRange(r.URL.Query())
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 		response := api.SitesOverviewStatsResponse{
 			Sites: make([]api.SiteOverviewStats, 0, len(sites)),
 		}
@@ -104,24 +104,6 @@ func (h *handler) listAccessibleSites(ctx context.Context, userID uuid.UUID, api
 	}
 
 	return sites, nil
-}
-
-func parseOverviewStatsRange(q url.Values) (time.Time, time.Time) {
-	now := time.Now().UTC()
-	end := now.AddDate(0, 0, 1)
-	start := end.AddDate(0, 0, -30)
-
-	if fromStr := q.Get("from"); fromStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			start = parsed
-		}
-	}
-	if toStr := q.Get("to"); toStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
-			end = parsed
-		}
-	}
-	return start, end
 }
 
 func overviewStatsError(siteID uuid.UUID) api.SiteOverviewStats {
