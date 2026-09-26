@@ -385,6 +385,8 @@ describe('TeamOverviewPage', () => {
 
     it('hides usage limits and cloud plan details for OSS instances', async () => {
         fixture.destroy();
+        const cloudService = TestBed.inject(CloudService);
+        vi.mocked(cloudService.getPlans).mockClear();
         systemStatusResponse = {
             needs_setup: false,
             version: 'v2.0.0'
@@ -400,5 +402,6 @@ describe('TeamOverviewPage', () => {
         expect(text).not.toContain('Cloud plan');
         expect(text).toContain('Acme Analytics');
         expect(text).toContain('Members');
+        expect(cloudService.getPlans).not.toHaveBeenCalled();
     });
 });

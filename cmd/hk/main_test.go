@@ -39,10 +39,10 @@ func TestDetachedCLIActionOutlivesLauncher(t *testing.T) {
 	for name, body := range map[string]string{
 		"go.mod":                               "module example.test/hk\n\ngo 1.27.1\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
-		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.2\"}\n",
+		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.1.0\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.node-version":     "24.19.0\n",
+		"frontend/dashboard/.node-version":     "26.10.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -210,10 +210,10 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	for name, body := range map[string]string{
 		"go.mod":                               "module example.test/hk\n\ngo 1.27.1\n",
 		"CONTRIBUTING.md":                      "# Contributing\n",
-		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.0.2\"}\n",
+		"frontend/dashboard/package.json":      "{\"packageManager\":\"npm@12.1.0\"}\n",
 		"frontend/dashboard/package-lock.json": "{}\n",
 		"frontend/dashboard/.npmrc":            "legacy-peer-deps=true\n",
-		"frontend/dashboard/.node-version":     "24.19.0\n",
+		"frontend/dashboard/.node-version":     "26.10.0\n",
 	} {
 		path := filepath.Join(workspace, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -231,7 +231,7 @@ func TestMCPStdioActionRunLifecycle(t *testing.T) {
 	goScript := "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.27.1 test'; exit 0; fi\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	dockerScript := "#!/bin/sh\ncase \"$*\" in *version*) echo 1.0.0; exit 0;; esac\nif [ -f \"" + slowFile + "\" ]; then sleep 30; fi\nexit 0\n"
 	for name, script := range map[string]string{
-		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v24.19.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
+		"docker": dockerScript, "go": goScript, "npm": "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.1.0'; exit 0; fi\nmkdir -p node_modules\nexit 0\n", "node": "#!/bin/sh\necho v26.10.0\n", "npx": "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 	} {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
@@ -320,7 +320,7 @@ func installFakeManagedToolchain(t *testing.T, stateDir string) {
 	t.Helper()
 	platform := runtime.GOOS + "-" + runtime.GOARCH
 	goBin := filepath.Join(stateDir, "shared", "toolchains", "go-1.27.1-"+platform, "bin")
-	nodeRoot := filepath.Join(stateDir, "shared", "toolchains", "node-24.19.0-"+platform)
+	nodeRoot := filepath.Join(stateDir, "shared", "toolchains", "node-26.10.0-"+platform)
 	nodeBin := filepath.Join(nodeRoot, "bin")
 	npmCLI := filepath.Join(nodeRoot, "lib", "node_modules", "npm", "bin", "npm-cli.js")
 	for _, directory := range []string{goBin, nodeBin, filepath.Dir(npmCLI)} {
@@ -330,8 +330,8 @@ func installFakeManagedToolchain(t *testing.T, stateDir string) {
 	}
 	managedCommands := map[string]string{
 		filepath.Join(goBin, "go"):     "#!/bin/sh\nif [ \"${1:-}\" = version ]; then echo 'go version go1.27.1 test'; fi\nexit 0\n",
-		filepath.Join(nodeBin, "node"): "#!/bin/sh\ncase \"${1:-}\" in *npm-cli.js) echo 12.0.2 ;; *) echo v24.19.0 ;; esac\nexit 0\n",
-		filepath.Join(nodeBin, "npm"):  "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.0.2'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
+		filepath.Join(nodeBin, "node"): "#!/bin/sh\ncase \"${1:-}\" in *npm-cli.js) echo 12.1.0 ;; *) echo v26.10.0 ;; esac\nexit 0\n",
+		filepath.Join(nodeBin, "npm"):  "#!/bin/sh\nif [ \"${1:-}\" = --version ]; then echo '12.1.0'; exit 0; fi\nmkdir -p node_modules\nexit 0\n",
 		filepath.Join(nodeBin, "npx"):  "#!/bin/sh\nmkdir -p node_modules\nexit 0\n",
 		npmCLI:                         "#!/bin/sh\nexit 0\n",
 	}

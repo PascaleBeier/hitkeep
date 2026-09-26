@@ -20,7 +20,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <app-crud-dialog [title]="dialogTitle()" [visible]="visible()" (visibleChange)="onVisibleChange($event)" [submitLabel]="submitLabel()" [cancelLabel]="'common.actions.cancel' | transloco" [saving]="saving()" (submitted)="saveGoal()">
-            <form class="flex flex-col gap-4" (ngSubmit)="saveGoal()">
+            <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); saveGoal()">
                 <div class="flex flex-col gap-1">
                     <label for="goal-name" class="text-sm font-medium">{{ 'common.columns.name' | transloco }}</label>
                     <input pInputText id="goal-name" [formControl]="form.name().control()" [placeholder]="'goals.manager.namePlaceholder' | transloco" autocomplete="off" />

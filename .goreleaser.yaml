@@ -16,7 +16,6 @@ builds:
       - amd64
       - arm64
     tags:
-      - hashicorpmetrics
       - timetzdata
     flags:
       - -trimpath
@@ -35,7 +34,6 @@ builds:
       - amd64
       - arm64
     tags:
-      - hashicorpmetrics
       - timetzdata
       - s3
       - billing

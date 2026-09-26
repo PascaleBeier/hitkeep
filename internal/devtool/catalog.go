@@ -11,7 +11,7 @@ var variants = []Variant{
 	{
 		ID:                  "self-hosted",
 		Description:         "Public self-hosted HitKeep build",
-		BuildTags:           []string{"hashicorpmetrics", "timetzdata"},
+		BuildTags:           []string{"timetzdata"},
 		LocalImage:          "ghcr.io/pascalebeier/hitkeep:snapshot",
 		Publishable:         true,
 		ProductionImageOnly: false,
@@ -19,7 +19,7 @@ var variants = []Variant{
 	{
 		ID:          "cloud",
 		Description: "Managed-cloud parity build for local use",
-		BuildTags:   []string{"hashicorpmetrics", "timetzdata", "s3", "billing", "tenancy"},
+		BuildTags:   []string{"timetzdata", "s3", "billing", "tenancy"},
 		Environment: map[string]string{
 			"HITKEEP_CLOUD_HOSTED":               "true",
 			"HITKEEP_CLOUD_SIGNUP_ENABLED":       "true",

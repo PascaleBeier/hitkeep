@@ -43,10 +43,10 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	if err := os.MkdirAll(dashboard, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dashboard, ".node-version"), []byte("24.19.0\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dashboard, ".node-version"), []byte("26.10.0\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@12.0.2"}`), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dashboard, "package.json"), []byte(`{"packageManager":"npm@12.1.0"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	app, err := NewApp(root)
@@ -57,8 +57,8 @@ func TestDoctorRequiresDockerComposeForDevelopment(t *testing.T) {
 	commands := map[string]string{
 		"git":  "git version 2.50.0",
 		"go":   "go version go1.27.1 test/arch",
-		"node": "v24.19.0",
-		"npm":  "12.0.2",
+		"node": "v26.10.0",
+		"npm":  "12.1.0",
 		"cc":   "cc 1.0",
 	}
 	for name, output := range commands {
@@ -228,8 +228,8 @@ func writeTestToolchainConfig(t *testing.T, root string) {
 	t.Helper()
 	for path, content := range map[string]string{
 		"go.mod":                           "module example.test\n\ngo 1.27.1\n",
-		"frontend/dashboard/.node-version": "24.19.0\n",
-		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.0.2"}`,
+		"frontend/dashboard/.node-version": "26.10.0\n",
+		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.1.0"}`,
 	} {
 		absolute := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(absolute), 0o700); err != nil {

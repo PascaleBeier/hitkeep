@@ -50,7 +50,7 @@ interface SiteMember {
             [saving]="isAdding()"
             (submitted)="addMember()"
         >
-            <form class="site-settings-dialog-form" (ngSubmit)="addMember()">
+            <form class="site-settings-dialog-form" (submit)="$event.preventDefault(); addMember()">
                 <div class="site-settings-field-grid site-settings-member-grid">
                     <div class="site-settings-field">
                         <label for="member-email">{{ 'common.emailAddress' | transloco }}</label>

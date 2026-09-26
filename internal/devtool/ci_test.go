@@ -19,8 +19,8 @@ func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
 	}
 	for name, body := range map[string]string{
 		"go.mod":                           "module example.test\n\ngo 1.27.1\n",
-		"frontend/dashboard/.node-version": "24.19.0\n",
-		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.0.2"}`,
+		"frontend/dashboard/.node-version": "26.10.0\n",
+		"frontend/dashboard/package.json":  `{"packageManager":"npm@12.1.0"}`,
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
@@ -34,7 +34,7 @@ func TestToolchainConfigUsesCanonicalVersionFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Go != "1.27.1" || config.Node != "24.19.0" || config.NPM != "12.0.2" {
+	if config.Go != "1.27.1" || config.Node != "26.10.0" || config.NPM != "12.1.0" {
 		t.Fatalf("unexpected toolchain: %+v", config)
 	}
 }
@@ -44,10 +44,10 @@ func TestGoBuildConfigUsesTrimpath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.GOFLAGS != "-trimpath -tags=hashicorpmetrics,timetzdata" {
+	if config.GOFLAGS != "-trimpath -tags=timetzdata" {
 		t.Fatalf("Go build flags = %q, want trimpath and self-hosted tags", config.GOFLAGS)
 	}
-	if !slices.Equal(goBuildTagArgs(config.Tags), []string{"-trimpath", "-tags", "hashicorpmetrics timetzdata"}) {
+	if !slices.Equal(goBuildTagArgs(config.Tags), []string{"-trimpath", "-tags", "timetzdata"}) {
 		t.Fatalf("Go build arguments = %v, want trimpath and self-hosted tags", goBuildTagArgs(config.Tags))
 	}
 }
@@ -182,7 +182,7 @@ func TestGoReleaserConfigPreservesReleaseArtifactContract(t *testing.T) {
 	for _, required := range []string{
 		"version: 2", "id: self-hosted", "binary: hitkeep-linux-{{ .Arch }}",
 		"id: cloud", "binary: hitkeep-cloud-linux-{{ .Arch }}", "HITKEEP_VERSION",
-		"hashicorpmetrics", "timetzdata", "s3", "billing", "tenancy", "name_template: SHA256SUMS",
+		"timetzdata", "s3", "billing", "tenancy", "name_template: SHA256SUMS",
 	} {
 		if !bytes.Contains(raw, []byte(required)) {
 			t.Fatalf("GoReleaser config is missing release contract %q", required)

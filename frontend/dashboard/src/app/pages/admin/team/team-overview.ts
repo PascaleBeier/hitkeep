@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { rxResource, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -45,7 +45,11 @@ export class TeamOverviewPage {
         stream: () => this.analyticsService.getSystemStatus()
     });
     protected readonly systemStatus = computed(() => (this.systemStatusResource.hasValue() ? this.systemStatusResource.value() : null));
-    protected readonly planTiers = signal<CloudPlanTier[]>([]);
+    protected readonly planTiersResource = rxResource({
+        params: () => (this.systemStatus()?.cloud?.hosted ? true : undefined),
+        stream: () => this.cloudService.getPlans()
+    });
+    protected readonly planTiers = computed<CloudPlanTier[]>(() => (this.planTiersResource.hasValue() ? this.planTiersResource.value() : []));
     protected readonly portalPending = signal(false);
     protected readonly checkoutPending = signal(false);
     protected readonly billingInterval = signal<BillingInterval>('annual');
@@ -151,21 +155,6 @@ export class TeamOverviewPage {
         }
         return labels;
     });
-    private planTiersLoaded = false;
-
-    constructor() {
-        effect(() => {
-            if (this.planTiersLoaded || !this.systemStatus()?.cloud?.hosted) {
-                return;
-            }
-            this.planTiersLoaded = true;
-            this.cloudService
-                .getPlans()
-                .pipe(takeUntilDestroyed(this.destroyRef))
-                .subscribe((tiers) => this.planTiers.set(tiers));
-        });
-    }
-
     protected roleSeverity(role: TeamRole): 'danger' | 'info' | 'secondary' {
         switch (role) {
             case 'owner':

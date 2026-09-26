@@ -25,7 +25,7 @@ interface StepControl {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <app-crud-dialog [title]="dialogTitle()" [visible]="visible()" (visibleChange)="onVisibleChange($event)" [submitLabel]="submitLabel()" [cancelLabel]="'common.actions.cancel' | transloco" [saving]="saving()" (submitted)="saveFunnel()">
-            <form class="flex flex-col gap-5" (ngSubmit)="saveFunnel()">
+            <form class="flex flex-col gap-5" (submit)="$event.preventDefault(); saveFunnel()">
                 <div class="flex flex-col gap-1">
                     <label for="funnel-name" class="text-sm font-medium">{{ 'common.columns.name' | transloco }}</label>
                     <input pInputText id="funnel-name" [formControl]="nameControl" [placeholder]="'funnels.manager.namePlaceholder' | transloco" autocomplete="off" />
