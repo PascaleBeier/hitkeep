@@ -2,7 +2,7 @@
     [visible]="visible()"
     (visibleChange)="onVisibleChange($event)"
     [title]="'theme.dialogTitle' | transloco"
-    [width]="'46rem'"
+    [width]="'72rem'"
 >
     <div class="flex flex-col gap-5">
         <p class="m-0 text-sm text-muted-color">{{ 'theme.subtitle' | transloco }}</p>
@@ -26,8 +26,8 @@
             }
         </div>
 
-        <form class="grid grid-cols-1 gap-4 md:grid-cols-2" [formGroup]="form" (ngSubmit)="save()">
-            <div class="flex flex-col gap-2 md:col-span-2">
+        <form class="grid grid-cols-1 gap-4 md:grid-cols-3" [formGroup]="form" (ngSubmit)="save()">
+            <div class="flex flex-col gap-2 md:col-span-3">
                 <label for="hk-color-mode" class="text-sm font-medium">{{ 'theme.mode.label' | transloco }}</label>
                 <p-select
                     inputId="hk-color-mode"
@@ -47,7 +47,7 @@
                 </p-select>
             </div>
 
-            <div class="flex flex-col gap-2 md:col-span-2">
+            <div class="flex flex-col gap-2 md:col-span-3">
                 <label for="hk-theme-name" class="text-sm font-medium">{{ 'theme.fields.name' | transloco }}</label>
                 <input pInputText id="hk-theme-name" formControlName="name" />
             </div>
@@ -111,13 +111,13 @@
                 </p-select>
             </div>
 
-            <div class="flex flex-col gap-2 md:col-span-2">
+            <div class="flex flex-col gap-2 md:col-span-3">
                 <label for="hk-theme-font" class="text-sm font-medium">{{ 'theme.fields.fontFamily' | transloco }}</label>
                 <input pInputText id="hk-theme-font" formControlName="fontFamily" [placeholder]="'theme.fields.fontFamilyPlaceholder' | transloco" />
                 <small class="text-muted-color">{{ 'theme.fields.fontFamilyHint' | transloco }}</small>
             </div>
 
-            <div class="flex flex-col gap-2 md:col-span-2">
+            <div class="flex flex-col gap-2 md:col-span-3">
                 <label for="hk-theme-css" class="text-sm font-medium">{{ 'theme.fields.customCss' | transloco }}</label>
                 <textarea
                     pTextarea

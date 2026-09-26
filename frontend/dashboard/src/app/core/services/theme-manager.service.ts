@@ -26,12 +26,12 @@ html.hk-density-compact .p-dialog-content { padding: 0 1.25rem 1rem; }
  */
 html.hk-menu-compact app-layout-sidebar aside { padding: 0.75rem; gap: 0.75rem; }
 html.hk-menu-compact app-layout-sidebar aside > div { gap: 0.5rem; }
-html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__section.layout-sidebar-menu__section { margin-top: 0.4rem; }
-html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__section-label.layout-sidebar-menu__section-label { margin-bottom: 0.15rem; font-size: 0.6875rem; }
-html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__item-row.layout-sidebar-menu__item-row { min-height: 1.8rem; }
-html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__item-main.layout-sidebar-menu__item-main { min-height: 1.8rem; padding: 0.2rem 0.625rem; gap: 0.5rem; }
+html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__section.layout-sidebar-menu__section { margin-top: 0.55rem; }
+html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__section-label.layout-sidebar-menu__section-label { margin-bottom: 0.2rem; font-size: 0.6875rem; }
+html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__item-row.layout-sidebar-menu__item-row { min-height: 1.95rem; }
+html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__item-main.layout-sidebar-menu__item-main { min-height: 1.95rem; padding: 0.3rem 0.65rem; gap: 0.5rem; }
 html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__list--nested.layout-sidebar-menu__list--nested { margin-left: 1rem; padding-left: 0.5rem; }
-html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__list--nested .layout-sidebar-menu__item-main.layout-sidebar-menu__item-main { padding: 0.15rem 0.5rem; min-height: 1.65rem; }
+html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__list--nested .layout-sidebar-menu__item-main.layout-sidebar-menu__item-main { padding: 0.2rem 0.5rem; min-height: 1.8rem; }
 `;
 
 /**
