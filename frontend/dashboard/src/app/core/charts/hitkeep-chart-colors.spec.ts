@@ -7,8 +7,14 @@ import { HITKEEP_CHART_PALETTE, resolveChartColor } from '@core/charts/hitkeep-c
  * all chart token colors.
  */
 function mockTokensUnset(): void {
-    const style = getComputedStyle(document.documentElement);
-    vi.spyOn(style, 'getPropertyValue').mockReturnValue('');
+    const original = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+        const style = original(el as Element);
+        if (el === document.documentElement) {
+            vi.spyOn(style, 'getPropertyValue').mockReturnValue('');
+        }
+        return style;
+    });
 }
 
 afterEach(() => {
