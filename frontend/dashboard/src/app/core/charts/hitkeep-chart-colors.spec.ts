@@ -17,6 +17,10 @@ describe('resolveChartColor', () => {
     });
 
     it('falls back to the original hex when the token is unset', () => {
+        // Other specs may have applied the full preset, which defines this
+        // token - force it empty so the fallback path is exercised.
+        document.documentElement.style.setProperty('--p-primary-500', '');
+
         expect(resolveChartColor('#6366F1')).toBe('#6366F1');
     });
 });
