@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.13.19](https://github.com/PascaleBeier/hitkeep/compare/v2.13.18...v2.13.19) (2026-09-26)
+
+
+### Bug Fixes
+
+* **config:** complete configuration migration and release handoff ([fdd096a](https://github.com/PascaleBeier/hitkeep/commit/fdd096a5b2f0738b7224d08122bf24ff5858c4f6))
+* **database:** bundle DuckDB extensions for offline startup ([#355](https://github.com/PascaleBeier/hitkeep/issues/355)) ([7290ae3](https://github.com/PascaleBeier/hitkeep/commit/7290ae3ea7d9f8af190b0b8d1c649ba2351f6418))
+* **data:** skip timestamp-only refresh PR updates ([7779735](https://github.com/PascaleBeier/hitkeep/commit/7779735f6a8b37b0210bb0acdbe40aefb9c107d3))
+* **dependencies:** update Go to 1.27.1 and refresh module dependencies ([758c304](https://github.com/PascaleBeier/hitkeep/commit/758c304341fb79a4a5695279819b7f093f2053e4))
+* **i18n:** complete and unify Spanish dashboard translations ([#354](https://github.com/PascaleBeier/hitkeep/issues/354)) ([da5e61d](https://github.com/PascaleBeier/hitkeep/commit/da5e61deadbff73086b69f8a9238ad5a3e9d854f))
+* publish tracker from local tarball ([#328](https://github.com/PascaleBeier/hitkeep/issues/328)) ([bfdf60f](https://github.com/PascaleBeier/hitkeep/commit/bfdf60fbfd9ad309f84c2062afd656d5611afd0c))
+* share npm trusted publishing token ([#332](https://github.com/PascaleBeier/hitkeep/issues/332)) ([228e71b](https://github.com/PascaleBeier/hitkeep/commit/228e71b1066c8108c0fa067a8e6d3ef93a7d5d57))
+* wait for npm package visibility ([#331](https://github.com/PascaleBeier/hitkeep/issues/331)) ([3481cff](https://github.com/PascaleBeier/hitkeep/commit/3481cff4845ebdc630770f9b80136525e830ba4a))
+
 ## [2.13.18](https://github.com/PascaleBeier/hitkeep/compare/v2.13.17...v2.13.18) (2026-09-01)
 
 
