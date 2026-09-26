@@ -2894,7 +2894,7 @@
       "rtlBadge": "RTL"
     }
   },
-  "theme":     {
+  "theme":       {
     "dialogTitle": "Erscheinungsbild",
     "subtitle": "Wähle ein Design, passe es unten an und speichere es, um es jederzeit wiederzuverwenden.",
     "openDialogAria": "Design anpassen",
@@ -2919,7 +2919,11 @@
       "densityCompact": "Kompakt",
       "menuSpacing": "Menüabstand",
       "menuSpacingDefault": "Standard",
-      "menuSpacingCompact": "Kompakt"
+      "menuSpacingCompact": "Kompakt",
+      "colorsGroup": "Farben",
+      "primaryShort": "Primär",
+      "surfaceShort": "Oberfläche",
+      "accentShort": "Akzent"
     },
     "actions": {
       "saveTheme": "Design speichern",

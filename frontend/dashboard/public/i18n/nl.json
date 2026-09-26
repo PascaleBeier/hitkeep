@@ -2838,7 +2838,7 @@
       "rtlBadge": "RTL"
     }
   },
-  "theme":     {
+  "theme":       {
     "dialogTitle": "Weergave",
     "subtitle": "Kies een thema, pas het hieronder aan en sla het op om het later opnieuw te gebruiken.",
     "openDialogAria": "Thema aanpassen",
@@ -2863,7 +2863,11 @@
       "densityCompact": "Compact",
       "menuSpacing": "Menuafstand",
       "menuSpacingDefault": "Standaard",
-      "menuSpacingCompact": "Compact"
+      "menuSpacingCompact": "Compact",
+      "colorsGroup": "Kleuren",
+      "primaryShort": "Primair",
+      "surfaceShort": "Oppervlak",
+      "accentShort": "Accent"
     },
     "actions": {
       "saveTheme": "Thema opslaan",

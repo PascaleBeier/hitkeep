@@ -2957,7 +2957,7 @@
       "rtlBadge": "RTL"
     }
   },
-  "theme":     {
+  "theme":       {
     "dialogTitle": "Appearance",
     "subtitle": "Pick a theme, customize it below, and save it to reuse it anytime.",
     "openDialogAria": "Customize theme",
@@ -2982,7 +2982,11 @@
       "densityCompact": "Compact",
       "menuSpacing": "Menu spacing",
       "menuSpacingDefault": "Default",
-      "menuSpacingCompact": "Compact"
+      "menuSpacingCompact": "Compact",
+      "colorsGroup": "Colors",
+      "primaryShort": "Primary",
+      "surfaceShort": "Surface",
+      "accentShort": "Accent"
     },
     "actions": {
       "saveTheme": "Save theme",

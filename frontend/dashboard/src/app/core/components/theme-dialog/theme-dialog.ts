@@ -5,6 +5,7 @@ import { ColorPickerModule } from '@openng/optimus-ui/colorpicker';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { TextareaModule } from '@openng/optimus-ui/textarea';
+import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PreferencesService, type HitkeepColorMode } from '@services/preferences.service';
@@ -13,7 +14,7 @@ import { BUILT_IN_THEMES, DEFAULT_THEME_ID, createThemeId, type HitkeepTheme } f
 
 @Component({
     selector: 'app-theme-dialog',
-    imports: [DialogShell, ReactiveFormsModule, FormsModule, ButtonModule, ColorPickerModule, InputTextModule, SelectModule, TextareaModule, TranslocoPipe],
+    imports: [DialogShell, ReactiveFormsModule, FormsModule, ButtonModule, ColorPickerModule, InputTextModule, SelectModule, TextareaModule, TooltipModule, TranslocoPipe],
     templateUrl: './theme-dialog.html',
     styleUrl: './theme-dialog.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -46,12 +47,14 @@ export class ThemeDialog {
         { labelKey: 'theme.fields.menuSpacingCompact', value: 'compact' }
     ];
 
-    protected readonly form = this.fb.nonNullable.group({
+    protected readonly form = this.fb.group({
         id: [''],
         name: ['', Validators.required],
         primary: ['#6366f1', Validators.required],
-        surface: [''],
-        accent: [''],
+        // Null (not empty string) keeps the colorpicker placeholder neutral
+        // instead of rendering an empty value as red.
+        surface: [null as string | null],
+        accent: [null as string | null],
         fontFamily: [''],
         fontSize: [''],
         density: this.fb.nonNullable.control<'comfortable' | 'compact'>('comfortable'),
@@ -116,6 +119,33 @@ export class ThemeDialog {
         this.prefs.setColorMode(mode);
     }
 
+    protected hexValue(field: 'primary' | 'surface' | 'accent'): string {
+        const value = this.form.get(field)?.value as string | null | undefined;
+        if (!value) {
+            return '';
+        }
+        const normalized = value.trim().replace(/^#/, '');
+        return `#${normalized}`;
+    }
+
+    protected onHexChange(field: 'primary' | 'surface' | 'accent', event: Event): void {
+        const control = this.form.get(field);
+        if (!control) {
+            return;
+        }
+        const raw = ((event.target as HTMLInputElement).value ?? '').trim();
+        if (!raw) {
+            control.setValue(field === 'primary' ? BUILT_IN_THEMES[0].primary : null);
+            return;
+        }
+        const hex = raw.replace(/^#/, '');
+        if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+            // The colorpicker parses values as #-prefixed hex; a bare string
+            // gets misread (its first character is dropped).
+            control.setValue(`#${hex.toLowerCase()}`);
+        }
+    }
+
     protected onVisibleChange(visible: boolean): void {
         if (!visible) {
             // Dialog dismissed without saving: drop the unsaved preview.
@@ -130,8 +160,8 @@ export class ThemeDialog {
             id: theme.id,
             name: theme.name,
             primary: theme.primary,
-            surface: theme.surface ?? '',
-            accent: theme.accent ?? '',
+            surface: theme.surface ?? null,
+            accent: theme.accent ?? null,
             fontFamily: theme.fontFamily ?? '',
             fontSize: theme.fontSize ?? '',
             density: theme.density ?? 'comfortable',
@@ -144,16 +174,16 @@ export class ThemeDialog {
         const value = this.form.getRawValue();
         return {
             id: value.id || createThemeId(),
-            name: value.name.trim() || 'Custom',
+            name: value.name?.trim() || 'Custom',
             builtin: false,
-            primary: value.primary,
-            surface: value.surface.trim() || undefined,
-            accent: value.accent.trim() || undefined,
-            fontFamily: value.fontFamily.trim() || undefined,
-            fontSize: value.fontSize.trim() || undefined,
+            primary: value.primary ?? BUILT_IN_THEMES[0].primary,
+            surface: value.surface?.trim() || undefined,
+            accent: value.accent?.trim() || undefined,
+            fontFamily: value.fontFamily?.trim() || undefined,
+            fontSize: value.fontSize?.trim() || undefined,
             density: value.density,
             menuSpacing: value.menuSpacing,
-            customCss: value.customCss.trim() || undefined
+            customCss: value.customCss?.trim() || undefined
         };
     }
 }

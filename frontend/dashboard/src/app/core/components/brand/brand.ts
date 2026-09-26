@@ -18,7 +18,7 @@ export class Brand {
     private document = inject(DOCUMENT);
     size = input<'small' | 'large'>('small');
 
-    private static readonly aspect = 209.03 / 48.207;
+    private static readonly aspect = 240.784 / 48.207;
 
     protected logoUrl = computed(() => browserAppUrl(this.document, '/brand-logo.svg'));
 

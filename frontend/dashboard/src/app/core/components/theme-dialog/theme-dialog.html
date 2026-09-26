@@ -2,7 +2,7 @@
     [visible]="visible()"
     (visibleChange)="onVisibleChange($event)"
     [title]="'theme.dialogTitle' | transloco"
-    [width]="'72rem'"
+    [width]="'60rem'"
 >
     <div class="flex flex-col gap-5">
         <p class="m-0 text-sm text-muted-color">{{ 'theme.subtitle' | transloco }}</p>
@@ -26,8 +26,8 @@
             }
         </div>
 
-        <form class="grid grid-cols-1 gap-4 md:grid-cols-3" [formGroup]="form" (ngSubmit)="save()">
-            <div class="flex flex-col gap-2 md:col-span-3">
+        <form class="grid grid-cols-1 gap-4 md:grid-cols-3" [formGroup]="form">
+            <div class="flex flex-col gap-2">
                 <label for="hk-color-mode" class="text-sm font-medium">{{ 'theme.mode.label' | transloco }}</label>
                 <p-select
                     inputId="hk-color-mode"
@@ -47,32 +47,92 @@
                 </p-select>
             </div>
 
-            <div class="flex flex-col gap-2 md:col-span-3">
+            <div class="flex flex-col gap-2 md:col-span-2">
                 <label for="hk-theme-name" class="text-sm font-medium">{{ 'theme.fields.name' | transloco }}</label>
                 <input pInputText id="hk-theme-name" formControlName="name" />
             </div>
 
-            <div class="flex flex-col gap-2">
-                <label for="hk-theme-primary" class="text-sm font-medium">{{ 'theme.fields.primary' | transloco }}</label>
-                <p-colorpicker inputId="hk-theme-primary" formControlName="primary" />
+            <div class="flex flex-col gap-3 md:col-span-3">
+                <span class="text-sm font-medium">{{ 'theme.fields.colorsGroup' | transloco }}</span>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div class="flex items-center gap-2">
+                        <p-colorpicker inputId="hk-theme-primary" formControlName="primary" />
+                        <input
+                            pInputText
+                            class="w-[6.5rem] font-mono text-xs"
+                            [value]="hexValue('primary')"
+                            (change)="onHexChange('primary', $event)"
+                            (keydown.enter)="$event.preventDefault()"
+                            placeholder="#6366f1"
+                            [attr.aria-label]="'theme.fields.primary' | transloco"
+                        />
+                        <label for="hk-theme-primary" class="text-sm">{{ 'theme.fields.primaryShort' | transloco }}</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p-colorpicker inputId="hk-theme-surface" formControlName="surface" defaultColor="64748b" />
+                        <input
+                            pInputText
+                            class="w-[6.5rem] font-mono text-xs"
+                            [value]="hexValue('surface')"
+                            (change)="onHexChange('surface', $event)"
+                            (keydown.enter)="$event.preventDefault()"
+                            placeholder="#64748b"
+                            [attr.aria-label]="'theme.fields.surface' | transloco"
+                        />
+                        <label for="hk-theme-surface" class="text-sm">{{ 'theme.fields.surfaceShort' | transloco }}</label>
+                        <i
+                            class="pi pi-info-circle cursor-help text-xs text-muted-color"
+                            [pTooltip]="'theme.fields.surfaceHint' | transloco"
+                            tooltipPosition="top"
+                            aria-hidden="true"
+                        ></i>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p-colorpicker inputId="hk-theme-accent" formControlName="accent" defaultColor="64748b" />
+                        <input
+                            pInputText
+                            class="w-[6.5rem] font-mono text-xs"
+                            [value]="hexValue('accent')"
+                            (change)="onHexChange('accent', $event)"
+                            (keydown.enter)="$event.preventDefault()"
+                            placeholder="#14b8a6"
+                            [attr.aria-label]="'theme.fields.accent' | transloco"
+                        />
+                        <label for="hk-theme-accent" class="text-sm">{{ 'theme.fields.accentShort' | transloco }}</label>
+                        <i
+                            class="pi pi-info-circle cursor-help text-xs text-muted-color"
+                            [pTooltip]="'theme.fields.accentHint' | transloco"
+                            tooltipPosition="top"
+                            aria-hidden="true"
+                        ></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-2 md:col-span-2">
+                <label for="hk-theme-font" class="flex items-center gap-1.5 text-sm font-medium">
+                    {{ 'theme.fields.fontFamily' | transloco }}
+                    <i
+                        class="pi pi-info-circle cursor-help text-xs font-normal text-muted-color"
+                        [pTooltip]="'theme.fields.fontFamilyHint' | transloco"
+                        tooltipPosition="top"
+                        aria-hidden="true"
+                    ></i>
+                </label>
+                <input pInputText id="hk-theme-font" formControlName="fontFamily" [placeholder]="'theme.fields.fontFamilyPlaceholder' | transloco" />
             </div>
 
             <div class="flex flex-col gap-2">
-                <label for="hk-theme-surface" class="text-sm font-medium">{{ 'theme.fields.surface' | transloco }}</label>
-                <p-colorpicker inputId="hk-theme-surface" formControlName="surface" />
-                <small class="text-muted-color">{{ 'theme.fields.surfaceHint' | transloco }}</small>
-            </div>
-
-            <div class="flex flex-col gap-2">
-                <label for="hk-theme-accent" class="text-sm font-medium">{{ 'theme.fields.accent' | transloco }}</label>
-                <p-colorpicker inputId="hk-theme-accent" formControlName="accent" />
-                <small class="text-muted-color">{{ 'theme.fields.accentHint' | transloco }}</small>
-            </div>
-
-            <div class="flex flex-col gap-2">
-                <label for="hk-theme-fontsize" class="text-sm font-medium">{{ 'theme.fields.fontSize' | transloco }}</label>
+                <label for="hk-theme-fontsize" class="flex items-center gap-1.5 text-sm font-medium">
+                    {{ 'theme.fields.fontSize' | transloco }}
+                    <i
+                        class="pi pi-info-circle cursor-help text-xs font-normal text-muted-color"
+                        [pTooltip]="'theme.fields.fontSizeHint' | transloco"
+                        tooltipPosition="top"
+                        aria-hidden="true"
+                    ></i>
+                </label>
                 <input pInputText id="hk-theme-fontsize" formControlName="fontSize" [placeholder]="'theme.fields.fontSizePlaceholder' | transloco" />
-                <small class="text-muted-color">{{ 'theme.fields.fontSizeHint' | transloco }}</small>
             </div>
 
             <div class="flex flex-col gap-2">
@@ -112,22 +172,23 @@
             </div>
 
             <div class="flex flex-col gap-2 md:col-span-3">
-                <label for="hk-theme-font" class="text-sm font-medium">{{ 'theme.fields.fontFamily' | transloco }}</label>
-                <input pInputText id="hk-theme-font" formControlName="fontFamily" [placeholder]="'theme.fields.fontFamilyPlaceholder' | transloco" />
-                <small class="text-muted-color">{{ 'theme.fields.fontFamilyHint' | transloco }}</small>
-            </div>
-
-            <div class="flex flex-col gap-2 md:col-span-3">
-                <label for="hk-theme-css" class="text-sm font-medium">{{ 'theme.fields.customCss' | transloco }}</label>
+                <label for="hk-theme-css" class="flex items-center gap-1.5 text-sm font-medium">
+                    {{ 'theme.fields.customCss' | transloco }}
+                    <i
+                        class="pi pi-info-circle cursor-help text-xs font-normal text-muted-color"
+                        [pTooltip]="'theme.fields.customCssHint' | transloco"
+                        tooltipPosition="top"
+                        aria-hidden="true"
+                    ></i>
+                </label>
                 <textarea
                     pTextarea
                     id="hk-theme-css"
                     formControlName="customCss"
-                    rows="6"
+                    rows="4"
                     class="font-mono"
                     [placeholder]="'theme.fields.customCssPlaceholder' | transloco"
                 ></textarea>
-                <small class="text-muted-color">{{ 'theme.fields.customCssHint' | transloco }}</small>
             </div>
         </form>
 
