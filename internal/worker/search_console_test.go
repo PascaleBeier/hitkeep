@@ -729,11 +729,11 @@ type fakeSearchConsoleQuery struct {
 	Query searchconsole.SearchAnalyticsQuery
 }
 
-func TestSearchConsoleSyncWorkerStartStopsBlockedSyncWhenContextExpires(t *testing.T) {
+func TestSearchConsoleSyncWorkerStartStopsBlockedSyncWhenContextCanceled(t *testing.T) {
 	fixture := newSearchConsoleWorkerFixture(t, "gsc-worker-cancel@test.dev", "gsc-worker-cancel.example.com")
 	source := &blockingSearchConsoleSource{started: make(chan struct{}, 1)}
 	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	done := make(chan struct{})
@@ -744,13 +744,14 @@ func TestSearchConsoleSyncWorkerStartStopsBlockedSyncWhenContextExpires(t *testi
 
 	select {
 	case <-source.started:
-	case <-time.After(time.Second):
+		cancel()
+	case <-time.After(10 * time.Second):
 		t.Fatal("blocked Search Console sync did not start")
 	}
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("Search Console worker did not stop after its parent context expired")
+		t.Fatal("Search Console worker did not stop after its parent context was canceled")
 	}
 }
 

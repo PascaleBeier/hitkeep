@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -99,7 +98,7 @@ func (h *handler) handleGetShareFunnelStats() http.HandlerFunc {
 			return
 		}
 
-		start, end := parseTimeseriesRange(r.URL.Query())
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 
 		params := api.AnalyticsParams{
 			SiteID: site.ID,
@@ -200,7 +199,7 @@ func (h *handler) handleTimeseries(
 			return
 		}
 
-		start, end := parseTimeseriesRange(r.URL.Query())
+		start, end := filterparams.ParseLenientAnalyticsRange(r.URL.Query())
 
 		ids, err := parseUUIDQueryParam(r.URL.Query(), idParam)
 		if err != nil {
@@ -227,44 +226,6 @@ func (h *handler) handleTimeseries(
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
 		}
 	}
-}
-
-func parseStatsRange(q url.Values) (time.Time, time.Time) {
-	now := time.Now().UTC()
-	end := now.AddDate(0, 0, 1)
-	start := end.AddDate(0, 0, -30)
-
-	if fromStr := q.Get("from"); fromStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			start = parsed
-		}
-	}
-	if toStr := q.Get("to"); toStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
-			end = parsed
-		}
-	}
-
-	return start, end
-}
-
-func parseTimeseriesRange(q url.Values) (time.Time, time.Time) {
-	now := time.Now().UTC()
-	end := now.AddDate(0, 0, 1)
-	start := end.AddDate(0, 0, -30)
-
-	if fromStr := q.Get("from"); fromStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
-			start = parsed
-		}
-	}
-	if toStr := q.Get("to"); toStr != "" {
-		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
-			end = parsed
-		}
-	}
-
-	return start, end
 }
 
 func parseUUIDQueryParam(q url.Values, key string) ([]uuid.UUID, error) {

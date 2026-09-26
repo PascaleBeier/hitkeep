@@ -122,3 +122,16 @@ Run `./hk setup`, then start seeded development with `./hk dev --seed` or use `.
 ## License
 
 HitKeep is distributed under the [MIT License](./LICENSE).
+
+### DuckDB extensions
+
+HitKeep includes the DuckDB extensions required for S3 backups and XLSX exports.
+It does not download extensions at startup. On first use, bundled files are
+extracted into `HITKEEP_DATA_PATH/.duckdb/extensions`; this directory must be
+writable by the process running HitKeep and reside on a mount without `noexec`.
+The cache is disposable and can be
+recreated without network access. No `HOME` override or separate extension
+installation is needed for binary, Homebrew, or container deployments.
+
+Contributor instructions for DuckDB upgrades are in
+[the extension bundle documentation](internal/duckdbextensions/README.md).

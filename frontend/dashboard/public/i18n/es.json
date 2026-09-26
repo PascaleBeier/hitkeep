@@ -76,11 +76,11 @@
     "sortLabel": "Ordenar sitios",
     "sort": {
       "domain": "Nombre",
-      "pageviews": "Vistas",
+      "pageviews": "Páginas vistas",
       "visitors": "Visitantes"
     },
     "metrics": {
-      "pageviews": "Vistas",
+      "pageviews": "Páginas vistas",
       "visitors": "Visitantes",
       "bounceRate": "Rebote"
     },
@@ -141,8 +141,8 @@
     "context": {
       "setupStatus": "HitKeep no pudo confirmar si la configuración está completa. Inténtalo de nuevo cuando el servidor esté disponible.",
       "dashboardBootstrap": "HitKeep no pudo cargar tu sesión del panel. Inténtalo de nuevo sin volver a iniciar sesión.",
-    "cloudSignupStatus": "HitKeep no pudo comprobar si el registro en la nube está disponible. Inténtalo de nuevo en unos instantes.",
-    "cloudSignupProfile": "HitKeep no pudo confirmar tu sesión en la nube. Inténtalo de nuevo en unos instantes."
+      "cloudSignupStatus": "HitKeep no pudo comprobar si el registro en la nube está disponible. Inténtalo de nuevo en unos instantes.",
+      "cloudSignupProfile": "HitKeep no pudo confirmar tu sesión en la nube. Inténtalo de nuevo en unos instantes."
     },
     "actions": {
       "tryAgain": "Intentar de nuevo",
@@ -187,9 +187,9 @@
       "siteOverview": "Resumen del sitio",
       "eventNames": "Nombres de eventos",
       "eventBreakdown": "Desglose de eventos",
-      "ecommerce": "Ecommerce",
+      "ecommerce": "Comercio electrónico",
       "webVitals": "Web Vitals",
-      "aiVisibility": "Visibilidad de AI",
+      "aiVisibility": "Visibilidad de IA",
       "analytics": "Analíticas"
     },
     "status": {
@@ -227,8 +227,8 @@
       "action": "Acción",
       "outcome": "Resultado",
       "targetType": "Área",
-      "dateRange": "Intervalo de fechas",
-      "dateRangePlaceholder": "Intervalo de fechas",
+      "dateRange": "Rango de fechas",
+      "dateRangePlaceholder": "Rango de fechas",
       "search": "Buscar",
       "searchPlaceholder": "Buscar actores, destinos, IP o IDs de solicitud...",
       "allActions": "Todas las acciones",
@@ -243,9 +243,9 @@
       "collapseRow": "Ocultar evidencia",
       "roleUpdated": "Rol cambiado",
       "mfaDisabled": "MFA desactivado",
-      "backupTriggered": "Copia iniciada",
-      "backupCompleted": "Copia completada",
-      "backupFailed": "Copia fallida",
+      "backupTriggered": "Copia de seguridad iniciada",
+      "backupCompleted": "Copia de seguridad completada",
+      "backupFailed": "Copia de seguridad fallida",
       "databaseCheckpointRequested": "Punto de control de la base de datos",
       "spamRefreshed": "Filtro de spam actualizado",
       "mailTested": "Prueba de correo",
@@ -273,7 +273,7 @@
       "memberAdded": "Miembro añadido",
       "memberRoleUpdated": "Rol de miembro cambiado",
       "memberRemoved": "Miembro eliminado",
-      "memberLeft": "Miembro salió",
+      "memberLeft": "Miembro abandonó el equipo",
       "ownershipTransferred": "Propiedad transferida",
       "siteCreated": "Sitio creado",
       "siteDeleted": "Sitio eliminado",
@@ -368,11 +368,11 @@
       "actorId": "ID de actor",
       "actorRole": "Rol del actor",
       "teamId": "ID de equipo",
-      "targetType": "Tipo de destino",
+      "targetType": "Área",
       "targetId": "ID de destino",
       "targetUserId": "ID de usuario destino",
       "requestId": "ID de solicitud",
-      "userAgent": "User agent",
+      "userAgent": "Agente de usuario",
       "askAIStatus": "Estado de IA",
       "askAIHTTPStatus": "Estado HTTP",
       "askAIRunId": "ID de ejecución de IA",
@@ -648,9 +648,9 @@
       "retry": "Reintentar",
       "save": "Guardar",
       "more": "Más acciones",
-      "edit": "Edit",
-      "delete": "Delete",
-      "archive": "Archive",
+      "edit": "Editar",
+      "delete": "Eliminar",
+      "archive": "Archivar",
       "remove": "Quitar"
     },
     "previous": "Anterior",
@@ -660,7 +660,7 @@
     "loading": "Cargando...",
     "columns": {
       "actions": "Acciones",
-      "added": "Agregado",
+      "added": "Añadido",
       "created": "Creado",
       "device": "Dispositivo",
       "domain": "Dominio",
@@ -668,7 +668,7 @@
       "name": "Nombre",
       "owner": "Propietario",
       "path": "Ruta",
-      "referrer": "Referencia",
+      "referrer": "Referente",
       "members": "Miembros",
       "role": "Rol",
       "sites": "Sitios",
@@ -676,7 +676,7 @@
       "time": "Hora",
       "type": "Tipo",
       "value": "Valor",
-      "createdAt": "Created",
+      "createdAt": "Creado",
       "updated": "Actualizado"
     },
     "devices": {
@@ -745,7 +745,7 @@
       "pageModeAria": "Seleccionar métrica de páginas",
       "topPages": "Páginas principales",
       "topSources": "Fuentes principales",
-      "topReferrers": "Top referrers"
+      "topReferrers": "Principales referentes"
     },
     "noActiveFilter": "Sin filtros activos",
     "noSiteSelected": "Ningún sitio seleccionado",
@@ -818,7 +818,15 @@
     "unknown": "Desconocido"
   },
   "dashboard": {
-    "conversions": { "title": "Conversiones", "description": "Filtra todo el espacio de trabajo por una cohorte de objetivo o embudo.", "filters": { "goal": "Objetivo: {{name}}", "funnel": "Embudo: {{name}}" }, "invalidSubject": "Ese objetivo o embudo ya no está disponible para este sitio." },
+    "conversions": {
+      "title": "Conversiones",
+      "description": "Filtra todo el espacio de trabajo por una cohorte de objetivo o embudo.",
+      "filters": {
+        "goal": "Objetivo: {{name}}",
+        "funnel": "Embudo: {{name}}"
+      },
+      "invalidSubject": "Ese objetivo o embudo ya no está disponible para este sitio."
+    },
     "breadcrumbOverview": "Resumen",
     "filteredBadge": "Filtrado",
     "rawHitsTitle": "Últimos hits",
@@ -826,7 +834,7 @@
     "openPageInNewTabAria": "Abrir página en una nueva pestaña",
     "openReferrerInNewTabAria": "Abrir referencia en una nueva pestaña",
     "exportStatus": {
-      "success": "La descarga de exportación se ha iniciado.",
+      "success": "Descarga de exportación iniciada.",
       "error": "No se pudieron exportar los datos filtrados. Inténtalo de nuevo."
     },
     "chartTitleWithRange": "Tráfico: {{range}}",
@@ -839,10 +847,10 @@
     },
     "kpis": {
       "liveVisitors": "Visitantes en vivo",
-      "pageviews": "Vistas de página",
+      "pageviews": "Páginas vistas",
       "uniqueSessions": "Sesiones únicas",
       "bounceRate": "Porcentaje de rebote",
-      "avgDuration": "Duración promedio",
+      "avgDuration": "Duración media",
       "pagesPerSession": "Páginas / sesión"
     },
     "empty": {
@@ -875,7 +883,13 @@
       }
     }
   },
-  "trafficRecords": { "unavailableTitle": "Aún no hay tráfico de conversión", "unavailableDescription": "Crea un objetivo o embudo para definir el tráfico que se muestra aquí.", "errorTitle": "Tráfico no disponible", "errorDescription": "No se pudieron cargar los registros de tráfico. Inténtalo de nuevo.", "empty": "No se encontraron registros de tráfico coincidentes." },
+  "trafficRecords": {
+    "unavailableTitle": "Aún no hay tráfico de conversión",
+    "unavailableDescription": "Crea un objetivo o embudo para definir el tráfico que se muestra aquí.",
+    "errorTitle": "Tráfico no disponible",
+    "errorDescription": "No se pudieron cargar los registros de tráfico. Inténtalo de nuevo.",
+    "empty": "No se encontraron registros de tráfico coincidentes."
+  },
   "goals": {
     "manageAction": "Administrar objetivos",
     "noSiteDescription": "Selecciona o crea un sitio para ver objetivos.",
@@ -883,15 +897,42 @@
       "title": "Objetivos",
       "description": "Filtra la serie por objetivo.",
       "workspaceDescription": "Conversiones a lo largo del tiempo para el objeto de informe seleccionado.",
-      "addFilterPlaceholder": "Agregar filtro de objetivo",
+      "addFilterPlaceholder": "Añadir filtro de objetivo",
       "emptyTitle": "Aún no hay conversiones de objetivos",
       "emptyDescription": "Crea un objetivo y genera tráfico para ver conversiones a lo largo del tiempo."
     },
     "kpis": {
       "totalGoals": "Objetivos totales",
-      "conversions": "Conversiones", "convertingSessions": "Sesiones con conversión"
+      "conversions": "Conversiones",
+      "convertingSessions": "Sesiones con conversión"
     },
-    "subject": { "label": "Objeto del informe", "all": "Todos los objetivos" }, "traffic": { "title": "Tráfico coincidente", "selectedDescription": "Vistas de página de sesiones que completaron este objetivo.", "allDescription": "Vistas de página de sesiones que completaron cualquier objetivo.", "unavailableTitle": "No hay objetivos que comparar", "unavailableDescription": "Crea un objetivo para ver el tráfico de sesiones coincidente." }, "states": { "errorTitle": "Objetivos no disponibles", "errorDescription": "No se pudieron cargar los objetivos. Inténtalo de nuevo." }, "notices": { "unavailable": "Ese objetivo ya no está disponible para este sitio." }, "definitions": { "title": "Definiciones de objetivos", "count": "{{count}} objetivos", "steps": "Pasos" }, "types": { "path": "Ruta", "event": "Evento" },
+    "subject": {
+      "label": "Objeto del informe",
+      "all": "Todos los objetivos"
+    },
+    "traffic": {
+      "title": "Tráfico coincidente",
+      "selectedDescription": "Páginas vistas de sesiones que completaron este objetivo.",
+      "allDescription": "Páginas vistas de sesiones que completaron cualquier objetivo.",
+      "unavailableTitle": "No hay objetivos que comparar",
+      "unavailableDescription": "Crea un objetivo para ver el tráfico de sesiones coincidente."
+    },
+    "states": {
+      "errorTitle": "Objetivos no disponibles",
+      "errorDescription": "No se pudieron cargar los objetivos. Inténtalo de nuevo."
+    },
+    "notices": {
+      "unavailable": "Ese objetivo ya no está disponible para este sitio."
+    },
+    "definitions": {
+      "title": "Definiciones de objetivos",
+      "count": "{{count}} objetivos",
+      "steps": "Pasos"
+    },
+    "types": {
+      "path": "Ruta",
+      "event": "Evento"
+    },
     "list": {
       "title": "Objetivos",
       "manageTooltip": "Administrar objetivos",
@@ -899,15 +940,16 @@
       "emptyDescription": "Haz seguimiento de eventos de conversión específicos como registros o compras.",
       "createAction": "Crear objetivo",
       "conversionsSuffix": "conversiones",
-      "conversionRateShort": "CR"
-      ,"dashboardDescription": "Acciones completadas y sus tasas de conversión.", "detailsAria": "Abrir detalles de {{name}}"
+      "conversionRateShort": "CR",
+      "dashboardDescription": "Acciones completadas y sus tasas de conversión.",
+      "detailsAria": "Abrir detalles de {{name}}"
     },
     "manager": {
       "dialogTitle": "Administrar objetivos",
       "dialogDescription": "Define objetivos de conversión para seguir acciones de usuario o visitas de página específicas.",
       "empty": "Aún no hay objetivos definidos.",
       "newAction": "Nuevo objetivo",
-      "addTitle": "Agregar nuevo objetivo",
+      "addTitle": "Añadir nuevo objetivo",
       "editTitle": "Editar objetivo",
       "editTooltip": "Editar objetivo",
       "deleteTooltip": "Eliminar objetivo",
@@ -919,12 +961,15 @@
       "eventNameLabel": "Evento",
       "urlPathPlaceholder": "/gracias",
       "eventNamePlaceholder": "signup_completed",
-      "urlPathHelp": "Se activa cuando un usuario visita una URL especifica.",
+      "urlPathHelp": "Se activa cuando un usuario visita una URL específica.",
       "eventNameHelpPrefix": "Se activa cuando llamas",
       "eventNameHelpSuffix": ".",
       "createAction": "Crear objetivo",
       "saveAction": "Guardar cambios",
-      "suggestionsHelp": "Elige un valor observado o introduce un valor futuro exacto.", "errors": { "save": "No se pudo guardar el objetivo. Revisa el formulario e inténtalo de nuevo." },
+      "suggestionsHelp": "Elige un valor observado o introduce un valor futuro exacto.",
+      "errors": {
+        "save": "No se pudo guardar el objetivo. Revisa el formulario e inténtalo de nuevo."
+      },
       "messages": {
         "createSuccess": "Objetivo creado.",
         "createError": "No se pudo crear el objetivo.",
@@ -943,7 +988,7 @@
       "title": "Embudos",
       "description": "Filtra la serie por embudo.",
       "workspaceDescription": "Entradas y completaciones a lo largo del tiempo para el objeto de informe seleccionado.",
-      "addFilterPlaceholder": "Agregar filtro de embudo",
+      "addFilterPlaceholder": "Añadir filtro de embudo",
       "emptyTitle": "Aún no hay actividad de embudo",
       "emptyDescription": "Crea un embudo y genera tráfico para ver entradas y completaciones a lo largo del tiempo."
     },
@@ -951,23 +996,51 @@
       "funnels": "Embudos",
       "entries": "Entradas",
       "completions": "Completaciones",
-      "completionRate": "Tasa de completacion"
+      "completionRate": "Tasa de completación"
     },
-    "subject": { "label": "Objeto del informe", "all": "Todos los embudos" }, "traffic": { "title": "Tráfico coincidente", "selectedDescription": "Vistas de página de sesiones que entraron en este embudo.", "allDescription": "Vistas de página de sesiones que entraron en cualquier embudo.", "unavailableTitle": "No hay embudos que comparar", "unavailableDescription": "Crea un embudo para ver el tráfico de sesiones coincidente." }, "states": { "errorTitle": "Embudos no disponibles", "errorDescription": "No se pudieron cargar los embudos. Inténtalo de nuevo." }, "notices": { "unavailable": "Ese embudo ya no está disponible para este sitio." }, "definitions": { "title": "Definiciones de embudos", "count": "{{count}} embudos", "steps": "Pasos ordenados" }, "steps": { "title": "Rendimiento por paso", "retention": "{{rate}}% retenido", "dropoff": "{{count}} abandonos" },
+    "subject": {
+      "label": "Objeto del informe",
+      "all": "Todos los embudos"
+    },
+    "traffic": {
+      "title": "Tráfico coincidente",
+      "selectedDescription": "Páginas vistas de sesiones que entraron en este embudo.",
+      "allDescription": "Páginas vistas de sesiones que entraron en cualquier embudo.",
+      "unavailableTitle": "No hay embudos que comparar",
+      "unavailableDescription": "Crea un embudo para ver el tráfico de sesiones coincidente."
+    },
+    "states": {
+      "errorTitle": "Embudos no disponibles",
+      "errorDescription": "No se pudieron cargar los embudos. Inténtalo de nuevo."
+    },
+    "notices": {
+      "unavailable": "Ese embudo ya no está disponible para este sitio."
+    },
+    "definitions": {
+      "title": "Definiciones de embudos",
+      "count": "{{count}} embudos",
+      "steps": "Pasos ordenados"
+    },
+    "steps": {
+      "title": "Rendimiento por paso",
+      "retention": "{{rate}}% retenido",
+      "dropoff": "{{count}} abandonos"
+    },
     "list": {
       "title": "Embudos",
       "manageTooltip": "Administrar embudos",
       "emptyTitle": "Aún no hay embudos",
       "emptyDescription": "Construye un flujo de eventos para medir abandonos y conversiones.",
       "createAction": "Crear embudo",
-      "stepsCount": "{{count}} pasos"
-      ,"dashboardDescription": "Recorridos que muestran progreso y abandono.", "detailsAria": "Abrir detalles de {{name}}"
+      "stepsCount": "{{count}} pasos",
+      "dashboardDescription": "Recorridos que muestran progreso y abandono.",
+      "detailsAria": "Abrir detalles de {{name}}"
     },
     "manager": {
       "dialogTitle": "Administrar embudos",
-      "dialogDescription": "Haz seguimiento de recorridos de usuario a traves de multiples pasos.",
+      "dialogDescription": "Haz seguimiento de recorridos de usuario a través de múltiples pasos.",
       "stepsLabel": "Pasos",
-      "viewStats": "Ver estadisticas",
+      "viewStats": "Ver estadísticas",
       "empty": "Aún no hay embudos definidos.",
       "newAction": "Nuevo embudo",
       "createTitle": "Crear nuevo embudo",
@@ -978,10 +1051,19 @@
       "namePlaceholder": "p. ej. Flujo de checkout",
       "stepPathPlaceholder": "/ruta",
       "stepEventPlaceholder": "event_name",
-      "addStep": "Agregar paso",
+      "addStep": "Añadir paso",
       "createAction": "Crear embudo",
       "saveAction": "Guardar cambios",
-      "stepsTitle": "Pasos ordenados", "reorderHelp": "Arrastra los pasos o usa los controles de movimiento. Se requieren al menos dos pasos.", "dragStepAria": "Arrastrar paso {{index}}", "stepValueAria": "Valor del paso {{index}}", "moveUpAria": "Mover paso hacia arriba", "moveDownAria": "Mover paso hacia abajo", "removeStepAria": "Eliminar paso", "errors": { "save": "No se pudo guardar el embudo. Revisa el formulario e inténtalo de nuevo." },
+      "stepsTitle": "Pasos ordenados",
+      "reorderHelp": "Arrastra los pasos o usa los controles de movimiento. Se requieren al menos dos pasos.",
+      "dragStepAria": "Arrastrar paso {{index}}",
+      "stepValueAria": "Valor del paso {{index}}",
+      "moveUpAria": "Mover paso hacia arriba",
+      "moveDownAria": "Mover paso hacia abajo",
+      "removeStepAria": "Eliminar paso",
+      "errors": {
+        "save": "No se pudo guardar el embudo. Revisa el formulario e inténtalo de nuevo."
+      },
       "typePagePath": "Ruta",
       "typeCustomEvent": "Evento",
       "messages": {
@@ -996,7 +1078,7 @@
     "viewer": {
       "dialogTitle": "Análisis de embudo",
       "editAction": "Editar embudo",
-      "droppedSuffix": "abandono",
+      "droppedSuffix": "abandonos",
       "retention": "retención",
       "entry": "Entrada"
     }
@@ -1033,7 +1115,7 @@
   },
   "utmBuilder": {
     "breadcrumb": "Generador UTM",
-    "subtitle": "Genera enlaces de campaña etiquetados para rastrear fuentes de tráfico en tus análisis.",
+    "subtitle": "Genera enlaces de campaña etiquetados para rastrear fuentes de tráfico en tus analíticas.",
     "form": {
       "title": "Construye tu enlace",
       "siteSelectLabel": "Rellenar desde un sitio",
@@ -1071,7 +1153,11 @@
     }
   },
   "social": {
-    "continueWith": { "google": "Continuar con Google", "github": "Continuar con GitHub", "microsoft": "Continuar con Microsoft" },
+    "continueWith": {
+      "google": "Continuar con Google",
+      "github": "Continuar con GitHub",
+      "microsoft": "Continuar con Microsoft"
+    },
     "signupMethods": "Métodos de registro social",
     "confirmEmailSubtitle": "Confirma a qué cuenta de HitKeep debe acceder esta identidad de Microsoft.",
     "confirmEmailPrompt": "Los datos de correo de Microsoft pueden cambiar. Revisa el correo de HitKeep antes de que enviemos un enlace de confirmación.",
@@ -1119,10 +1205,18 @@
         "title": "Inicio de sesión social",
         "description": "Conecta cuentas de proveedores que puedas usar para iniciar sesión en HitKeep.",
         "empty": "No hay proveedores de inicio de sesión social vinculados.",
-        "linkedDate": "Vinculado", "lastUsed": "Último uso", "connectAction": "Conectar {{provider}}", "unlinkAction": "Desvincular",
+        "linkedDate": "Vinculado",
+        "lastUsed": "Último uso",
+        "connectAction": "Conectar {{provider}}",
+        "unlinkAction": "Desvincular",
         "passwordConfirmationHint": "Introduce tu contraseña actual en la sección de contraseña antes de desvincular tu único proveedor social.",
-        "linked": "Proveedor vinculado correctamente.", "unlinked": "Proveedor desvinculado correctamente.",
-        "errors": { "linkFailed": "No se pudo vincular este proveedor.", "unlinkFailed": "No se pudo desvincular este proveedor.", "lastMethod": "Añade otro proveedor social o una clave de acceso, o confirma una contraseña habilitada." }
+        "linked": "Proveedor vinculado correctamente.",
+        "unlinked": "Proveedor desvinculado correctamente.",
+        "errors": {
+          "linkFailed": "No se pudo vincular este proveedor.",
+          "unlinkFailed": "No se pudo desvincular este proveedor.",
+          "lastMethod": "Añade otro proveedor social o una passkey, o confirma una contraseña habilitada antes de desvincular."
+        }
       },
       "twoFactor": {
         "title": "Autenticación en dos pasos",
@@ -1133,7 +1227,7 @@
         "otpauthLabel": "URI de OTPAuth",
         "verifyCodeLabel": "Código de verificación",
         "disableCodeLabel": "Código actual del autenticador",
-        "disableHint": "Ingresa un código válido de 6 dígitos para desactivar la autenticación en dos pasos.",
+        "disableHint": "Introduce un código válido de 6 dígitos para desactivar la autenticación en dos pasos.",
         "startSetupAction": "Iniciar configuración",
         "verifyAction": "Activar autenticación en dos pasos",
         "disableAction": "Desactivar autenticación en dos pasos",
@@ -1152,7 +1246,7 @@
         "nameLabel": "Nombre de la passkey",
         "namePlaceholder": "p. ej. Portátil del trabajo",
         "nameHint": "Etiqueta opcional para identificar el dispositivo.",
-        "addAction": "Agregar passkey",
+        "addAction": "Añadir passkey",
         "removeAction": "Eliminar",
         "registered": "Passkey registrada.",
         "deleted": "Passkey eliminada.",
@@ -1211,7 +1305,7 @@
         },
         "validation": {
           "emailRequired": "El correo electrónico es obligatorio.",
-          "emailInvalid": "Ingresa un correo electrónico válido.",
+          "emailInvalid": "Introduce un correo electrónico válido.",
           "emailTooLong": "El correo electrónico debe tener 320 caracteres o menos.",
           "nameTooLong": "El nombre y el apellido deben tener 120 caracteres o menos."
         },
@@ -1232,7 +1326,7 @@
       },
       "exportShortcut": {
         "title": "Exportación de analíticas",
-        "description": "Exporta todos los sitios accesibles o takeouts de sitios individuales desde el hub Importar y exportar.",
+        "description": "Exporta todos los sitios accesibles o takeouts de sitios individuales desde Importar y exportar.",
         "action": "Abrir Importar y exportar"
       }
     },
@@ -1240,11 +1334,11 @@
       "breadcrumb": "Informes",
       "subtitle": "Crea informes de analíticas fiables y programados para ti o tu equipo.",
       "newReport": "Nuevo informe",
-      "mailUnavailable": "SMTP no está disponible. Puedes editar borradores, pero no activar, probar ni reintentar informes.",
+      "mailUnavailable": "SMTP no está disponible. Puedes crear y editar borradores, pero no activar, probar ni reintentar informes.",
       "mailUnavailableDraft": "El envío de correo no está disponible. Guarda el informe como borrador hasta configurar SMTP.",
-            "saved": "Informe guardado.",
-            "deleted": "Informe eliminado.",
-            "emptyFiltered": "Ningún informe coincide con tu búsqueda.",
+      "saved": "Informe guardado.",
+      "deleted": "Informe eliminado.",
+      "emptyFiltered": "Ningún informe coincide con tu búsqueda.",
       "previewSuppressed": "No se enviaría ningún correo porque este informe no tiene contenido válido para el periodo seleccionado.",
       "previewDeliverable": "{{count}} destinatario(s) confirmado(s) recibirían este informe.",
       "previewPending": "{{count}} destinatario(s) externo(s) están pendientes de confirmación.",
@@ -1269,80 +1363,184 @@
       "deleteConfirm": "¿Eliminar el informe «{{name}}»? También se eliminará el historial de entregas.",
       "optedOut": "Has cancelado este informe.",
       "resubscribe": "Volver a suscribirse",
-      "empty": { "title": "Aún no hay informes", "description": "Crea un informe con los sitios, destinatarios y hora que encajen con tu flujo.", "action": "Crear informe" },
-      "filteredEmpty": { "title": "No hay informes coincidentes" },
-      "presets": {
-        "site_summary": { "title": "Resumen del sitio", "description": "Métricas, objetivos, tendencia, páginas y referencias de un sitio." },
-        "portfolio_digest": { "title": "Resumen de cartera", "description": "Comparación compacta de los sitios seleccionados o accesibles." },
-        "opportunity_brief": { "title": "Resumen de oportunidades", "description": "Oportunidades guardadas y validadas con evidencias; se omiten los emails vacíos." }
+      "empty": {
+        "title": "Aún no hay informes",
+        "description": "Crea un informe con los sitios, destinatarios y hora que encajen con tu flujo.",
+        "action": "Crear informe"
       },
-      "scope": { "label": "Ámbito", "personal": "Personal", "team": "Equipo" },
+      "filteredEmpty": {
+        "title": "No hay informes coincidentes"
+      },
+      "presets": {
+        "site_summary": {
+          "title": "Resumen del sitio",
+          "description": "Métricas, objetivos, tendencia, páginas y referencias de un sitio."
+        },
+        "portfolio_digest": {
+          "title": "Resumen de cartera",
+          "description": "Comparación compacta de los sitios seleccionados o accesibles."
+        },
+        "opportunity_brief": {
+          "title": "Resumen de oportunidades",
+          "description": "Oportunidades guardadas y validadas con evidencias; se omiten los emails vacíos."
+        }
+      },
+      "scope": {
+        "label": "Ámbito",
+        "personal": "Personal",
+        "team": "Equipo"
+      },
       "scopeSites": "Ámbito y sitios",
-      "sort": { "label": "Ordenar por", "ascending": "Orden ascendente", "descending": "Orden descendente" },
-      "sites": { "label": "Sitios", "placeholder": "Selecciona sitios" },
+      "sort": {
+        "label": "Ordenar por",
+        "ascending": "Orden ascendente",
+        "descending": "Orden descendente"
+      },
+      "sites": {
+        "label": "Sitios",
+        "placeholder": "Selecciona sitios"
+      },
       "recipients": {
-        "label": "Destinatarios", "placeholder": "Selecciona usuarios de HitKeep",
-        "externalLabel": "Destinatarios de correo externos", "externalPlaceholder": "cliente@ejemplo.com",
+        "label": "Destinatarios",
+        "placeholder": "Selecciona usuarios de HitKeep",
+        "externalLabel": "Destinatarios de correo externos",
+        "externalPlaceholder": "cliente@ejemplo.com",
         "externalHint": "Los destinatarios externos deben confirmar antes de recibir informes. Máximo 25 por informe.",
         "proNudge": "Los destinatarios externos de informes programados están disponibles en Pro y Business. En Free, elimina las direcciones externas existentes antes de guardar cambios.",
         "proRequired": "Los destinatarios externos requieren el plan Pro o superior.",
         "upgradeToPro": "Mejorar a Pro",
-        "add": "Añadir correo", "invalidEmail": "Introduce una dirección de correo válida.", "limit": "Un informe puede tener como máximo 25 destinatarios externos.",
-        "removeEmail": "Eliminar {{email}}", "resend": "Reenviar", "resent": "Correo de confirmación reenviado.",
-        "resendFailed": "Todavía no se pudo reenviar el correo de confirmación.", "removeConfirm": "¿Eliminar {{email}} de este informe?", "removed": "Destinatario externo eliminado."
+        "add": "Añadir correo",
+        "invalidEmail": "Introduce un correo electrónico válido.",
+        "limit": "Un informe puede tener como máximo 25 destinatarios externos.",
+        "removeEmail": "Eliminar {{email}}",
+        "resend": "Reenviar",
+        "resent": "Correo de confirmación reenviado.",
+        "resendFailed": "Todavía no se pudo reenviar el correo de confirmación.",
+        "removeConfirm": "¿Eliminar {{email}} de este informe?",
+        "removed": "Destinatario externo eliminado."
       },
-      "recipientStatus": { "confirmed": "Confirmado", "pending_confirmation": "Confirmación pendiente", "opted_out": "Dado de baja", "expired": "Confirmación caducada", "invitation_failed": "Invitación fallida" },
-      "schedule": { "label": "Programación" },
+      "recipientStatus": {
+        "confirmed": "Confirmado",
+        "pending_confirmation": "Confirmación pendiente",
+        "opted_out": "Dado de baja",
+        "expired": "Confirmación caducada",
+        "invitation_failed": "Invitación fallida"
+      },
+      "schedule": {
+        "label": "Programación"
+      },
       "frequency": {
         "label": "Frecuencia",
-        "daily": { "label": "Diario", "hint": "Día anterior" },
-        "weekly": { "label": "Semanal", "hint": "Siete días anteriores" },
-        "monthly": { "label": "Mensual", "hint": "Mes natural anterior" }
+        "daily": {
+          "label": "Diario",
+          "hint": "Día anterior"
+        },
+        "weekly": {
+          "label": "Semanal",
+          "hint": "Siete días anteriores"
+        },
+        "monthly": {
+          "label": "Mensual",
+          "hint": "Mes natural anterior"
+        }
       },
-      "weekdays": { "0": "Domingo", "1": "Lunes", "2": "Martes", "3": "Miércoles", "4": "Jueves", "5": "Viernes", "6": "Sábado" },
-      "status": { "draft": "Borrador", "active": "Activo", "paused": "Pausado" },
-      "runStatus": { "queued": "En cola", "running": "Enviando", "sending": "Enviando", "completed": "Aceptado por el servidor de correo", "accepted": "Aceptado por el servidor de correo", "partial": "Aceptado parcialmente por el servidor de correo", "failed": "Fallido", "skipped": "Omitido" },
-      "actions": { "preview": "Generar vista previa", "test": "Enviar prueba", "history": "Historial", "duplicate": "Duplicar", "pause": "Pausar", "resume": "Reanudar", "retry": "Reintentar" },
-      "editor": { "createTitle": "Crear informe", "editTitle": "Editar informe", "presetStep": "Elige una plantilla", "sitesStep": "Elige sitios", "recipientsStep": "Elige destinatarios", "scheduleStep": "Define la programación", "previewStep": "Vista previa" },
+      "weekdays": {
+        "0": "Domingo",
+        "1": "Lunes",
+        "2": "Martes",
+        "3": "Miércoles",
+        "4": "Jueves",
+        "5": "Viernes",
+        "6": "Sábado"
+      },
+      "status": {
+        "draft": "Borrador",
+        "active": "Activo",
+        "paused": "Pausado"
+      },
+      "runStatus": {
+        "queued": "En cola",
+        "running": "Enviando",
+        "sending": "Enviando",
+        "completed": "Aceptado por el servidor de correo",
+        "accepted": "Aceptado por el servidor de correo",
+        "partial": "Aceptado parcialmente por el servidor de correo",
+        "failed": "Fallido",
+        "skipped": "Omitido"
+      },
+      "actions": {
+        "preview": "Generar vista previa",
+        "test": "Enviar prueba",
+        "history": "Historial",
+        "duplicate": "Duplicar",
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "retry": "Reintentar"
+      },
+      "editor": {
+        "createTitle": "Crear informe",
+        "editTitle": "Editar informe",
+        "presetStep": "Elige una plantilla",
+        "sitesStep": "Elige sitios",
+        "recipientsStep": "Elige destinatarios",
+        "scheduleStep": "Define la programación",
+        "previewStep": "Vista previa"
+      },
       "saveDraft": "Guardar borrador",
       "activate": "Guardar y activar",
-      "history": { "title": "Historial de entregas", "empty": "Aún no hay ejecuciones programadas.", "deliveries": "entregas", "attempts": "intentos", "acceptedAt": "Aceptado", "retryAt": "Próximo intento" },
-      "errors": { "loadTitle": "Los informes no están disponibles", "load": "No se pudieron cargar los informes.", "save": "No se pudo guardar el informe.", "preview": "No se pudo generar la vista previa.", "members": "No se pudieron cargar los miembros del equipo. Inténtalo de nuevo antes de elegir destinatarios.", "history": "No se pudo cargar el historial de entregas.", "test": "El servidor no aceptó el mensaje de prueba.", "action": "La acción del informe ha fallado." }
+      "history": {
+        "title": "Historial de entregas",
+        "empty": "Aún no hay ejecuciones programadas.",
+        "deliveries": "entregas",
+        "attempts": "intentos",
+        "acceptedAt": "Aceptado",
+        "retryAt": "Próximo reintento"
+      },
+      "errors": {
+        "loadTitle": "Los informes no están disponibles",
+        "load": "No se pudieron cargar los informes.",
+        "save": "No se pudo guardar el informe.",
+        "preview": "No se pudo generar la vista previa.",
+        "members": "No se pudieron cargar los miembros del equipo. Inténtalo de nuevo antes de elegir destinatarios.",
+        "history": "No se pudo cargar el historial de entregas.",
+        "test": "El servidor no aceptó el mensaje de prueba.",
+        "action": "La acción del informe ha fallado."
+      }
     },
     "apiClients": {
-      "title": "Clientes de API",
-      "description": "Crea clientes de API delegados con permisos limitados a tu propio acceso.",
-      "loading": "Cargando clientes de API...",
-      "empty": "Todavía no hay clientes de API.",
-      "createDialogTitle": "Agregar cliente de API",
-      "editDialogTitle": "Editar cliente de API",
-      "confirmDelete": "¿Eliminar el cliente de API \"{{name}}\"?",
-      "confirmRotate": "¿Renovar el token del cliente de API \"{{name}}\"? El token anterior dejará de funcionar de inmediato.",
+      "title": "Clientes API",
+      "description": "Crea clientes API delegados con permisos limitados a tu propio acceso.",
+      "loading": "Cargando clientes API...",
+      "empty": "Todavía no hay clientes API.",
+      "createDialogTitle": "Añadir cliente API",
+      "editDialogTitle": "Editar cliente API",
+      "confirmDelete": "¿Eliminar el cliente API \"{{name}}\"?",
+      "confirmRotate": "¿Renovar el token del cliente API \"{{name}}\"? El token anterior dejará de funcionar de inmediato.",
       "noSiteAccess": "Sin acceso a sitios",
       "noSiteAccessInstanceOnly": "Solo instancia/admin; sin acceso a sitios",
-      "siteGrantCount": "{{count}} concesiones de sitio",
-      "siteGrantPopoverTitle": "Concesiones de sitio",
+      "siteGrantCount": "{{count}} permisos de sitio",
+      "siteGrantPopoverTitle": "Permisos de sitio",
       "status": {
         "active": "Activo",
         "inactive": "Inactivo",
         "revoked": "Revocado",
-        "expired": "Expirado"
+        "expired": "Caducado"
       },
       "meta": {
         "instanceRole": "Rol de instancia",
         "created": "Creado",
         "lastUsed": "Último uso",
-        "expires": "Expira"
+        "expires": "Caduca"
       },
       "actions": {
-        "add": "Agregar cliente de API",
+        "add": "Añadir cliente API",
         "create": "Crear cliente",
         "save": "Guardar cambios",
         "edit": "Editar",
         "revoke": "Revocar",
         "reactivate": "Reactivar",
         "delete": "Eliminar",
-        "addScope": "Agregar permiso",
+        "addScope": "Añadir permiso",
         "refresh": "Actualizar",
         "rollToken": "Renovar token"
       },
@@ -1363,7 +1561,7 @@
           "instanceRoleRequired": "El rol de instancia es obligatorio.",
           "expiresAtPast": "La expiración debe estar en el futuro.",
           "expiresAtInvalid": "La fecha de expiración no es válida.",
-          "scopeSiteRequired": "Selecciona un sitio antes de agregar un permiso."
+          "scopeSiteRequired": "Selecciona un sitio antes de añadir un permiso."
         },
         "teamSiteScopesHint": "Los clientes de equipo solo pueden acceder a los sitios añadidos aquí con un rol de sitio."
       },
@@ -1372,21 +1570,21 @@
         "description": "Por seguridad, el token solo se muestra una vez. Guárdalo en tu gestor de secretos."
       },
       "messages": {
-        "created": "Cliente de API creado.",
-        "updated": "Cliente de API actualizado.",
-        "deleted": "Cliente de API eliminado.",
-        "revoked": "Cliente de API revocado.",
-        "reactivated": "Cliente de API reactivado.",
+        "created": "Cliente API creado.",
+        "updated": "Cliente API actualizado.",
+        "deleted": "Cliente API eliminado.",
+        "revoked": "Cliente API revocado.",
+        "reactivated": "Cliente API reactivado.",
         "rotated": "Token de API renovado. Copia el nuevo token ahora."
       },
       "errors": {
-        "loadFailed": "No se pudieron cargar los clientes de API.",
-        "createFailed": "No se pudo crear el cliente de API.",
-        "updateFailed": "No se pudo actualizar el cliente de API.",
+        "loadFailed": "No se pudieron cargar los clientes API.",
+        "createFailed": "No se pudo crear el cliente API.",
+        "updateFailed": "No se pudo actualizar el cliente API.",
         "rotateFailed": "No se pudo renovar el token de API.",
-        "deleteFailed": "No se pudo eliminar el cliente de API.",
+        "deleteFailed": "No se pudo eliminar el cliente API.",
         "invalidExpiration": "La fecha de expiración no es válida.",
-        "notFound": "Cliente de API no encontrado."
+        "notFound": "Cliente API no encontrado."
       },
       "teamTitle": "Clientes API del equipo",
       "teamDescription": "Crea clientes API del equipo para automatizaciones compartidas sin depender de una sola cuenta de usuario."
@@ -1402,20 +1600,20 @@
     "createAdminAction": "Crear cuenta de administrador",
     "createAdminAndContinueAction": "Crear cuenta de administrador y continuar",
     "errors": {
-      "unexpected": "Ocurrió un error inesperado. Inténtalo de nuevo."
+      "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo."
     }
   },
   "password": {
     "forgot": {
       "title": "Restablecer contraseña",
-      "description": "Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.",
+      "description": "Introduce tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.",
       "successTitle": "Revisa tu bandeja de entrada",
       "successDescription": "Si existe una cuenta para {{email}}, hemos enviado un enlace de restablecimiento.",
       "returnToSignIn": "Volver a iniciar sesión",
       "sendResetLink": "Enviar enlace de restablecimiento",
       "backToSignIn": "Volver a iniciar sesión",
       "errors": {
-        "unexpected": "Algo salio mal. Inténtalo de nuevo más tarde."
+        "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo más tarde."
       }
     },
     "reset": {
@@ -1465,7 +1663,7 @@
       "loadFailed": "No se pueden cargar enlaces compartidos ahora. Inténtalo de nuevo.",
       "deleteAction": "Eliminar",
       "deleteConfirmTitle": "Eliminar enlace compartido",
-      "deleteConfirmMessage": "Cualquiera que use este enlace perdera acceso de inmediato.",
+      "deleteConfirmMessage": "Cualquiera que use este enlace perderá acceso de inmediato.",
       "createSuccess": "Enlace compartido creado.",
       "deleteSuccess": "Enlace compartido eliminado.",
       "deleteFailed": "No se puede eliminar el enlace compartido ahora."
@@ -1478,17 +1676,17 @@
   },
   "sites": {
     "addDialog": {
-      "title": "Agregar sitio",
-      "instructionsLine1": "Ingresa tu dominio raíz o subdominio (p. ej., {{apex}}, {{subdomain}}).",
+      "title": "Añadir sitio",
+      "instructionsLine1": "Introduce tu dominio raíz o subdominio (p. ej., {{apex}}, {{subdomain}}).",
       "instructionsLine2": "Rastreamos automáticamente {{www}} con tu dominio raíz.",
       "domainLabel": "Nombre de dominio",
       "domainPlaceholder": "example.com",
-      "addAction": "Agregar sitio",
+      "addAction": "Añadir sitio",
       "errors": {
         "domainRequired": "El dominio es obligatorio.",
         "domainInvalid": "Formato de dominio inválido.",
         "removeProtocol": "Elimina http:// o https://",
-        "removeWww": "Elimina 'www.'. Ingresa el dominio sin el prefijo 'www.'.",
+        "removeWww": "Elimina 'www.'. Introduce el dominio sin el prefijo 'www.'.",
         "createFailed": "No se pudo crear el sitio. El dominio puede existir ya."
       }
     },
@@ -1517,7 +1715,7 @@
       "savePolicy": "Guardar política"
     },
     "exclusions": {
-      "description": "Excluye tráfico interno, de monitoreo, bots, países, agentes de usuario o rutas para que nunca llegue al almacenamiento analítico.",
+      "description": "Excluye tráfico interno, de monitorización, bots, países, agentes de usuario o rutas para que nunca llegue al almacenamiento analítico.",
       "typeLabel": "Tipo de regla",
       "cidrLabel": "IP o CIDR",
       "cidrPlaceholder": "203.0.113.5 o 192.168.0.0/24",
@@ -1529,12 +1727,12 @@
       "pathPlaceholder": "/admin",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "VPN de oficina, monitor sintético, etc.",
-      "addAction": "Agregar exclusión",
+      "addAction": "Añadir exclusión",
       "loading": "Cargando exclusiones...",
       "empty": "No hay exclusiones configuradas para este sitio.",
       "confirmDelete": "¿Eliminar la exclusión {{value}}?",
       "suggestionsTitle": "Tu IP actual",
-      "suggestionsHint": "Copia este CIDR y pegalo en el campo IP o CIDR.",
+      "suggestionsHint": "Copia este CIDR y pégalo en el campo IP o CIDR.",
       "currentIpLoading": "Resolviendo tu IP...",
       "currentIpUnavailable": "No se pudo resolver tu IP actual.",
       "inheritedHint": "Los filtros de instancia y equipo también se aplican a este sitio. Los filtros heredados son de solo lectura aquí.",
@@ -1557,10 +1755,10 @@
         "created": "Creado"
       },
       "errors": {
-        "invalidCidr": "Ingresa un valor IP o CIDR válido.",
+        "invalidCidr": "Introduce un valor IP o CIDR válido.",
         "invalidCountry": "Selecciona un país.",
-        "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
-        "invalidPath": "Ingresa una ruta.",
+        "invalidUserAgent": "Introduce una subcadena de agente de usuario.",
+        "invalidPath": "Introduce una ruta.",
         "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
         "loadFailed": "No se pudieron cargar las exclusiones.",
         "createFailed": "No se pudo crear la exclusión.",
@@ -1574,7 +1772,7 @@
     "selector": {
       "regionAria": "Selección de sitio",
       "sitesLabel": "Sitios",
-      "addSiteAria": "Agregar un nuevo sitio",
+      "addSiteAria": "Añadir un nuevo sitio",
       "selectPlaceholder": "Seleccionar sitio",
       "selectSiteAria": "Selecciona un sitio para ver estadísticas",
       "siteSettingsAria": "Configuración del sitio",
@@ -1591,7 +1789,7 @@
         "general": "General",
         "tracking": "Seguimiento",
         "filtering": "Filtrado",
-        "retention": "Retencion",
+        "retention": "Retención",
         "access": "Acceso",
         "dangerZone": "Zona de peligro"
       },
@@ -1619,16 +1817,16 @@
           "error": "No se pudieron exportar los datos del sitio. Inténtalo de nuevo."
         },
         "exportShortcutTitle": "Exportación de analíticas",
-        "exportShortcutDescription": "Exporta este sitio o cualquier otro sitio accesible desde el hub Importar y exportar.",
+        "exportShortcutDescription": "Exporta este sitio o cualquier otro sitio accesible desde Importar y exportar.",
         "exportShortcutAction": "Abrir Importar y exportar"
       },
       "unsavedChangesConfirm": "Tienes cambios sin guardar. ¿Deseas descartarlos?"
     },
     "team": {
       "emailPlaceholder": "user@example.com",
-      "addMemberAction": "Agregar miembro del sitio",
-      "addMemberDialogTitle": "Agregar miembro del sitio",
-      "addMemberSuccess": "Miembro del sitio agregado.",
+      "addMemberAction": "Añadir miembro del sitio",
+      "addMemberDialogTitle": "Añadir miembro del sitio",
+      "addMemberSuccess": "Miembro del sitio añadido.",
       "removeMemberSuccess": "Miembro del sitio quitado.",
       "confirmRemove": "¿Quitar a {{email}} del sitio?",
       "transfer": {
@@ -1644,7 +1842,7 @@
         }
       },
       "errors": {
-        "addFailed": "No se pudo agregar el miembro. Asegúrate de que el usuario exista.",
+        "addFailed": "No se pudo añadir el miembro. Asegúrate de que el usuario exista.",
         "removeFailed": "No se pudo quitar el miembro: {{error}}"
       }
     },
@@ -1674,13 +1872,13 @@
         "wordpress": {
           "description": "Instala el plugin HitKeep Analytics desde el directorio de plugins de WordPress y pega esta URL de instancia en Ajustes → HitKeep. Sin editar el tema ni usar un gestor de etiquetas.",
           "urlLabel": "URL de la instancia de HitKeep",
-          "urlHint": "No añadas /hk.js: el plugin lo agrega automáticamente.",
+          "urlHint": "No añadas /hk.js: el plugin lo añade automáticamente.",
           "directoryAction": "Obtener el plugin",
           "docsAction": "Guía de WordPress"
         },
         "server": {
           "description": "Envía páginas vistas y eventos de confianza desde un backend, un CMS, un proxy inverso o un trabajo de reproducción de registros. Quien llama aporta la marca de tiempo original, la IP del visitante y el agente de usuario.",
-          "tokenHint": "Requiere un token de cliente de API con el permiso site.manage_data para este sitio. Guarda el token en el servidor.",
+          "tokenHint": "Requiere un token de cliente API con el permiso site.manage_data para este sitio. Guarda el token en el servidor.",
           "docsAction": "Guía de seguimiento del lado del servidor",
           "tokenAction": "Guía de clientes de API"
         }
@@ -1692,9 +1890,9 @@
         "deliveryTitle": "Entrega y privacidad"
       },
       "collectDntLabel": "Recopilar DNT",
-      "collectDntDescription": "Rastrear usuarios incluso si \"Do Not Track\" esta habilitado en su navegador.",
+      "collectDntDescription": "Rastrear usuarios incluso si \"Do Not Track\" está habilitado en su navegador.",
       "disableBeaconLabel": "Desactivar sendBeacon",
-      "disableBeaconDescription": "Usar solicitudes fetch estandar en lugar de navigator.sendBeacon.",
+      "disableBeaconDescription": "Usar solicitudes fetch estándar en lugar de navigator.sendBeacon.",
       "webVitalsLabel": "Web Vitals",
       "webVitalsDescription": "Carga el bundle separado de Web Vitals y envía muestras de LCP, INP, CLS, FCP y TTFB. Desactivado de forma predeterminada.",
       "autoTrackingTitle": "Seguimiento automático de eventos",
@@ -1717,7 +1915,7 @@
           "waiting": "Esperando",
           "live": "En vivo",
           "dormant": "Inactivo",
-          "domain_mismatch": "Dominio no coincide"
+          "domain_mismatch": "El dominio no coincide"
         },
         "waitingHint": "Esperando el primer hit aceptado. Este panel se actualiza automáticamente durante dos minutos.",
         "mismatchHint": "El hostname detectado más reciente no coincide con el dominio configurado del sitio.",
@@ -1746,7 +1944,7 @@
       "health": "Estado",
       "storage": "Almacenamiento",
       "ingest": "Ingesta",
-      "backups": "Copias",
+      "backups": "Copias de seguridad",
       "spam": "Spam",
       "caches": "Cachés",
       "mail": "Correo",
@@ -1775,12 +1973,12 @@
       "pathPlaceholder": "/admin",
       "descriptionLabel": "Descripción",
       "descriptionPlaceholder": "Monitor de uptime, rango de oficina, etc.",
-      "addAction": "Agregar filtro global",
+      "addAction": "Añadir filtro global",
       "loading": "Cargando filtros globales...",
       "empty": "No hay filtros globales configurados.",
       "confirmDelete": "¿Eliminar el filtro global {{value}}?",
       "suggestionsTitle": "Tu IP actual",
-      "suggestionsHint": "Copia este CIDR y pegalo en el campo IP o CIDR.",
+      "suggestionsHint": "Copia este CIDR y pégalo en el campo IP o CIDR.",
       "currentIpLoading": "Resolviendo tu IP...",
       "currentIpUnavailable": "No se pudo resolver tu IP actual.",
       "ruleTypes": {
@@ -1796,10 +1994,10 @@
         "created": "Creado"
       },
       "errors": {
-        "invalidCidr": "Ingresa un valor IP o CIDR válido.",
+        "invalidCidr": "Introduce un valor IP o CIDR válido.",
         "invalidCountry": "Selecciona un país.",
-        "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
-        "invalidPath": "Ingresa una ruta.",
+        "invalidUserAgent": "Introduce una subcadena de agente de usuario.",
+        "invalidPath": "Introduce una ruta.",
         "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
         "loadFailed": "No se pudieron cargar los filtros globales.",
         "createFailed": "No se pudo crear el filtro global.",
@@ -1873,7 +2071,7 @@
         "pathPlaceholder": "/admin",
         "descriptionLabel": "Descripción",
         "descriptionPlaceholder": "VPN de oficina, monitor sintético, etc.",
-        "addAction": "Agregar filtro de equipo",
+        "addAction": "Añadir filtro de equipo",
         "loading": "Cargando filtros del equipo...",
         "empty": "No hay filtros de tráfico configurados para este equipo.",
         "confirmDelete": "¿Eliminar el filtro del equipo {{value}}?",
@@ -1882,20 +2080,37 @@
         "currentIpUnavailable": "No se pudo resolver tu IP actual.",
         "inheritedHint": "Los filtros de instancia también se aplican a este equipo. Los filtros heredados son de solo lectura aquí.",
         "inheritedReadOnly": "Heredado",
-        "ruleTypes": { "cidr": "IP/CIDR", "country": "País", "userAgent": "Agente de usuario", "path": "Ruta" },
-        "scopes": { "instance": "Instancia", "team": "Equipo", "site": "Sitio" },
-        "columns": { "type": "Tipo", "value": "Valor", "description": "Descripción", "created": "Creado" },
+        "ruleTypes": {
+          "cidr": "IP/CIDR",
+          "country": "País",
+          "userAgent": "Agente de usuario",
+          "path": "Ruta"
+        },
+        "scopes": {
+          "instance": "Instancia",
+          "team": "Equipo",
+          "site": "Sitio"
+        },
+        "columns": {
+          "type": "Tipo",
+          "value": "Valor",
+          "description": "Descripción",
+          "created": "Creado"
+        },
         "errors": {
-          "invalidCidr": "Ingresa un valor IP o CIDR válido.",
+          "invalidCidr": "Introduce un valor IP o CIDR válido.",
           "invalidCountry": "Selecciona un país.",
-          "invalidUserAgent": "Ingresa una subcadena de agente de usuario.",
-          "invalidPath": "Ingresa una ruta.",
+          "invalidUserAgent": "Introduce una subcadena de agente de usuario.",
+          "invalidPath": "Introduce una ruta.",
           "descriptionTooLong": "La descripción debe tener 255 caracteres o menos.",
           "loadFailed": "No se pudieron cargar los filtros del equipo.",
           "createFailed": "No se pudo crear el filtro del equipo.",
           "deleteFailed": "No se pudo eliminar el filtro del equipo."
         },
-        "status": { "createSuccess": "Se creó el filtro del equipo {{value}}.", "deleteSuccess": "Se eliminó el filtro del equipo {{value}}." }
+        "status": {
+          "createSuccess": "Se creó el filtro del equipo {{value}}.",
+          "deleteSuccess": "Se eliminó el filtro del equipo {{value}}."
+        }
       },
       "overview": {
         "breadcrumb": "Resumen del equipo",
@@ -1971,7 +2186,10 @@
       "sso": {
         "title": "Inicio de sesión único",
         "description": "Conecta este equipo con su proveedor de identidad OpenID Connect.",
-        "status": { "enabled": "Activado", "disabled": "Desactivado" },
+        "status": {
+          "enabled": "Activado",
+          "disabled": "Desactivado"
+        },
         "provider": {
           "title": "Proveedor de identidad",
           "description": "HitKeep admite actualmente OpenID Connect basado en estándares."
@@ -2069,20 +2287,20 @@
           "title": "Dominios personalizados",
           "description": "Verifica dominios personalizados una vez y usa cualquier dominio activo como host del tracker para los sitios del equipo.",
           "hostnamePlaceholder": "analytics.example.com",
-          "addAction": "Anadir dominio",
+          "addAction": "Añadir dominio",
           "hostnameLabel": "Nombre de host",
           "setupAction": "Configuración DNS",
           "setupDescription": "Añade estos registros DNS en tu proveedor de DNS y luego ejecuta la verificación.",
           "hostnameRequired": "Introduce un nombre de host.",
           "hostnameInvalid": "Usa un nombre de host válido como analytics.example.com.",
           "hostnameTooLong": "Los nombres de host pueden tener como máximo 253 caracteres.",
-          "empty": "Todavia no se han anadido dominios de seguimiento.",
+          "empty": "Todavía no se han añadido dominios de seguimiento.",
           "enabled": "Activado",
           "disabled": "Desactivado",
           "active": "Activo",
           "notActive": "No activo",
-          "added": "Dominio de seguimiento anadido. Configura los registros DNS y luego verificalo.",
-          "checked": "Verificacion comprobada. Revisa los detalles de estado abajo.",
+          "added": "Dominio de seguimiento añadido. Configura los registros DNS y luego verifícalo.",
+          "checked": "Verificación comprobada. Revisa los detalles de estado abajo.",
           "verified": "Dominio de seguimiento verificado y listo para usar.",
           "enabledSuccess": "Dominio de seguimiento activado.",
           "disabledSuccess": "Dominio de seguimiento desactivado. Los sitios que lo usaban volvieron a la URL predeterminada.",
@@ -2090,7 +2308,7 @@
           "verifyAction": "Verificar",
           "disableAction": "Desactivar",
           "enableAction": "Activar",
-          "deleteConfirm": "Eliminar {{ hostname }}? Los sitios que lo usen volveran a la URL predeterminada del tracker.",
+          "deleteConfirm": "Eliminar {{ hostname }}? Los sitios que lo usen volverán a la URL predeterminada del tracker.",
           "dns": {
             "txtName": "Nombre TXT",
             "txtValue": "Valor TXT",
@@ -2102,7 +2320,7 @@
             "tls": "TLS"
           },
           "checksLabel": "Comprobaciones de verificación",
-          "lastChecked": "Ultima comprobacion",
+          "lastChecked": "Última comprobación",
           "lastTLSAsk": "Última solicitud TLS",
           "status": {
             "pending": "Pendiente",
@@ -2115,8 +2333,8 @@
           },
           "errors": {
             "load": "No se pudieron cargar los dominios de seguimiento.",
-            "add": "No se pudo anadir el dominio de seguimiento.",
-            "conflict": "Ese hostname ya esta usado por otro sitio o dominio de seguimiento.",
+            "add": "No se pudo añadir el dominio de seguimiento.",
+            "conflict": "Ese hostname ya está usado por otro sitio o dominio de seguimiento.",
             "verify": "No se pudo verificar el dominio de seguimiento.",
             "update": "No se pudo actualizar el dominio de seguimiento.",
             "delete": "No se pudo eliminar el dominio de seguimiento."
@@ -2152,43 +2370,43 @@
         "actions": {
           "teamCreated": "Equipo creado",
           "teamUpdated": "Equipo actualizado",
-          "teamActiveChanged": "Active team changed",
+          "teamActiveChanged": "Equipo activo cambiado",
           "memberInvited": "Miembro invitado",
           "memberInviteAccepted": "Invitación aceptada",
           "memberInviteResent": "Invitación reenviada",
           "memberInviteRevoked": "Invitación revocada",
-          "memberAdded": "Miembro agregado",
-          "memberRoleUpdated": "Rol de miembro actualizado",
+          "memberAdded": "Miembro añadido",
+          "memberRoleUpdated": "Rol de miembro cambiado",
           "memberRemoved": "Miembro eliminado",
-          "memberLeft": "Miembro salió del equipo",
+          "memberLeft": "Miembro abandonó el equipo",
           "ownershipTransferred": "Propiedad transferida",
           "teamArchived": "Equipo archivado",
-          "siteCreated": "Site created",
-          "siteDeleted": "Site deleted",
-          "siteRetentionUpdated": "Retention updated",
-          "siteTransferredIn": "Sitio trasladado aquí",
-          "siteTransferredOut": "Sitio trasladado fuera",
-          "siteExclusionCreated": "Exclusion created",
-          "siteExclusionDeleted": "Exclusion deleted",
-          "authLoginSucceeded": "Login succeeded",
-          "authLoginFailed": "Login failed",
-          "authMfaRequired": "MFA required",
-          "authMfaSucceeded": "MFA succeeded",
-          "authLogout": "Logout",
-          "authSessionExtended": "Session extended",
-          "importUploadCreated": "Import upload created",
-          "importFileUploaded": "Import file uploaded",
-          "importValidationStarted": "Import validation started",
-          "importValidated": "Import validated",
-          "importValidationFailed": "Import validation failed",
-          "importQueued": "Import queued",
-          "importRequeued": "Import requeued",
-          "importStarted": "Import started",
-          "importFailed": "Import failed",
-          "importCompleted": "Import completed",
-          "importDeleted": "Import deleted",
-          "importDataCleared": "Imported data cleared",
-          "importDataWritten": "Imported data written",
+          "siteCreated": "Sitio creado",
+          "siteDeleted": "Sitio eliminado",
+          "siteRetentionUpdated": "Retención cambiada",
+          "siteTransferredIn": "Sitio transferido dentro",
+          "siteTransferredOut": "Sitio transferido fuera",
+          "siteExclusionCreated": "Exclusión creada",
+          "siteExclusionDeleted": "Exclusión eliminada",
+          "authLoginSucceeded": "Inicio de sesión correcto",
+          "authLoginFailed": "Inicio de sesión fallido",
+          "authMfaRequired": "MFA requerida",
+          "authMfaSucceeded": "MFA correcta",
+          "authLogout": "Cierre de sesión",
+          "authSessionExtended": "Sesión extendida",
+          "importUploadCreated": "Carga de importación creada",
+          "importFileUploaded": "Archivo de importación subido",
+          "importValidationStarted": "Validación de importación iniciada",
+          "importValidated": "Importación validada",
+          "importValidationFailed": "Validación de importación fallida",
+          "importQueued": "Importación en cola",
+          "importRequeued": "Importación reencolada",
+          "importStarted": "Importación iniciada",
+          "importFailed": "Importación fallida",
+          "importCompleted": "Importación completada",
+          "importDeleted": "Importación eliminada",
+          "importDataCleared": "Datos importados borrados",
+          "importDataWritten": "Datos importados escritos",
           "unknown": "Acción desconocida"
         }
       }
@@ -2200,7 +2418,7 @@
         "uptime": "Tiempo activo",
         "publicUrl": "URL pública",
         "runtimeMode": "Modo",
-        "healthStatus": "Salud",
+        "healthStatus": "Estado",
         "enabledFeatures": "Interruptores de funciones",
         "actions": {
           "refresh": "Actualizar"
@@ -2214,7 +2432,7 @@
           "label": "Herramientas de docs MCP"
         },
         "automatic_backups": {
-          "label": "Copias automáticas"
+          "label": "Copias de seguridad automáticas"
         },
         "spam_auto_update": {
           "label": "Autoactualización de spam"
@@ -2226,15 +2444,23 @@
           "label": "Google Search Console"
         },
         "managed_cloud": {
-          "label": "Cloud gestionado"
+          "label": "Cloud gestionada"
         },
         "cloud_signup": {
           "label": "Registro cloud"
         },
-        "social_google": { "label": "Inicio de sesión con Google" },
-        "social_github": { "label": "Inicio de sesión con GitHub" },
-        "social_microsoft": { "label": "Inicio de sesión con Microsoft" },
-        "social_signup": { "label": "Registro social" },
+        "social_google": {
+          "label": "Inicio de sesión con Google"
+        },
+        "social_github": {
+          "label": "Inicio de sesión con GitHub"
+        },
+        "social_microsoft": {
+          "label": "Inicio de sesión con Microsoft"
+        },
+        "social_signup": {
+          "label": "Registro social"
+        },
         "ai": {
           "label": "Pasarela de IA"
         },
@@ -2254,13 +2480,13 @@
         "interval": "Cada {{interval}}",
         "stripe": "Stripe configurado",
         "plan": "Plan {{plan}}",
-		"social": {
-		  "configured": "Configurado",
-		  "partial_configuration": "Degradado: configuración incompleta",
-		  "not_configured": "No configurado",
-		  "soleMethodUser": "Único método de acceso para {{count}} usuario",
-		  "soleMethodUsers": "Único método de acceso para {{count}} usuarios"
-		}
+        "social": {
+          "configured": "Configurado",
+          "partial_configuration": "Degradado: configuración incompleta",
+          "not_configured": "No configurado",
+          "soleMethodUser": "Único método de acceso para {{count}} usuario",
+          "soleMethodUsers": "Único método de acceso para {{count}} usuarios"
+        }
       },
       "mcp": {
         "title": "Acceso MCP",
@@ -2280,7 +2506,7 @@
         }
       },
       "health": {
-        "title": "Comprobación de salud",
+        "title": "Comprobación del estado",
         "status": "Estado",
         "database": "Base de datos",
         "workers": "Workers",
@@ -2301,7 +2527,7 @@
         "issues": "Incidencias",
         "lastAttempt": "Último intento",
         "lastSuccess": "Último éxito",
-        "nextRetry": "Próximo intento",
+        "nextRetry": "Próximo reintento",
         "status": {
           "healthy": "Correcto",
           "idle": "Inactivo",
@@ -2361,7 +2587,7 @@
         },
         "configModes": {
           "cloud_managed": "Gestionada en la nube",
-          "self_hosted": "Autohospedada"
+          "self_hosted": "Autoalojada"
         }
       },
       "storage": {
@@ -2407,23 +2633,23 @@
         "checkpointFailed": "Falló el punto de control de la base de datos."
       },
       "backups": {
-        "title": "Copias",
+        "title": "Copias de seguridad",
         "configPath": "Ruta / destino",
         "enabled": "Activado",
         "disabled": "Desactivado",
         "interval": "Intervalo",
         "retention": "Retención",
-        "lastBackup": "Última copia",
-        "nextBackup": "Próxima copia",
+        "lastBackup": "Última copia de seguridad",
+        "nextBackup": "Próxima copia de seguridad",
         "lastFailed": "Último fallo",
         "lastError": "Último error",
         "recentFailures": "Fallos recientes",
         "actions": {
-          "backupNow": "Copiar ahora",
-          "backupNowConfirm": "¿Iniciar una copia ahora?"
+          "backupNow": "Crear copia de seguridad",
+          "backupNowConfirm": "¿Crear una copia de seguridad ahora?"
         },
-        "backupTriggered": "Copia iniciada",
-        "backupFailed": "Copia fallida"
+        "backupTriggered": "Copia de seguridad iniciada",
+        "backupFailed": "Copia de seguridad fallida"
       },
       "spam": {
         "title": "Filtro de spam",
@@ -2461,7 +2687,7 @@
         },
         "permissions": "Permisos",
         "apiClients": "Clientes API",
-        "rateLimiter": "Rate limiter",
+        "rateLimiter": "Limitador de peticiones",
         "columns": {
           "cache": "Caché",
           "size": "Tamaño",
@@ -2474,7 +2700,7 @@
         "configured": "Configurado",
         "notConfigured": "No configurado",
         "driver": "Driver",
-        "host": "Host",
+        "host": "Servidor",
         "port": "Puerto",
         "encryption": "Cifrado",
         "fromAddress": "Remitente",
@@ -2488,7 +2714,7 @@
         "testFailed": "Falló el correo de prueba",
         "recipientLabel": "Destinatario de prueba",
         "recipientPlaceholder": "ops@example.com",
-        "recipientInvalid": "Introduce una dirección de correo válida."
+        "recipientInvalid": "Introduce un correo electrónico válido."
       },
       "audit": {
         "title": "Registro de auditoría de instancia",
@@ -2497,7 +2723,7 @@
         },
         "filter": {
           "action": "Acción",
-          "targetType": "Tipo de destino",
+          "targetType": "Área",
           "outcome": "Resultado",
           "dateRange": "Rango de fechas",
           "search": "Buscar..."
@@ -2514,8 +2740,8 @@
           "targetType": "Área",
           "target": "Destino",
           "outcome": "Resultado",
-          "ipAddress": "IP address",
-          "country": "Country",
+          "ipAddress": "Dirección IP",
+          "country": "País",
           "details": "Detalles"
         },
         "outcome": {
@@ -2529,10 +2755,10 @@
           "user": "Usuario",
           "team": "Equipo",
           "site": "Sitio",
-          "import": "Import",
-          "siteExclusion": "Site exclusion",
-          "apiClient": "API client",
-          "backup": "Copia",
+          "import": "Importación",
+          "siteExclusion": "Exclusión de sitio",
+          "apiClient": "Cliente API",
+          "backup": "Copia de seguridad",
           "spamFilter": "Filtro de spam",
           "diagnostics": "Diagnóstico"
         },
@@ -2540,52 +2766,52 @@
           "export": "Exportar",
           "roleUpdated": "Rol cambiado",
           "mfaDisabled": "MFA desactivado",
-          "backupTriggered": "Copia iniciada",
-          "backupCompleted": "Copia completada",
-          "backupFailed": "Copia fallida",
-          "spamRefreshed": "Actualización de spam",
+          "backupTriggered": "Copia de seguridad iniciada",
+          "backupCompleted": "Copia de seguridad completada",
+          "backupFailed": "Copia de seguridad fallida",
+          "spamRefreshed": "Filtro de spam actualizado",
           "mailTested": "Prueba de correo",
           "diagnosticsExported": "Diagnóstico exportado",
           "accessDenied": "Acceso denegado",
-          "authLoginSucceeded": "Login succeeded",
-          "authLoginFailed": "Login failed",
-          "authMfaRequired": "MFA required",
-          "authMfaSucceeded": "MFA succeeded",
-          "authLogout": "Logout",
-          "authSessionExtended": "Session extended",
-          "teamCreated": "Team created",
-          "teamUpdated": "Team updated",
-          "teamArchived": "Team archived",
-          "teamActiveChanged": "Active team changed",
-          "memberInvited": "Member invited",
-          "memberInviteAccepted": "Invite accepted",
-          "memberInviteResent": "Invite resent",
-          "memberInviteRevoked": "Invite revoked",
-          "memberAdded": "Member added",
-          "memberRoleUpdated": "Member role updated",
-          "memberRemoved": "Member removed",
-          "memberLeft": "Member left",
-          "ownershipTransferred": "Ownership transferred",
-          "siteCreated": "Site created",
-          "siteDeleted": "Site deleted",
-          "siteRetentionUpdated": "Retention updated",
-          "siteTransferredIn": "Site moved in",
-          "siteTransferredOut": "Site moved out",
-          "siteExclusionCreated": "Exclusion created",
-          "siteExclusionDeleted": "Exclusion deleted",
-          "importUploadCreated": "Import upload created",
-          "importFileUploaded": "Import file uploaded",
-          "importValidationStarted": "Import validation started",
-          "importValidated": "Import validated",
-          "importValidationFailed": "Import validation failed",
-          "importQueued": "Import queued",
-          "importRequeued": "Import requeued",
-          "importStarted": "Import started",
-          "importFailed": "Import failed",
-          "importCompleted": "Import completed",
-          "importDeleted": "Import deleted",
-          "importDataCleared": "Imported data cleared",
-          "importDataWritten": "Imported data written"
+          "authLoginSucceeded": "Inicio de sesión correcto",
+          "authLoginFailed": "Inicio de sesión fallido",
+          "authMfaRequired": "MFA requerida",
+          "authMfaSucceeded": "MFA correcta",
+          "authLogout": "Cierre de sesión",
+          "authSessionExtended": "Sesión extendida",
+          "teamCreated": "Equipo creado",
+          "teamUpdated": "Equipo actualizado",
+          "teamArchived": "Equipo archivado",
+          "teamActiveChanged": "Equipo activo cambiado",
+          "memberInvited": "Miembro invitado",
+          "memberInviteAccepted": "Invitación aceptada",
+          "memberInviteResent": "Invitación reenviada",
+          "memberInviteRevoked": "Invitación revocada",
+          "memberAdded": "Miembro añadido",
+          "memberRoleUpdated": "Rol de miembro cambiado",
+          "memberRemoved": "Miembro eliminado",
+          "memberLeft": "Miembro abandonó el equipo",
+          "ownershipTransferred": "Propiedad transferida",
+          "siteCreated": "Sitio creado",
+          "siteDeleted": "Sitio eliminado",
+          "siteRetentionUpdated": "Retención cambiada",
+          "siteTransferredIn": "Sitio transferido dentro",
+          "siteTransferredOut": "Sitio transferido fuera",
+          "siteExclusionCreated": "Exclusión creada",
+          "siteExclusionDeleted": "Exclusión eliminada",
+          "importUploadCreated": "Carga de importación creada",
+          "importFileUploaded": "Archivo de importación subido",
+          "importValidationStarted": "Validación de importación iniciada",
+          "importValidated": "Importación validada",
+          "importValidationFailed": "Validación de importación fallida",
+          "importQueued": "Importación en cola",
+          "importRequeued": "Importación reencolada",
+          "importStarted": "Importación iniciada",
+          "importFailed": "Importación fallida",
+          "importCompleted": "Importación completada",
+          "importDeleted": "Importación eliminada",
+          "importDataCleared": "Datos importados borrados",
+          "importDataWritten": "Datos importados escritos"
         },
         "pagination": {
           "total": "Mostrando {{ loaded }} de {{ total }} entradas"
@@ -2594,7 +2820,7 @@
       "console": {
         "eyebrow": "Operaciones de instancia",
         "title": "Estado del sistema",
-        "subtitle": "Supervisa salud de ejecución, almacenamiento, entrega de correo, protección contra spam y actividad administrativa desde una única superficie operativa.",
+        "subtitle": "Supervisa el estado de ejecución, el almacenamiento, la entrega de correo, la protección contra spam y la actividad administrativa desde una única superficie operativa.",
         "runtimePosture": "Postura de ejecución",
         "summaryAria": "Resumen del estado del sistema",
         "healthHint": "Base de datos, workers y preparación del nodo",
@@ -2633,7 +2859,7 @@
         "databaseDescription": "Recuperación, checkpoints, archivos, memoria y espacio en disco de DuckDB.",
         "ingestDescription": "Volumen reciente de tracking y tráfico bloqueado en la instancia.",
         "cachesDescription": "Ocupación de cachés LRU para auth, clientes API y rate limiting.",
-        "backupsDescription": "Destino de copias, retención y salud de ejecuciones recientes.",
+        "backupsDescription": "Destino de copias de seguridad, retención y estado de las ejecuciones recientes.",
         "spamDescription": "Frescura de la caché antispam y control de actualización manual.",
         "importCleanupDescription": "Retención de importaciones preparadas, limpieza pendiente y resultados de la última ejecución.",
         "mailDescription": "Configuración de transporte de correo redactada y envío de prueba seguro.",
@@ -2644,7 +2870,7 @@
         "settingsSubtitle": "Gestiona usuarios, sitios, equipos y filtros globales de la instancia.",
         "copyReport": "Copiar informe del sistema",
         "copyReportAria": "Copiar el informe del sistema para solicitudes de soporte",
-        "reportHint": "Comparta el estado de esta consola al informar de un problema."
+        "reportHint": "Comparte el estado de esta consola al informar de un problema."
       },
       "activation": {
         "title": "Activación de usuarios",
@@ -2675,7 +2901,7 @@
           "waiting": "Esperando",
           "live": "En vivo",
           "dormant": "Inactivo",
-          "domain_mismatch": "Dominio no coincide"
+          "domain_mismatch": "El dominio no coincide"
         },
         "actions": {
           "filterTeam": "Filtrar a este equipo",
@@ -2725,7 +2951,7 @@
     "cloudSignupAction": "Crear un espacio de trabajo",
     "emailLabel": "Correo electrónico",
     "emailPlaceholder": "you@example.com",
-    "emailInvalid": "Ingresa una dirección de correo válida.",
+    "emailInvalid": "Introduce un correo electrónico válido.",
     "passwordLabel": "Contraseña",
     "passwordPlaceholder": "••••••••",
     "passwordRequired": "La contraseña es obligatoria.",
@@ -2761,7 +2987,7 @@
       "invalidRecoveryCode": "Código de recuperación no válido.",
       "emailLinkFailed": "No pudimos enviar tu enlace de acceso. Inténtalo de nuevo.",
       "mfaEmailLinkInvalid": "Este enlace de acceso no es válido o ha caducado. Solicita uno nuevo para continuar.",
-      "unexpected": "Ocurrió un error inesperado. Inténtalo de nuevo."
+      "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo."
     }
   },
   "signup": {
@@ -2820,19 +3046,19 @@
       "github": "Ver el código en GitHub"
     },
     "tosLabel": "Acepto los",
-    "tosLink": "Términos de Servicio",
+    "tosLink": "términos de servicio",
     "tosAnd": "y la",
-    "privacyLink": "Política de Privacidad",
+    "privacyLink": "política de privacidad",
     "tosRequired": "Debes aceptar los Términos de Servicio y la Política de Privacidad.",
     "verifyTitle": "Revisa tu bandeja de entrada",
     "verifySubtitle": "Hemos enviado un enlace de verificación a {{email}}. Haz clic para activar tu espacio de trabajo.",
     "verification": {
-        "spamGuidance": "Puede tardar un momento. Revisa la carpeta de spam si no ves el correo.",
-        "resendAction": "Reenviar correo de verificación",
-        "resendCountdown": "Podrás reenviarlo en {{seconds}} s",
-        "resendSuccess": "Si la dirección cumple los requisitos, recibirás otro correo de verificación.",
-        "resendError": "No pudimos enviar la solicitud. Inténtalo de nuevo.",
-        "editEmail": "Usar otro correo"
+      "spamGuidance": "Puede tardar un momento. Revisa la carpeta de spam si no ves el correo.",
+      "resendAction": "Reenviar correo de verificación",
+      "resendCountdown": "Podrás reenviarlo en {{seconds}} s",
+      "resendSuccess": "Si la dirección cumple los requisitos, recibirás otro correo de verificación.",
+      "resendError": "No pudimos enviar la solicitud. Inténtalo de nuevo.",
+      "editEmail": "Usar otro correo"
     },
     "errors": {
       "emailExists": "Ya existe una cuenta con este correo electrónico.",
@@ -2920,7 +3146,7 @@
     },
     "title": "Eventos",
     "docsAction": "Guía de seguimiento automático",
-    "noSiteDescription": "Selecciona o crea un sitio para ver el análisis de eventos.",
+    "noSiteDescription": "Selecciona o crea un sitio para ver la analítica de eventos.",
     "eventNameLabel": "Evento",
     "eventNamePlaceholder": "Seleccionar un evento",
     "propertyKeyLabel": "Desglosar por",
@@ -2930,11 +3156,11 @@
     },
     "series": {
       "title": "Actividad de eventos",
-      "description": "Ocurrencias de eventos en el período seleccionado.",
+      "description": "Ocurrencias de eventos en el periodo seleccionado.",
       "emptyTitle": "Sin datos de eventos",
       "emptyDescription": "Selecciona un evento para ver la actividad a lo largo del tiempo.",
       "emptySelectedTitle": "Sin actividad para este evento",
-      "emptySelectedDescription": "No hay eventos coincidentes en el período seleccionado."
+      "emptySelectedDescription": "No hay eventos coincidentes en el periodo seleccionado."
     },
     "breakdown": {
       "title": "Desglose de propiedades",
@@ -2955,13 +3181,13 @@
       "description": "Cómo los agentes de IA rastrean tus páginas y cuántas visitas devuelven sus respuestas.",
       "series": {
         "aiRequests": "Solicitudes de IA",
-        "referralVisits": "Visitas de referencia de IA",
+        "referralVisits": "Visitas referidas por IA",
         "crawlerFetches": "Fetches de rastreadores (importación de logs)"
       }
     },
     "kpis": {
       "aiRequests": "Solicitudes de IA",
-      "referralVisits": "Visitas de referencia de IA",
+      "referralVisits": "Visitas referidas por IA",
       "pathsCrawled": "Páginas rastreadas",
       "shareOfPageviews": "Porcentaje de páginas vistas",
       "note": "Las solicitudes de IA combinan los hits registrados con los logs de rastreadores reenviados."
@@ -2985,7 +3211,7 @@
     },
     "enrich": {
       "title": "Configura el seguimiento de fetches de rastreadores",
-      "description": "La analítica de fetches necesita que reenvíes los logs de tu CDN, edge o servidor al endpoint de AI fetch de HitKeep. En cuanto lleguen registros, esta sección mostrará los rastreadores que tu seguimiento no puede ver, con códigos de estado, tiempos de respuesta, bytes servidos y la correlación entre fetch y visita.",
+      "description": "La analítica de fetches necesita que reenvíes los logs de tu CDN, edge o servidor al endpoint de fetch de IA de HitKeep. En cuanto lleguen registros, esta sección mostrará los rastreadores que tu seguimiento no puede ver, con códigos de estado, tiempos de respuesta, bytes servidos y la correlación entre fetch y visita.",
       "docsAction": "Leer la guía de configuración"
     },
     "fetchDepth": {
@@ -3022,7 +3248,7 @@
       },
       "exportStatus": {
         "success": "Descarga de exportación iniciada.",
-        "error": "Error al exportar datos de AI fetch. Inténtalo de nuevo."
+        "error": "No se pudieron exportar datos de fetch de IA. Inténtalo de nuevo."
       }
     },
     "noSiteDescription": "Selecciona un sitio para ver el tráfico de agentes de IA."
@@ -3071,7 +3297,7 @@
       "surfaces": "Superficies principales"
     },
     "exportStatus": {
-      "success": "La descarga de la exportación ha comenzado.",
+      "success": "Descarga de exportación iniciada.",
       "error": "No se pudieron exportar los datos de chatbots de IA. Inténtalo de nuevo."
     }
   },
@@ -3101,9 +3327,12 @@
         "noSiteTitle": "Selecciona un sitio",
         "noSiteMessage": "Elige un sitio para gestionar sus webhooks.",
         "forbiddenTitle": "Se requiere acceso a webhooks",
-        "forbiddenMessage": "Solo propietarios y administradores de instancia o sitio pueden gestionarlos."
+        "forbiddenMessage": "Solo los propietarios y administradores de la instancia o del sitio pueden gestionar webhooks."
       },
-      "status": { "enabled": "Activo", "disabled": "Desactivado" },
+      "status": {
+        "enabled": "Activo",
+        "disabled": "Desactivado"
+      },
       "events": {
         "count": "{{count}} eventos",
         "none": "Sin eventos",
@@ -3152,7 +3381,7 @@
         "rotateError": "No se pudo rotar el secreto.",
         "testQueued": "Entrega de prueba en cola.",
         "testError": "No se pudo poner en cola la prueba.",
-        "deliveryError": "No se pudo cargar el historial.",
+        "deliveryError": "No se pudo cargar el historial de entregas.",
         "deleted": "Webhook eliminado.",
         "deleteError": "No se pudo eliminar el webhook."
       },
@@ -3218,7 +3447,7 @@
       },
       "actions": {
         "refresh": "Actualizar",
-        "docs": "Guía de setup",
+        "docs": "Guía de configuración",
         "connect": "Conectar",
         "reconnect": "Reconectar",
         "disconnect": "Desconectar",
@@ -3313,7 +3542,7 @@
     },
     "states": {
       "pending": "Importando datos de Search Console.",
-      "empty": "No hay filas para este intervalo.",
+      "empty": "No hay filas para este rango.",
       "error": "Datos de Search Console no disponibles."
     },
     "setup": {
@@ -3395,7 +3624,7 @@
       "types": {
         "all": "Todas",
         "conversion": "Fugas de conversión",
-        "ai": "Visibilidad IA",
+        "ai": "Visibilidad de IA",
         "search": "Búsqueda",
         "setup": "Configuración",
         "performance": "Rendimiento",
@@ -3446,7 +3675,7 @@
       "ariaLabel": "Bandeja de oportunidades",
       "title": "Bandeja de oportunidades",
       "subtitle": "{{count}} sugerencias priorizadas para este periodo",
-      "cloudBadge": "Copy IA listo para Cloud"
+      "cloudBadge": "Texto IA listo para Cloud"
     },
     "impact": {
       "monthlyRevenue": "actividad",
@@ -3487,9 +3716,9 @@
       "pageviews": "Páginas vistas",
       "sessions": "Sesiones",
       "top_source": "Fuente principal",
-      "top_city": "Ciudad principal total",
-      "top_provider": "Proveedor principal total",
-      "top_asn": "ASN principal total",
+      "top_city": "Ciudad principal en general",
+      "top_provider": "Proveedor principal en general",
+      "top_asn": "ASN principal en general",
       "search_impressions": "Impresiones de búsqueda",
       "search_ctr": "CTR de búsqueda",
       "search_position": "Posición media",
@@ -3504,7 +3733,7 @@
       "source_hits": "Visitas de la fuente",
       "web_vital_metric": "Métrica Web Vital",
       "web_vital_p75": "Valor p75",
-      "web_vital_rating": "Evaluación",
+      "web_vital_rating": "Valoración",
       "web_vital_samples": "Muestras",
       "web_vital_poor_samples": "Muestras malas",
       "web_vital_top_page": "Página más lenta",
@@ -3527,20 +3756,20 @@
       "traffic_quality": {
         "title": "Revisa el tráfico de {{source}}",
         "summary": "{{source}} generó {{source_hits}} visitas de {{total_pageviews}} páginas vistas en este periodo.",
-        "action": "Revisa las landing pages y la intención de las visitas desde {{source}}.",
+        "action": "Revisa las páginas de entrada y la intención de las visitas desde {{source}}.",
         "digest": "Revisa el tráfico de {{source}}."
       },
       "web_vitals_performance": {
         "title": "Revisa el rendimiento {{metric}} en {{path}}",
-        "summary": "El p75 de {{metric}} es {{p75}} con evaluación {{rating}} en {{samples}} muestras.",
+        "summary": "El p75 de {{metric}} es {{p75}} con valoración {{rating}} en {{samples}} muestras.",
         "action": "Prioriza la página más lenta antes de que arrastre más sesiones a Web Vitals malos.",
         "digest": "El p75 de {{metric}} es {{p75}} en {{path}}."
       },
       "search_visibility": {
         "title": "Revisa páginas ya visibles en búsqueda",
-        "summary": "Search muestra {{impressions}} impresiones con {{ctr}} CTR; clics perdidos estimados: {{estimated_clicks}}.",
+        "summary": "La búsqueda muestra {{impressions}} impresiones con {{ctr}} de CTR; clics perdidos estimados: {{estimated_clicks}}.",
         "action": "Mejora el snippet, el título y la respuesta en página para las consultas que ya generan impresiones.",
-        "digest": "Search muestra unos {{estimated_clicks}} clics perdidos."
+        "digest": "La visibilidad en búsqueda muestra unos {{estimated_clicks}} clics perdidos."
       },
       "conversion_signal": {
         "title": "Revisa eventos rastreados como señales de conversión",
@@ -3550,13 +3779,13 @@
       },
       "setup_goal_suggestion": {
         "title": "Crea un objetivo para {{event_name}}",
-        "summary": "{{event_name}} se disparó {{event_count}} veces, pero aún no está guardado como objetivo.",
+        "summary": "{{event_name}} se activó {{event_count}} veces, pero aún no está guardado como objetivo.",
         "action": "Crea un objetivo de evento con valor {{goal_value}} para que HitKeep pueda priorizar oportunidades de conversión a partir de él.",
         "digest": "{{event_name}} debería convertirse en objetivo."
       },
       "setup_funnel_suggestion": {
         "title": "Crea un embudo de {{start_path}} a {{conversion_event}}",
-        "summary": "{{start_path}} tiene tráfico y {{conversion_event}} se disparó {{event_count}} veces, pero esos pasos aún no están guardados como embudo.",
+        "summary": "{{start_path}} tiene tráfico y {{conversion_event}} se activó {{event_count}} veces, pero esos pasos aún no están guardados como embudo.",
         "action": "Crea un embudo de {{step_count}} pasos para {{funnel_steps}} para que HitKeep pueda vigilar el abandono antes de la conversión.",
         "digest": "{{start_path}} a {{conversion_event}} debería convertirse en embudo."
       },
@@ -3569,12 +3798,12 @@
     },
     "aiStatus": {
       "disabled": "IA desactivada",
-      "selfHosted": "IA autogestionada: {{provider}} {{model}}",
-      "cloudManaged": "IA gestionada por Cloud",
+      "selfHosted": "IA autoalojada: {{provider}} {{model}}",
+      "cloudManaged": "IA gestionada en la nube",
       "notConfigured": "IA no configurada",
       "providerUnknown": "proveedor desconocido",
       "modelUnknown": "modelo desconocido",
-      "disabledHint": "Las oportunidades guardadas siguen disponibles. Las nuevas explicaciones escritas por IA se omiten hasta que una persona propietaria de la instancia active la IA.",
+      "disabledHint": "Las oportunidades guardadas siguen disponibles. Las nuevas explicaciones escritas por IA se omiten hasta que el propietario de la instancia active la IA.",
       "notConfiguredHint": "Las oportunidades guardadas siguen disponibles. Configura un proveedor de IA para actualizar los resúmenes con contexto del modelo.",
       "budgetExhaustedHint": "Las actualizaciones de IA están pausadas porque se agotó el presupuesto de solicitudes o tokens configurado para esta ventana."
     },
@@ -3587,7 +3816,7 @@
       "priorityHint": "Ponderado por evidencia",
       "why": "Por qué HitKeep cree que importa",
       "nextBestAction": "Siguiente mejor acción",
-      "readOnly": "Tienes acceso de solo lectura a este sitio. Pide a una persona administradora que guarde, descarte o marque oportunidades como hechas."
+      "readOnly": "Tienes acceso de solo lectura a este sitio. Pide a un administrador del sitio que guarde, descarte o marque las oportunidades como hechas."
     },
     "empty": {
       "title": "No hay oportunidades para esta vista",
@@ -3641,7 +3870,7 @@
     },
     "pages": {
       "title": "Desglose por página",
-      "description": "Todas las rutas con muestras de {{metric}} en el rango seleccionado. Haz clic en una valoración del mix superior para ordenar las páginas que requieren atención.",
+      "description": "Todas las rutas con muestras de {{metric}} en el rango seleccionado. Haz clic en una valoración de la mezcla de arriba para ordenar las páginas que requieren atención.",
       "filteredTitle": "Páginas {{metric}} {{rating}}",
       "filteredDescription": "Se muestran las rutas que produjeron muestras {{rating}} de {{metric}} en el rango seleccionado. Acota el rango temporal superior para inspeccionar una ventana de incidencia concreta.",
       "empty": "Ninguna muestra de Web Vitals coincide con los filtros actuales."
@@ -3730,11 +3959,11 @@
       "createSuccess": "Enlace QR compartido creado.",
       "deleteSuccess": "Enlace QR compartido eliminado.",
       "deleteConfirmTitle": "Eliminar enlace QR compartido",
-      "deleteConfirmMessage": "¿Eliminar este enlace QR de solo lectura? Los visitantes existentes perderán acceso a la página de estadísticas compartidas.",
+      "deleteConfirmMessage": "¿Eliminar este enlace de solo QR? Los visitantes existentes perderán acceso a la página de estadísticas compartidas.",
       "tokenHint": "Pista del token",
       "url": "URL compartida",
       "urlUnavailable": "La URL solo se muestra justo después de crear el enlace.",
-      "empty": "Aún no hay enlaces QR de solo lectura.",
+      "empty": "Aún no hay enlaces de solo QR.",
       "invalid": "Este enlace QR compartido no es válido o ha caducado.",
       "readOnlyBadge": "Analíticas QR de solo lectura",
       "sharedStats": "Estadísticas compartidas"
@@ -3792,7 +4021,7 @@
     },
     "confirm": {
       "archiveTitle": "Archivar campaña QR",
-      "archiveMessage": "¿Archivar {{name}}? Los códigos impresos seguirán redirigiendo, pero marketing ya no verá esta campaña en la lista activa."
+      "archiveMessage": "¿Archivar {{name}}? Los códigos impresos seguirán redirigiendo, pero el equipo de marketing ya no verá esta campaña en la lista activa."
     }
   },
   "cloud": {
@@ -3805,7 +4034,7 @@
       "hint": "Mejora tu plan para conservar todo el historial de visitantes y desbloquear más sitios y asientos de equipo.",
       "usageMessageSites": "Tu equipo está usando {{current}} de {{limit}} sitios del plan gratuito.",
       "usageMessageMembers": "Tu equipo está usando {{current}} de {{limit}} miembros del plan gratuito.",
-      "upgradeAction": "Actualizar a Pro",
+      "upgradeAction": "Mejorar a Pro",
       "dismissAction": "Descartar aviso"
     },
     "planChip": {
@@ -3814,12 +4043,26 @@
     }
   },
   "reportConfirmation": {
-    "title": "Confirmar informe programado", "subtitle": "Revisa exactamente qué aceptas recibir.",
-    "team": "Equipo", "report": "Informe", "cadence": "Frecuencia", "sites": "Sitios",
+    "title": "Confirmar informe programado",
+    "subtitle": "Revisa exactamente qué aceptas recibir.",
+    "team": "Equipo",
+    "report": "Informe",
+    "cadence": "Frecuencia",
+    "sites": "Sitios",
     "disclaimer": "Confirmar no crea una cuenta ni da acceso a HitKeep, al equipo o a sus paneles. Puedes darte de baja desde cualquier correo del informe.",
-    "confirm": "Confirmar informes", "decline": "Rechazar",
-    "invalid": { "title": "Este enlace de confirmación no está disponible", "description": "Puede ser inválido, haber caducado, haberse usado o haber sido sustituido. Pide al responsable que lo reenvíe." },
-    "confirmed": { "title": "Entrega del informe confirmada", "description": "Recibirás los próximos informes programados. Los informes anteriores a la confirmación no se reenvían." },
-    "declined": { "title": "Entrega del informe rechazada", "description": "No recibirás este informe salvo que aceptes una nueva confirmación más adelante." }
+    "confirm": "Confirmar informes",
+    "decline": "Rechazar",
+    "invalid": {
+      "title": "Este enlace de confirmación no está disponible",
+      "description": "Puede ser inválido, haber caducado, haberse usado o haber sido sustituido. Pide al responsable que lo reenvíe."
+    },
+    "confirmed": {
+      "title": "Entrega del informe confirmada",
+      "description": "Recibirás los próximos informes programados. Los informes anteriores a la confirmación no se reenvían."
+    },
+    "declined": {
+      "title": "Entrega del informe rechazada",
+      "description": "No recibirás este informe salvo que aceptes una nueva confirmación más adelante."
+    }
   }
 }

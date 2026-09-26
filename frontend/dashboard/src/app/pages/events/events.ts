@@ -8,6 +8,7 @@ import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { SiteService } from '@features/sites/services/site.service';
+import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { MetricCardConfig, MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
@@ -486,20 +487,7 @@ export class Events {
     }
 
     protected toggleAudienceDimFilter(type: EventDimensionFilterType, item: MetricStat) {
-        if (!item.name) return;
-        this.audienceDimFilters.update((filters) => {
-            const existingIndex = filters.findIndex((filter) => filter.type === type);
-            if (existingIndex >= 0) {
-                const existing = filters[existingIndex];
-                if (existing.value === item.name) {
-                    return filters.filter((_, idx) => idx !== existingIndex);
-                }
-                const next = [...filters];
-                next[existingIndex] = { type, value: item.name };
-                return next;
-            }
-            return [...filters, { type, value: item.name }];
-        });
+        this.audienceDimFilters.update((filters) => toggleDimensionFilter(filters, type, item.name));
     }
 
     protected onMetricCardClick(event: MetricCardGroupRowClick): void {

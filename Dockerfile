@@ -62,6 +62,7 @@ COPY --from=frontend-builder /workspace/public/ ./public/
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     test -n "${GO_BUILD_TAGS}" && \
+    go run ./internal/duckdbextensions/update -check && \
     CGO_ENABLED=1 go build \
       -trimpath \
       -tags "${GO_BUILD_TAGS}" \
@@ -88,6 +89,8 @@ LABEL org.opencontainers.image.title="HitKeep" \
     io.hitkeep.variant="${HITKEEP_VARIANT}"
 
 COPY --from=data-dir --chown=nonroot:nonroot /var/lib/hitkeep/data /var/lib/hitkeep/data
+
+COPY internal/duckdbextensions/LICENSE.* /usr/share/licenses/hitkeep/
 
 WORKDIR /app
 

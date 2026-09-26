@@ -2,6 +2,7 @@ package filterparams
 
 import (
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -59,5 +60,26 @@ func ParseComparisonRange(fromRaw, toRaw string) (time.Time, time.Time) {
 			end = parsed
 		}
 	}
+	return start, end
+}
+
+// ParseLenientAnalyticsRange preserves the legacy report endpoints: missing or
+// malformed bounds use the trailing default window independently of each other.
+func ParseLenientAnalyticsRange(q url.Values) (time.Time, time.Time) {
+	now := time.Now().UTC()
+	end := now.AddDate(0, 0, 1)
+	start := end.AddDate(0, 0, -defaultAnalyticsRangeDays)
+
+	if fromStr := q.Get("from"); fromStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, fromStr); err == nil {
+			start = parsed
+		}
+	}
+	if toStr := q.Get("to"); toStr != "" {
+		if parsed, err := time.Parse(time.RFC3339, toStr); err == nil {
+			end = parsed
+		}
+	}
+
 	return start, end
 }
