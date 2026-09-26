@@ -6,27 +6,20 @@ import (
 	"io"
 	"log/slog"
 
-	"hitkeep/internal/aianalytics"
+	"hitkeep/internal/listrefresh"
 )
 
 func UpdateAIAgentLists(ctx context.Context, outputPath string, out, errOut io.Writer, logger *slog.Logger) error {
-	return runUpdateList(
-		ctx,
-		outputPath,
-		out,
-		errOut,
-		func(ctx context.Context) (aianalytics.AIAgentData, error) {
-			return aianalytics.FetchAIAgentData(ctx, nil, logger)
-		},
-		aianalytics.ValidateEmbeddedAIAgentData,
-		aianalytics.SaveAIAgentData,
-		"could not fetch AI agent lists",
-		"refusing to write incomplete embedded AI agent data",
-		"could not write AI agent data",
-		func(out io.Writer, data aianalytics.AIAgentData, outputPath string) {
-			_, _ = fmt.Fprintf(out, "Wrote AI agent master list to %s\n", outputPath)
-			_, _ = fmt.Fprintf(out, "Agents: %d\n", len(data.Agents))
-			_, _ = fmt.Fprintf(out, "AI referrers: %d\n", len(data.AIReferrers))
-		},
-	)
+	data, changed, err := listrefresh.RunAI(ctx, outputPath, logger)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "Error: %v\n", err)
+		return &ExitError{Code: 1}
+	}
+	if changed {
+		_, _ = fmt.Fprintf(out, "Wrote AI agent master list to %s\n", outputPath)
+	} else {
+		_, _ = fmt.Fprintf(out, "AI agent master list unchanged at %s\n", outputPath)
+	}
+	_, _ = fmt.Fprintf(out, "Agents: %d\nAI referrers: %d\n", len(data.Agents), len(data.AIReferrers))
+	return nil
 }

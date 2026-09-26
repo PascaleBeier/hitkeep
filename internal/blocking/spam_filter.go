@@ -157,7 +157,7 @@ func (f *SpamFilter) saveAndApply(ctx context.Context, data SpamFeedData) error 
 		return err
 	}
 
-	data.normalize()
+	data.Normalize()
 	if strings.TrimSpace(f.path) != "" {
 		if err := SaveSpamFeedData(f.path, data); err != nil {
 			return err

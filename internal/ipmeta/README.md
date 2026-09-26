@@ -7,13 +7,13 @@ not download data and do not need an IP2Location token.
 ## Release Refresh
 
 For the normal release refresh, set `IP2LOCATION_DOWNLOAD_TOKEN` and run the
-generator without CLI arguments:
+`ipmeta` target without additional flags from the repository root:
 
 ```sh
-go run ./cmd/ipmeta-generate
+go run ./cmd/data-refresh ipmeta
 ```
 
-The no-argument command is the release path. It:
+`go run ./cmd/ipmeta-generate` remains available for recovery and accepts the same flags. The no-argument target is the release path. It:
 
 - mirrors the public DB1 country ZIPs used by `github.com/phuslu/iploc`
 - writes the compact country asset and embed source:
@@ -37,7 +37,7 @@ generator or C encoder dependency.
 
 The generator can still accept explicit CSV/ZIP inputs for tests and unusual
 fixture work, but that is not the release workflow. Run `go run
-./cmd/ipmeta-generate -h` if you need those maintenance flags.
+./cmd/data-refresh ipmeta -h` if you need those maintenance flags.
 
 ## Attribution
 

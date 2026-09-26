@@ -6,27 +6,20 @@ import (
 	"io"
 	"log/slog"
 
-	"hitkeep/internal/blocking"
+	"hitkeep/internal/listrefresh"
 )
 
 func UpdateSpamLists(ctx context.Context, outputPath string, out, errOut io.Writer, logger *slog.Logger) error {
-	return runUpdateList(
-		ctx,
-		outputPath,
-		out,
-		errOut,
-		func(ctx context.Context) (blocking.SpamFeedData, error) {
-			return blocking.FetchSpamFeedData(ctx, nil, logger)
-		},
-		blocking.ValidateEmbeddedSpamFeedData,
-		blocking.SaveSpamFeedData,
-		"could not fetch spam feeds",
-		"refusing to write incomplete embedded spam data",
-		"could not write spam cache",
-		func(out io.Writer, data blocking.SpamFeedData, outputPath string) {
-			_, _ = fmt.Fprintf(out, "Wrote spam filter cache to %s\n", outputPath)
-			_, _ = fmt.Fprintf(out, "Referrer hosts: %d\n", len(data.ReferrerHostDenylist))
-			_, _ = fmt.Fprintf(out, "Blocked networks: %d\n", len(data.NetworkDenylist))
-		},
-	)
+	data, changed, err := listrefresh.RunSpam(ctx, outputPath, logger)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "Error: %v\n", err)
+		return &ExitError{Code: 1}
+	}
+	if changed {
+		_, _ = fmt.Fprintf(out, "Wrote spam filter cache to %s\n", outputPath)
+	} else {
+		_, _ = fmt.Fprintf(out, "Spam filter cache unchanged at %s\n", outputPath)
+	}
+	_, _ = fmt.Fprintf(out, "Referrer hosts: %d\nBlocked networks: %d\n", len(data.ReferrerHostDenylist), len(data.NetworkDenylist))
+	return nil
 }

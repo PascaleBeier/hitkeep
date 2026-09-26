@@ -25,14 +25,16 @@ automatically when a release ships a fresher list.
 ## Refresh
 
 The list is refresh-on-release (like `internal/ipmeta`), not runtime-updated.
-A scheduled workflow (`.github/workflows/ai-agent-list-refresh.yml`) runs the
-assembler twice a month and opens a pull request when the data changed.
+The scheduled `.github/workflows/data-refresh.yml` workflow runs the `ai-agents`
+target twice a month and opens a pull request when the data changes.
 
-Manual refresh:
+Manual refresh from the repository root:
 
 ```sh
-./scripts/update-default-ai-agents.sh
+go run ./cmd/data-refresh ai-agents
 ```
+
+The existing `./scripts/update-default-ai-agents.sh` and `hitkeep update-ai-agent-lists` commands remain available. A valid fetch with unchanged list content keeps the file's existing generation timestamp and does not rewrite it; source metadata changes still produce an update.
 
 `ValidateEmbeddedAIAgentData` gates the bundle: minimum totals per source,
 token hygiene (length, generic-term and dual-use denylists, LIKE-safety), the

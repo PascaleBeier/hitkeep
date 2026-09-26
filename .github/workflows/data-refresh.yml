@@ -1,0 +1,215 @@
+name: Refresh data and DuckDB
+
+on:
+  schedule:
+    - cron: "23 19 1,15 * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Data to refresh
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - ai-agents
+          - spam
+          - ipmeta
+          - duckdb
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    concurrency:
+      group: data-refresh-${{ matrix.target }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: ai-agents
+            branch: automation/ai-agent-list-refresh
+            title: "chore(analytics): refresh default AI agent list data"
+            description: "Refreshes HitKeep's embedded AI agent master list assembled from ai.robots.txt, device-detector, and crawler-user-agents."
+          - target: spam
+            branch: automation/spam-filter-refresh
+            title: "chore(security): refresh default spam filter data"
+            description: "Refreshes HitKeep's embedded Matomo referrer-spam and Spamhaus DROP datasets."
+          - target: ipmeta
+            branch: automation/ipmeta-data-refresh
+            title: "chore(analytics): refresh IP metadata data"
+            description: "Refreshes block-addressable compressed HitKeep IP metadata assets for country, city, and ASN/provider lookup."
+          - target: duckdb
+            branch: automation/duckdb-upgrade
+            title: "chore(deps): refresh DuckDB and bundled extensions"
+            description: "Refreshes the DuckDB Go dependency and official signed extension bundle for supported platforms."
+    env:
+      SELECTED: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == matrix.target }}
+    steps:
+      - if: env.SELECTED == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Go
+        if: env.SELECTED == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Generate embedded AI agent lists
+        if: env.SELECTED == 'true' && matrix.target == 'ai-agents'
+        timeout-minutes: 30
+        run: go run ./cmd/data-refresh ai-agents
+
+      - name: Test embedded AI agent data
+        if: env.SELECTED == 'true' && matrix.target == 'ai-agents'
+        timeout-minutes: 30
+        run: go test ./internal/aianalytics ./internal/database
+
+      - name: Generate embedded spam lists
+        if: env.SELECTED == 'true' && matrix.target == 'spam'
+        timeout-minutes: 30
+        run: go run ./cmd/data-refresh spam
+
+      - name: Test embedded spam data
+        if: env.SELECTED == 'true' && matrix.target == 'spam'
+        timeout-minutes: 30
+        run: go test ./internal/blocking
+
+      - name: Generate embedded IP metadata
+        if: env.SELECTED == 'true' && matrix.target == 'ipmeta'
+        timeout-minutes: 50
+        env:
+          IP2LOCATION_DOWNLOAD_TOKEN: ${{ secrets.IP2LOCATION_DOWNLOAD_TOKEN }}
+        run: go run ./cmd/data-refresh ipmeta
+
+      - name: Test embedded IP metadata
+        if: env.SELECTED == 'true' && matrix.target == 'ipmeta'
+        timeout-minutes: 30
+        run: go test ./cmd/ipmeta-generate ./internal/ipmeta/refresh ./internal/ipmeta ./internal/ipmeta/ipmetagen
+
+      - name: Update DuckDB Go dependency
+        if: env.SELECTED == 'true' && matrix.target == 'duckdb'
+        timeout-minutes: 20
+        run: |
+          go get github.com/duckdb/duckdb-go/v2@latest
+          go mod tidy
+
+      - name: Generate signed DuckDB extension bundle
+        if: env.SELECTED == 'true' && matrix.target == 'duckdb'
+        timeout-minutes: 50
+        run: go run ./cmd/data-refresh duckdb
+
+      - name: Verify DuckDB extension bundle
+        if: env.SELECTED == 'true' && matrix.target == 'duckdb'
+        timeout-minutes: 15
+        run: go run ./internal/duckdbextensions/update -check
+
+      - name: Test DuckDB bundle and database behavior
+        if: env.SELECTED == 'true' && matrix.target == 'duckdb'
+        timeout-minutes: 45
+        run: go test ./internal/duckdbextensions ./internal/database ./internal/takeout
+
+      - name: Open refresh pull request
+        if: env.SELECTED == 'true'
+        timeout-minutes: 10
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GHT }}
+          TARGET: ${{ matrix.target }}
+          BRANCH: ${{ matrix.branch }}
+          TITLE: ${{ matrix.title }}
+          DESCRIPTION: ${{ matrix.description }}
+          COMMAND: go run ./cmd/data-refresh ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+
+          case "$TARGET" in
+            ai-agents) paths=(internal/aianalytics/default_ai_agents.json) ;;
+            spam) paths=(internal/blocking/default_spam_filter.json) ;;
+            ipmeta) paths=(internal/ipmeta/data_country_lite.go internal/ipmeta/data_country.hk.zst internal/ipmeta/data_city_network_lite.go internal/ipmeta/data_city.hk.zst internal/ipmeta/data_asn.hk.zst) ;;
+            duckdb)
+              paths=(go.mod go.sum internal/duckdbextensions/manifest.json)
+              for platform in linux_amd64 linux_arm64 osx_amd64 osx_arm64; do
+                for extension in httpfs aws excel; do
+                  paths+=("internal/duckdbextensions/assets/$platform/$extension.duckdb_extension.gz")
+                done
+              done
+              ;;
+            *) echo "Unexpected refresh target: $TARGET" >&2; exit 1 ;;
+          esac
+
+          status_file="$(mktemp)"
+          body_file="$(mktemp)"
+          trap 'rm -f "$status_file" "$body_file"' EXIT
+          git status --porcelain=v1 -z --untracked-files=all > "$status_file"
+          while IFS= read -r -d '' entry; do
+            status="${entry:0:2}"
+            path="${entry:3}"
+            if [[ "$status" == *R* || "$status" == *C* ]]; then
+              echo "Unexpected renamed or copied output: $path" >&2
+              exit 1
+            fi
+            allowed=false
+            for candidate in "${paths[@]}"; do
+              if [[ "$path" == "$candidate" ]]; then allowed=true; break; fi
+            done
+            if [[ "$allowed" != true ]]; then
+              echo "Unexpected generated output: $path" >&2
+              exit 1
+            fi
+          done < "$status_file"
+
+          git add -- "${paths[@]}"
+          if git diff --cached --quiet HEAD -- "${paths[@]}"; then
+            echo "$TARGET is already up to date."
+            exit 0
+          fi
+
+          gh auth setup-git
+          printf '%s\n\nGenerated with:\n\n```sh\n%s\n```\n' "$DESCRIPTION" "$COMMAND" > "$body_file"
+          pr_number="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          remote_oid="$(git ls-remote --heads origin "$BRANCH" | cut -f1)"
+          if [[ -n "$remote_oid" ]]; then
+            git fetch --no-tags origin "refs/heads/$BRANCH"
+            remote_oid="$(git rev-parse FETCH_HEAD)"
+            branch_base="$(git merge-base HEAD FETCH_HEAD)"
+            git diff --name-only -z "$branch_base" FETCH_HEAD > "$status_file"
+            while IFS= read -r -d '' branch_path; do
+              allowed=false
+              for candidate in "${paths[@]}"; do
+                if [[ "$branch_path" == "$candidate" ]]; then allowed=true; break; fi
+              done
+              if [[ "$allowed" != true ]]; then
+                echo "Existing branch has unrelated changes: $branch_path" >&2
+                exit 1
+              fi
+            done < "$status_file"
+            if git diff --cached --quiet "$remote_oid" -- "${paths[@]}"; then
+              if [[ -z "$pr_number" ]]; then
+                gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$body_file"
+              fi
+              echo "$TARGET already matches its branch."
+              exit 0
+            fi
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git commit -m "$TITLE"
+          git push "--force-with-lease=refs/heads/$BRANCH:$remote_oid" origin "HEAD:refs/heads/$BRANCH"
+
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" --title "$TITLE" --body-file "$body_file"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$body_file"
+          fi

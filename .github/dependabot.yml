@@ -13,6 +13,13 @@ updates:
     labels:
       - "dependencies"
       - "go"
+    ignore:
+      - dependency-name: "github.com/duckdb/duckdb-go/v2"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "github.com/duckdb/duckdb-go-bindings"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "github.com/duckdb/duckdb-go-bindings/lib/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
 
   - package-ecosystem: "npm"
     directory: "/frontend/dashboard"

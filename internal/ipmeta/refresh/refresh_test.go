@@ -1,7 +1,9 @@
-package main
+package refresh
 
 import (
 	"archive/zip"
+	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"net/http"
@@ -14,6 +16,8 @@ import (
 
 	"hitkeep/internal/ipmeta/ipmetagen"
 )
+
+func run(args []string, out io.Writer) error { return Run(context.Background(), args, out) }
 
 func TestRunGeneratesIPMetaDataFromDB1DB3AndASNInputs(t *testing.T) {
 	dir := t.TempDir()
@@ -53,6 +57,17 @@ func TestRunGeneratesIPMetaDataFromDB1DB3AndASNInputs(t *testing.T) {
 		if !strings.Contains(string(generated), want) {
 			t.Fatalf("expected generated output to contain %q:\n%s", want, string(generated))
 		}
+	}
+	secondPath := filepath.Join(dir, "data_lite_second.go")
+	if err := run([]string{"-db1", db1Path, "-db3", db3Path, "-asn", asnPath, "-out", secondPath}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(secondPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(generated, second) {
+		t.Fatal("identical IP fixtures produced different output")
 	}
 }
 
@@ -215,21 +230,62 @@ func TestRunRequiresTokenForTokenBasedDownloads(t *testing.T) {
 func TestDownloadBINDataReportsIP2LocationTextError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-		_, _ = w.Write([]byte("THIS FILE CAN ONLY BE DOWNLOADED 5 TIMES WITHIN 24 HOURS"))
+		_, _ = w.Write([]byte("LIMIT token=secret"))
 	}))
 	defer server.Close()
 
-	_, err := downloadBINData(server.URL + "/download?token=secret&file=DB3LITEBINIPV6")
+	_, err := downloadBINData(context.Background(), server.URL+"/download?token=secret&file=DB3LITEBINIPV6")
 	if err == nil {
 		t.Fatal("expected invalid BIN download to fail")
 	}
-	for _, want := range []string{"did not return a ZIP or BIN payload", "THIS FILE CAN ONLY BE DOWNLOADED", "token=REDACTED"} {
+	for _, want := range []string{"did not return a ZIP or BIN payload", "LIMIT", "token=REDACTED"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("expected error to contain %q, got %v", want, err)
 		}
 	}
 	if strings.Contains(err.Error(), "secret") {
 		t.Fatalf("expected token to be redacted, got %v", err)
+	}
+}
+
+func TestDownloadErrorDoesNotExposeToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			t.Fatal("fixture cannot hijack")
+		}
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = conn.Close()
+	}))
+	defer server.Close()
+	_, err := downloadBINData(context.Background(), server.URL+"/download?token=secret&file=DB3LITEBINIPV6")
+	if err == nil || strings.Contains(err.Error(), "secret") {
+		t.Fatalf("download error leaked token: %v", err)
+	}
+}
+
+func TestRunCancelsBlockedDownloadWithoutWriting(t *testing.T) {
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	path := filepath.Join(t.TempDir(), "country.go")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- Run(ctx, []string{"-db1", server.URL, "-country-only", "-out", path}, io.Discard) }()
+	<-started
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("expected cancellation error")
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("canceled refresh wrote %s: %v", path, err)
 	}
 }
 

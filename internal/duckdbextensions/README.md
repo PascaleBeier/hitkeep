@@ -18,18 +18,26 @@ mounted with `noexec`). File execute permission is not required.
 
 ## Updating DuckDB
 
-After updating `github.com/duckdb/duckdb-go/v2` in `go.mod`, run from the repository
-root:
+The scheduled data refresh workflow owns routine DuckDB driver and extension
+updates. Run **Refresh data and DuckDB** manually with the `duckdb` target to
+request a candidate immediately. It updates the Go module graph and refreshes
+all supported extension assets even when the driver version is unchanged.
+Review its pull request as one dependency and bundle change.
+
+For manual recovery, update `github.com/duckdb/duckdb-go/v2` in `go.mod` when
+needed, then run from the repository root:
 
 ```sh
-go run ./internal/duckdbextensions/update
+go run ./cmd/data-refresh duckdb
 go run ./internal/duckdbextensions/update -check
 ```
+
+The standalone `go run ./internal/duckdbextensions/update` refresh command remains available for recovery. Keep the standalone `-check` for release builds: it verifies offline without importing the IP generator's native dependencies.
 
 The updater derives DuckDB's version from the upstream Go module's documented
 version encoding; it downloads that version's official HTTPS artifacts and
 records both compressed and extracted SHA-256 digests in `manifest.json`.
-Review and commit the manifest and assets together with the dependency update.
+Review and commit the manifest and assets together with any dependency update.
 Do not update the manifest alone or bypass signature checks.
 
 The read-only check verifies the selected dependency version and every artifact.
