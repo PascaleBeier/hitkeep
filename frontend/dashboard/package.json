@@ -53,7 +53,7 @@
     },
     "devDependencies": {
         "@angular-devkit/schematics": "^22.1.7",
-        "@angular-eslint/builder": "^22.2.0",
+        "@angular-eslint/builder": "^22.5.0",
         "@angular/build": "^22.1.7",
         "@angular/cli": "^22.1.7",
         "@angular/compiler-cli": "^22.1.5",
