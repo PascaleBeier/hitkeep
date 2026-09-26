@@ -56,7 +56,7 @@
         "@angular-eslint/builder": "^22.2.0",
         "@angular/build": "^22.1.7",
         "@angular/cli": "^22.1.7",
-        "@angular/compiler-cli": "^22.1.5",
+        "@angular/compiler-cli": "^22.1.7",
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.4.0",
         "@jsverse/transloco-optimize": "^8.4.0",
