@@ -9,28 +9,34 @@ import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
     imports: [NgOptimizedImage, RouterLink],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <a class="flex items-center select-none no-underline" routerLink="/">
-            <img [ngSrc]="logoUrl()" alt="HitKeep Analytics" class="object-contain" [class]="imgClass()" [width]="imgWidth()" [height]="imgSize()" priority />
+        <a class="flex items-center gap-3 select-none no-underline" routerLink="/">
+            <img [ngSrc]="iconUrl()" alt="HitKeep Logo" class="hk-brand-icon object-cover" [class]="imgClass()" [width]="imgSize()" [height]="imgSize()" priority />
+            <span class="font-bold tracking-tight text-[var(--p-text-color)]" [class]="textClass()"> HitKeep </span>
         </a>
-    `
+    `,
+    styles: [
+        `
+            :host-context(.p-dark) .hk-brand-icon {
+                filter: brightness(0) invert(1);
+            }
+        `
+    ]
 })
 export class Brand {
     private document = inject(DOCUMENT);
     size = input<'small' | 'large'>('small');
 
-    private static readonly aspect = 240.784 / 48.207;
-
-    protected logoUrl = computed(() => browserAppUrl(this.document, '/brand-logo.svg'));
+    protected iconUrl = computed(() => browserAppUrl(this.document, '/brand-icon.svg'));
 
     protected imgSize = computed(() => {
         return this.size() === 'large' ? 48 : 32;
     });
 
-    protected imgWidth = computed(() => {
-        return Math.round(this.imgSize() * Brand.aspect);
+    protected imgClass = computed(() => {
+        return this.size() === 'large' ? 'w-12 h-12' : 'w-8 h-8';
     });
 
-    protected imgClass = computed(() => {
-        return this.size() === 'large' ? 'h-12 w-auto' : 'h-8 w-auto';
+    protected textClass = computed(() => {
+        return this.size() === 'large' ? 'text-3xl' : 'text-xl';
     });
 }

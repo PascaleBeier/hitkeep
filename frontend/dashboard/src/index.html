@@ -31,8 +31,10 @@
             }
 
             .hk-preboot__brand {
-                height: 2rem;
-                width: auto;
+                color: #0f172a;
+                font-size: 1.5rem;
+                font-weight: 700;
+                letter-spacing: -0.025em;
             }
 
             .hk-preboot__spinner {
@@ -81,6 +83,10 @@
                     color: #a1a1aa;
                 }
 
+                .hk-preboot__brand {
+                    color: #ffffff;
+                }
+
                 .hk-preboot__spinner {
                     border-color: #3f3f46;
                     border-top-color: #34d399;
@@ -107,7 +113,7 @@
         <app-root>
             <main class="hk-preboot" role="status" aria-live="polite">
                 <div class="hk-preboot__content">
-                    <img class="hk-preboot__brand" src="/brand-logo.svg" alt="HitKeep Analytics" />
+                    <strong class="hk-preboot__brand">HitKeep</strong>
                     <span class="hk-preboot__spinner" aria-hidden="true"></span>
                     <p class="hk-preboot__message">Starting HitKeep…</p>
                     <p class="hk-preboot__help">If this screen does not change, <a href="">reload the page</a>.</p>
