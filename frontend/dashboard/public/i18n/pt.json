@@ -2828,6 +2828,49 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":       {
+    "dialogTitle": "Aparência",
+    "subtitle": "Escolha um tema, personalize-o abaixo e guarde-o para reutilizar quando quiser.",
+    "openDialogAria": "Personalizar tema",
+    "fields": {
+      "name": "Nome do tema",
+      "primary": "Cor primária",
+      "surface": "Cor de superfície",
+      "surfaceHint": "Opcional. Deixe em branco para manter as superfícies predefinidas.",
+      "fontFamily": "Família de fonte",
+      "fontFamilyPlaceholder": "ex. Inter, sans-serif",
+      "fontFamilyHint": "Opcional. Um valor CSS font-family. Fontes não incluídas no painel devem estar instaladas no seu sistema.",
+      "customCss": "CSS personalizado",
+      "customCssPlaceholder": "/* Sobrescrituras CSS opcionais */",
+      "customCssHint": "Opcional. Aplica-se sobre o tema selecionado, tanto no modo claro como no escuro.",
+      "accent": "Cor de destaque",
+      "accentHint": "Usada nas séries secundárias dos gráficos e em realces.",
+      "fontSize": "Tamanho de fonte base",
+      "fontSizePlaceholder": "ex. 15px",
+      "fontSizeHint": "Opcional. Dimensiona todo o painel relativamente ao valor predefinido do navegador (16px).",
+      "density": "Densidade",
+      "densityComfortable": "Confortável",
+      "densityCompact": "Compacta",
+      "menuSpacing": "Espaçamento do menu",
+      "menuSpacingDefault": "Predefinido",
+      "menuSpacingCompact": "Compacto",
+      "colorsGroup": "Cores",
+      "primaryShort": "Primária",
+      "surfaceShort": "Superfície",
+      "accentShort": "Destaque"
+    },
+    "actions": {
+      "saveTheme": "Guardar tema",
+      "deleteTheme": "Eliminar tema",
+      "resetDefaults": "Repor valores predefinidos"
+    },
+    "mode": {
+      "label": "Modo de aparência",
+      "auto": "Automático (sistema)",
+      "light": "Claro",
+      "dark": "Escuro"
+    }
+  },
   "comparison": {
     "vsLabel": "vs.",
     "pageviewsLabel": "Visualizações de página (ant.)",

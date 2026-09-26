@@ -2852,6 +2852,49 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":       {
+    "dialogTitle": "Aspetto",
+    "subtitle": "Scegli un tema, personalizzalo qui sotto e salvatelo per riutilizzarlo quando vuoi.",
+    "openDialogAria": "Personalizza tema",
+    "fields": {
+      "name": "Nome del tema",
+      "primary": "Colore primario",
+      "surface": "Colore di superficie",
+      "surfaceHint": "Opzionale. Lascia vuoto per mantenere le superfici predefinite.",
+      "fontFamily": "Famiglia di caratteri",
+      "fontFamilyPlaceholder": "es. Inter, sans-serif",
+      "fontFamilyHint": "Opzionale. Un valore CSS font-family. I caratteri non inclusi nella dashboard devono essere installati sul sistema.",
+      "customCss": "CSS personalizzato",
+      "customCssPlaceholder": "/* Override CSS opzionali */",
+      "customCssHint": "Opzionale. Viene applicato sopra il tema selezionato, sia in modalità chiara che scura.",
+      "accent": "Colore accento",
+      "accentHint": "Usato per le serie secondarie dei grafici e per i rilievi.",
+      "fontSize": "Dimensione carattere base",
+      "fontSizePlaceholder": "es. 15px",
+      "fontSizeHint": "Opzionale. Scala l’intera dashboard rispetto alla dimensione predefinita del browser (16px).",
+      "density": "Densità",
+      "densityComfortable": "Comoda",
+      "densityCompact": "Compatta",
+      "menuSpacing": "Spaziatura menu",
+      "menuSpacingDefault": "Predefinita",
+      "menuSpacingCompact": "Compatta",
+      "colorsGroup": "Colori",
+      "primaryShort": "Primario",
+      "surfaceShort": "Superficie",
+      "accentShort": "Accento"
+    },
+    "actions": {
+      "saveTheme": "Salva tema",
+      "deleteTheme": "Elimina tema",
+      "resetDefaults": "Ripristina valori predefiniti"
+    },
+    "mode": {
+      "label": "Modalità aspetto",
+      "auto": "Automatica (sistema)",
+      "light": "Chiara",
+      "dark": "Scura"
+    }
+  },
   "comparison": {
     "vsLabel": "vs.",
     "pageviewsLabel": "Visualizzazioni (prec.)",

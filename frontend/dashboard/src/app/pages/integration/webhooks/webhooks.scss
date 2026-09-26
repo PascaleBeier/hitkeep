@@ -19,8 +19,8 @@
 .webhooks-page__content {
     display: grid;
     gap: 1rem;
-    width: min(100%, 72rem);
-    margin-inline: auto;
+    width: 100%;
+    margin-inline: 0;
     padding: 1rem;
 }
 

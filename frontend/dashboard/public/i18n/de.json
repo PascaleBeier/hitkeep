@@ -2894,6 +2894,49 @@
       "rtlBadge": "RTL"
     }
   },
+  "theme":       {
+    "dialogTitle": "Erscheinungsbild",
+    "subtitle": "Wähle ein Design, passe es unten an und speichere es, um es jederzeit wiederzuverwenden.",
+    "openDialogAria": "Design anpassen",
+    "fields": {
+      "name": "Designname",
+      "primary": "Primärfarbe",
+      "surface": "Oberflächenfarbe",
+      "surfaceHint": "Optional. Leer lassen, um die Standardoberflächen zu behalten.",
+      "fontFamily": "Schriftart",
+      "fontFamilyPlaceholder": "z. B. Inter, sans-serif",
+      "fontFamilyHint": "Optional. Ein CSS-Wert für font-family. Nicht im Dashboard enthaltene Schriftarten müssen auf dem System installiert sein.",
+      "customCss": "Benutzerdefiniertes CSS",
+      "customCssPlaceholder": "/* Optionale CSS-Überschreibungen */",
+      "customCssHint": "Optional. Wird über dem gewählten Design angewendet, sowohl im Hell- als auch im Dunkelmodus.",
+      "accent": "Akzentfarbe",
+      "accentHint": "Wird für sekundäre Diagrammreihen und Hervorhebungen verwendet.",
+      "fontSize": "Basisschriftgröße",
+      "fontSizePlaceholder": "z. B. 15px",
+      "fontSizeHint": "Optional. Skaliert das gesamte Dashboard relativ zur Browser-Standardgröße (16px).",
+      "density": "Dichte",
+      "densityComfortable": "Komfortabel",
+      "densityCompact": "Kompakt",
+      "menuSpacing": "Menüabstand",
+      "menuSpacingDefault": "Standard",
+      "menuSpacingCompact": "Kompakt",
+      "colorsGroup": "Farben",
+      "primaryShort": "Primär",
+      "surfaceShort": "Oberfläche",
+      "accentShort": "Akzent"
+    },
+    "actions": {
+      "saveTheme": "Design speichern",
+      "deleteTheme": "Design löschen",
+      "resetDefaults": "Auf Standard zurücksetzen"
+    },
+    "mode": {
+      "label": "Erscheinungsmodus",
+      "auto": "Automatisch (System)",
+      "light": "Hell",
+      "dark": "Dunkel"
+    }
+  },
   "comparison": {
     "vsLabel": "vs.",
     "pageviewsLabel": "Seitenaufrufe (vor.)",
