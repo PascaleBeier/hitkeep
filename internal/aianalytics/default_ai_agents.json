@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-15T22:47:17.390880729Z",
+  "generated_at": "2026-09-26T14:26:03.027518497Z",
   "sources": {
     "ai_robots_txt": "https://raw.githubusercontent.com/ai-robots-txt/ai.robots.txt/main/robots.json",
     "crawler_user_agents": "https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json",
@@ -27,6 +27,16 @@
       "name": "AddSearchBot",
       "family": "AddSearchBot",
       "category": "ai_search_indexer",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
+      "token": "agentdatabot",
+      "name": "AgentDataBot",
+      "family": "AgentDataBot",
+      "category": "other_ai",
       "respects_robots_txt": "unclear",
       "sources": [
         "ai_robots_txt"
@@ -352,6 +362,16 @@
       ]
     },
     {
+      "token": "bixelbot",
+      "name": "BixelBot",
+      "family": "BixelBot",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "bravebot",
       "name": "Bravebot",
       "family": "https://safe.search.brave.com/help/brave-search-crawler",
@@ -564,6 +584,16 @@
       "sources": [
         "ai_robots_txt",
         "crawler_user_agents"
+      ]
+    },
+    {
+      "token": "cloudflarebrowserrenderingcrawler",
+      "name": "CloudflareBrowserRenderingCrawler",
+      "family": "Cloudflare that returns rendered website content for research, monitoring, and AI data workflows",
+      "category": "other_ai",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
       ]
     },
     {
@@ -1347,6 +1377,16 @@
       ]
     },
     {
+      "token": "kimi-agent",
+      "name": "Kimi-Agent",
+      "family": "Moonshot AI that browses websites while carrying out user-directed research and other tasks",
+      "category": "ai_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "kimi-searchbot",
       "name": "Kimi-SearchBot",
       "family": "Moonshot AI",
@@ -1913,6 +1953,16 @@
       ]
     },
     {
+      "token": "qodercli",
+      "name": "qodercli",
+      "family": "Qoder that helps developers build, debug, and modify software from the terminal",
+      "category": "ai_coding_agent",
+      "respects_robots_txt": "unclear",
+      "sources": [
+        "ai_robots_txt"
+      ]
+    },
+    {
       "token": "qualifiedbot",
       "name": "QualifiedBot",
       "family": "Qualified",
@@ -2330,8 +2380,8 @@
     },
     {
       "token": "webzio-extended",
-      "name": "Webzio-Extended",
-      "family": "Webzio-Extended",
+      "name": "webzio-extended",
+      "family": "webzio-extended",
       "category": "ai_training_crawler",
       "respects_robots_txt": "unclear",
       "url": "https://docs.webz.io/reference/how-it-works-video",
