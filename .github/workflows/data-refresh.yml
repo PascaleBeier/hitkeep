@@ -193,7 +193,11 @@ jobs:
                 exit 1
               fi
             done < "$status_file"
-            if git diff --cached --quiet "$remote_oid" -- "${paths[@]}"; then
+            timestamp_ignore=()
+            if [[ "$TARGET" == ai-agents || "$TARGET" == spam ]]; then
+              timestamp_ignore=(-I '^  "generated_at":')
+            fi
+            if git diff --cached --quiet "${timestamp_ignore[@]}" "$remote_oid" -- "${paths[@]}"; then
               if [[ -z "$pr_number" ]]; then
                 gh pr create --base main --head "$BRANCH" --title "$TITLE" --body-file "$body_file"
               fi
