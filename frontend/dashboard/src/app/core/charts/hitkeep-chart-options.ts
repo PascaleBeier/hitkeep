@@ -7,25 +7,30 @@ export type HitkeepChartDesign = 'area' | 'line' | 'bar';
  * tokens, so charts follow the active theme. Unknown colors pass through
  * unchanged; an unset token falls back to the original hex.
  */
-const CHART_TOKEN_COLORS: Record<string, string> = {
-    '#6366f1': '--p-primary-500',
-    '#14b8a6': '--p-teal-500',
-    '#0ea5b7': '--p-cyan-500',
-    '#2563eb': '--p-blue-500',
-    '#0f9d58': '--p-green-500',
-    '#059669': '--p-emerald-500',
-    '#0f766e': '--p-teal-700',
-    '#dc2626': '--p-red-500',
-    '#a16207': '--p-amber-600'
+const CHART_TOKEN_COLORS: Record<string, string[]> = {
+    '#6366f1': ['--p-primary-500'],
+    '#14b8a6': ['--p-accent-500', '--p-teal-500'],
+    '#0ea5b7': ['--p-cyan-500'],
+    '#2563eb': ['--p-blue-500'],
+    '#0f9d58': ['--p-green-500'],
+    '#059669': ['--p-emerald-500'],
+    '#0f766e': ['--p-teal-700'],
+    '#dc2626': ['--p-red-500'],
+    '#a16207': ['--p-amber-600']
 };
 
 export function resolveChartColor(color: string): string {
-    const token = CHART_TOKEN_COLORS[color.trim().toLowerCase()];
-    if (!token || typeof window === 'undefined') {
+    const tokens = CHART_TOKEN_COLORS[color.trim().toLowerCase()];
+    if (!tokens || typeof window === 'undefined') {
         return color;
     }
-    const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-    return value || color;
+    for (const token of tokens) {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+        if (value) {
+            return value;
+        }
+    }
+    return color;
 }
 
 export const HITKEEP_CHART_PALETTE = {

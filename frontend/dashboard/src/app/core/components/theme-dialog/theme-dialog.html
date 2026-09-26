@@ -28,6 +28,26 @@
 
         <form class="grid grid-cols-1 gap-4 md:grid-cols-2" [formGroup]="form" (ngSubmit)="save()">
             <div class="flex flex-col gap-2 md:col-span-2">
+                <label for="hk-color-mode" class="text-sm font-medium">{{ 'theme.mode.label' | transloco }}</label>
+                <p-select
+                    inputId="hk-color-mode"
+                    [options]="colorModeOptions"
+                    optionLabel="labelKey"
+                    optionValue="value"
+                    [ngModel]="colorMode()"
+                    [ngModelOptions]="{ standalone: true }"
+                    (onChange)="onColorModeChange($event.value)"
+                >
+                    <ng-template pTemplate="selectedItem" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                    <ng-template pTemplate="item" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                </p-select>
+            </div>
+
+            <div class="flex flex-col gap-2 md:col-span-2">
                 <label for="hk-theme-name" class="text-sm font-medium">{{ 'theme.fields.name' | transloco }}</label>
                 <input pInputText id="hk-theme-name" formControlName="name" />
             </div>
@@ -41,6 +61,54 @@
                 <label for="hk-theme-surface" class="text-sm font-medium">{{ 'theme.fields.surface' | transloco }}</label>
                 <p-colorpicker inputId="hk-theme-surface" formControlName="surface" />
                 <small class="text-muted-color">{{ 'theme.fields.surfaceHint' | transloco }}</small>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-accent" class="text-sm font-medium">{{ 'theme.fields.accent' | transloco }}</label>
+                <p-colorpicker inputId="hk-theme-accent" formControlName="accent" />
+                <small class="text-muted-color">{{ 'theme.fields.accentHint' | transloco }}</small>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-fontsize" class="text-sm font-medium">{{ 'theme.fields.fontSize' | transloco }}</label>
+                <input pInputText id="hk-theme-fontsize" formControlName="fontSize" [placeholder]="'theme.fields.fontSizePlaceholder' | transloco" />
+                <small class="text-muted-color">{{ 'theme.fields.fontSizeHint' | transloco }}</small>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-density" class="text-sm font-medium">{{ 'theme.fields.density' | transloco }}</label>
+                <p-select
+                    inputId="hk-theme-density"
+                    formControlName="density"
+                    [options]="densityOptions"
+                    optionLabel="labelKey"
+                    optionValue="value"
+                >
+                    <ng-template pTemplate="selectedItem" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                    <ng-template pTemplate="item" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                </p-select>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label for="hk-theme-menu-spacing" class="text-sm font-medium">{{ 'theme.fields.menuSpacing' | transloco }}</label>
+                <p-select
+                    inputId="hk-theme-menu-spacing"
+                    formControlName="menuSpacing"
+                    [options]="menuSpacingOptions"
+                    optionLabel="labelKey"
+                    optionValue="value"
+                >
+                    <ng-template pTemplate="selectedItem" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                    <ng-template pTemplate="item" let-item>
+                        {{ item.labelKey | transloco }}
+                    </ng-template>
+                </p-select>
             </div>
 
             <div class="flex flex-col gap-2 md:col-span-2">

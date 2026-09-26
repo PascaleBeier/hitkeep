@@ -165,14 +165,14 @@ export class SidebarMenuService {
                     { labelKey: 'nav.aiAgents', icon: 'pi pi-sparkles', routerLink: '/ai-agents', shareRouterLink: '/ai-agents' },
                     { labelKey: 'nav.aiChatbots', icon: 'pi pi-comments', routerLink: '/ai-chatbots', shareRouterLink: '/ai-chatbots' },
                     { labelKey: 'nav.ecommerce', icon: 'pi pi-shopping-bag', routerLink: '/ecommerce', shareRouterLink: '/ecommerce' },
-                    ...utmItems,
-                    { labelKey: 'nav.importExport', icon: 'pi pi-sync', routerLink: '/import-export', visible: notShare }
+                    ...utmItems
                 ]
             },
             {
                 labelKey: 'nav.integration',
                 visible: notShare,
                 items: [
+                    { labelKey: 'nav.importExport', icon: 'pi pi-sync', routerLink: '/import-export' },
                     {
                         labelKey: 'nav.apiClients',
                         icon: 'pi pi-key',

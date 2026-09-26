@@ -6,8 +6,16 @@ export interface HitkeepTheme {
     primary: string;
     /** Optional seed color for the surface palette. */
     surface?: string;
+    /** Optional seed color for the accent palette (charts, highlights). */
+    accent?: string;
     /** Optional font family override applied to --font-sans. */
     fontFamily?: string;
+    /** Optional base font size applied to the root element (e.g. '15px'). */
+    fontSize?: string;
+    /** Overall density of the dashboard. */
+    density?: 'comfortable' | 'compact';
+    /** Sidebar menu spacing. */
+    menuSpacing?: 'default' | 'compact';
     /** Optional raw CSS appended to a dedicated theme style element. */
     customCss?: string;
 }

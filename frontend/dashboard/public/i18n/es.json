@@ -2864,7 +2864,7 @@
       "rtlBadge": "RTL"
     }
   },
-  "theme":   {
+  "theme":     {
     "dialogTitle": "Apariencia",
     "subtitle": "Elige un tema, personalízalo abajo y guárdalo para reutilizarlo cuando quieras.",
     "openDialogAria": "Personalizar tema",
@@ -2878,12 +2878,29 @@
       "fontFamilyHint": "Opcional. Un valor CSS font-family. Las fuentes no incluidas en el panel deben estar instaladas en tu sistema.",
       "customCss": "CSS personalizado",
       "customCssPlaceholder": "/* Sobrescrituras CSS opcionales */",
-      "customCssHint": "Opcional. Se aplica sobre el tema seleccionado, tanto en modo claro como en oscuro."
+      "customCssHint": "Opcional. Se aplica sobre el tema seleccionado, tanto en modo claro como en oscuro.",
+      "accent": "Color de acento",
+      "accentHint": "Se usa en las series secundarias de las gráficas y en destacados.",
+      "fontSize": "Tamaño de fuente base",
+      "fontSizePlaceholder": "p. ej. 15px",
+      "fontSizeHint": "Opcional. Escala todo el panel respecto al valor por defecto del navegador (16px).",
+      "density": "Densidad",
+      "densityComfortable": "Cómoda",
+      "densityCompact": "Compacta",
+      "menuSpacing": "Espaciado del menú",
+      "menuSpacingDefault": "Predeterminado",
+      "menuSpacingCompact": "Compacto"
     },
     "actions": {
       "saveTheme": "Guardar tema",
       "deleteTheme": "Eliminar tema",
       "resetDefaults": "Restablecer valores por defecto"
+    },
+    "mode": {
+      "label": "Modo de apariencia",
+      "auto": "Automático (sistema)",
+      "light": "Claro",
+      "dark": "Oscuro"
     }
   },
   "comparison": {

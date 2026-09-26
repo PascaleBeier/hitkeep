@@ -2957,7 +2957,7 @@
       "rtlBadge": "RTL"
     }
   },
-  "theme":   {
+  "theme":     {
     "dialogTitle": "Appearance",
     "subtitle": "Pick a theme, customize it below, and save it to reuse it anytime.",
     "openDialogAria": "Customize theme",
@@ -2971,12 +2971,29 @@
       "fontFamilyHint": "Optional. A CSS font-family value. Fonts not bundled with the dashboard must be installed on your system.",
       "customCss": "Custom CSS",
       "customCssPlaceholder": "/* Optional CSS overrides */",
-      "customCssHint": "Optional. Applied on top of the selected theme, for both light and dark mode."
+      "customCssHint": "Optional. Applied on top of the selected theme, for both light and dark mode.",
+      "accent": "Accent color",
+      "accentHint": "Used for secondary series in charts and highlights.",
+      "fontSize": "Base font size",
+      "fontSizePlaceholder": "e.g. 15px",
+      "fontSizeHint": "Optional. Scales the whole dashboard relative to the browser default (16px).",
+      "density": "Density",
+      "densityComfortable": "Comfortable",
+      "densityCompact": "Compact",
+      "menuSpacing": "Menu spacing",
+      "menuSpacingDefault": "Default",
+      "menuSpacingCompact": "Compact"
     },
     "actions": {
       "saveTheme": "Save theme",
       "deleteTheme": "Delete theme",
       "resetDefaults": "Reset to defaults"
+    },
+    "mode": {
+      "label": "Appearance mode",
+      "auto": "Auto (system)",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "comparison": {
