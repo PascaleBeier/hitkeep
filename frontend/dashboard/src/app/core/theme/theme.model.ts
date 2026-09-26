@@ -22,12 +22,20 @@ export interface HitkeepTheme {
 
 export const DEFAULT_THEME_ID = 'hitkeep-default';
 
+/**
+ * Seeds for the pristine built-in theme. They match the stock OptimusUI Aura
+ * ramp defaults (emerald primary) so the untouched theme is visually
+ * identical to a dashboard without the theme manager.
+ */
+export const STOCK_PRIMARY = '#10b981';
+export const STOCK_SURFACE = '#64748b';
+
 export const BUILT_IN_THEMES: HitkeepTheme[] = [
     {
         id: DEFAULT_THEME_ID,
         name: 'HitKeep',
         builtin: true,
-        primary: '#6366f1'
+        primary: STOCK_PRIMARY
     },
     {
         id: 'hitkeep-teal',

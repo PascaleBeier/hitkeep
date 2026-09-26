@@ -1,4 +1,13 @@
-<app-dialog-shell [visible]="visible()" (visibleChange)="onVisibleChange($event)" [title]="'theme.dialogTitle' | transloco" [width]="'60rem'">
+<app-dialog-shell
+    [visible]="visible()"
+    (visibleChange)="onVisibleChange($event)"
+    [title]="'theme.dialogTitle' | transloco"
+    [width]="'60rem'"
+    [secondaryLabel]="'common.actions.cancel' | transloco"
+    [primaryLabel]="'theme.actions.saveTheme' | transloco"
+    [primaryDisabled]="form.invalid"
+    (primaryAction)="save()"
+>
     <div class="flex flex-col gap-5">
         <p class="m-0 text-sm text-muted-color">{{ 'theme.subtitle' | transloco }}</p>
 
@@ -39,7 +48,7 @@
                             [value]="hexValue('primary')"
                             (change)="onHexChange('primary', $event)"
                             (keydown.enter)="$event.preventDefault()"
-                            placeholder="#6366f1"
+                            placeholder="#10b981"
                             [attr.aria-label]="'theme.fields.primary' | transloco"
                         />
                         <label for="hk-theme-primary" class="text-sm">{{ 'theme.fields.primaryShort' | transloco }}</label>
@@ -116,14 +125,11 @@
             </div>
         </form>
 
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex gap-2">
-                @if (draftIsCustom()) {
-                <p-button [label]="'theme.actions.deleteTheme' | transloco" icon="pi pi-trash" severity="danger" [text]="true" size="small" type="button" (onClick)="deleteDraft()" />
-                }
-                <p-button [label]="'theme.actions.resetDefaults' | transloco" icon="pi pi-refresh" severity="secondary" [text]="true" size="small" type="button" (onClick)="resetDefaults()" />
-            </div>
-            <p-button [label]="'theme.actions.saveTheme' | transloco" icon="pi pi-check" type="button" [disabled]="form.invalid" (onClick)="save()" />
+        <div class="flex flex-wrap items-center gap-2">
+            @if (draftIsCustom()) {
+            <p-button [label]="'theme.actions.deleteTheme' | transloco" icon="pi pi-trash" severity="danger" [text]="true" size="small" type="button" (onClick)="deleteDraft()" />
+            }
+            <p-button [label]="'theme.actions.resetDefaults' | transloco" icon="pi pi-refresh" severity="secondary" [text]="true" size="small" type="button" (onClick)="resetDefaults()" />
         </div>
     </div>
 </app-dialog-shell>

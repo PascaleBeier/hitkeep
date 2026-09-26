@@ -50,7 +50,7 @@ export class ThemeDialog {
     protected readonly form = this.fb.group({
         id: [''],
         name: ['', Validators.required],
-        primary: ['#6366f1', Validators.required],
+        primary: [BUILT_IN_THEMES[0].primary, Validators.required],
         // Null (not empty string) keeps the colorpicker placeholder neutral
         // instead of rendering an empty value as red.
         surface: [null as string | null],

@@ -1,15 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { ThemeManagerService } from '@services/theme-manager.service';
-import { BUILT_IN_THEMES, DEFAULT_THEME_ID, type HitkeepTheme } from '@core/theme/theme.model';
+import { isStockAppearance, ThemeManagerService } from '@services/theme-manager.service';
+import { BUILT_IN_THEMES, DEFAULT_THEME_ID, STOCK_PRIMARY, type HitkeepTheme } from '@core/theme/theme.model';
 
 const updatePrimaryPalette = vi.fn();
 const updateSurfacePalette = vi.fn();
+const updatePreset = vi.fn();
 const palette = vi.fn((color: string) => ({ 500: color }));
 
 vi.mock('@openng/optimus-ui-themes', () => ({
     updatePrimaryPalette: (...args: unknown[]) => updatePrimaryPalette(...args),
     updateSurfacePalette: (...args: unknown[]) => updateSurfacePalette(...args),
+    updatePreset: (...args: unknown[]) => updatePreset(...args),
     palette: (color: string) => palette(color)
 }));
 
@@ -117,5 +119,47 @@ describe('ThemeManagerService', () => {
         const before = service.version();
         service.previewTheme({ id: 'x', name: 'X', builtin: false, primary: '#0d9488' });
         expect(service.version()).toBeGreaterThan(before);
+    });
+
+    it('leaves the preset untouched while the pristine default theme is active', () => {
+        service.restoreActiveTheme();
+
+        expect(service.activeThemeId()).toBe(DEFAULT_THEME_ID);
+        expect(updatePrimaryPalette).not.toHaveBeenCalled();
+        expect(updateSurfacePalette).not.toHaveBeenCalled();
+    });
+});
+
+describe('isStockAppearance', () => {
+    const stockTheme: HitkeepTheme = { ...BUILT_IN_THEMES[0] };
+
+    it('matches the pristine built-in theme', () => {
+        expect(isStockAppearance(stockTheme)).toBe(true);
+    });
+
+    it('matches a saved default that only renamed the theme', () => {
+        expect(isStockAppearance({ ...stockTheme, name: 'My brand', builtin: false })).toBe(true);
+    });
+
+    it('rejects a changed primary seed', () => {
+        expect(isStockAppearance({ ...stockTheme, primary: '#e11d48' })).toBe(false);
+    });
+
+    it('rejects any additional customization', () => {
+        expect(isStockAppearance({ ...stockTheme, surface: '#64748b' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, accent: '#14b8a6' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, fontFamily: 'Inter, sans-serif' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, fontSize: '15px' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, density: 'compact' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, menuSpacing: 'compact' })).toBe(false);
+        expect(isStockAppearance({ ...stockTheme, customCss: '.a { color: red; }' })).toBe(false);
+    });
+
+    it('rejects other theme ids even with stock values', () => {
+        expect(isStockAppearance({ ...stockTheme, id: 'custom-1' })).toBe(false);
+    });
+
+    it('accepts uppercase and padded stock hex', () => {
+        expect(isStockAppearance({ ...stockTheme, primary: ` ${STOCK_PRIMARY.toUpperCase()} ` })).toBe(true);
     });
 });

@@ -49,7 +49,7 @@ describe('HITKEEP_CHART_PALETTE', () => {
     it('falls back to the default palette when tokens are unset', () => {
         mockTokensUnset();
 
-        expect(HITKEEP_CHART_PALETTE.primary).toBe('#6366f1');
+        expect(HITKEEP_CHART_PALETTE.primary).toBe('#10b981');
         expect(HITKEEP_CHART_PALETTE.secondary).toBe('#14b8a6');
         expect(HITKEEP_CHART_PALETTE.warning).toBe('#a16207');
     });

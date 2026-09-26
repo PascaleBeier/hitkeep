@@ -8,6 +8,7 @@ export type HitkeepChartDesign = 'area' | 'line' | 'bar';
  * unchanged; an unset token falls back to the original hex.
  */
 const CHART_TOKEN_COLORS: Record<string, string[]> = {
+    '#10b981': ['--p-primary-500'],
     '#6366f1': ['--p-primary-500'],
     '#14b8a6': ['--p-accent-500', '--p-teal-500'],
     '#0ea5b7': ['--p-cyan-500'],
@@ -35,7 +36,7 @@ export function resolveChartColor(color: string): string {
 
 export const HITKEEP_CHART_PALETTE = {
     get primary() {
-        return resolveChartColor('#6366f1');
+        return resolveChartColor('#10b981');
     },
     get secondary() {
         return resolveChartColor('#14b8a6');

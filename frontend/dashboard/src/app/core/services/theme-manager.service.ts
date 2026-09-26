@@ -1,6 +1,6 @@
 import { Service, afterNextRender, computed, signal } from '@angular/core';
 import { palette, updatePreset, updatePrimaryPalette, updateSurfacePalette } from '@openng/optimus-ui-themes';
-import { BUILT_IN_THEMES, DEFAULT_THEME_ID, type HitkeepTheme } from '@core/theme/theme.model';
+import { BUILT_IN_THEMES, DEFAULT_THEME_ID, STOCK_PRIMARY, STOCK_SURFACE, type HitkeepTheme } from '@core/theme/theme.model';
 
 const THEMES_STORAGE_KEY = 'hk_themes';
 const ACTIVE_THEME_STORAGE_KEY = 'hk_active_theme';
@@ -42,6 +42,26 @@ html.hk-menu-compact app-layout-sidebar .layout-sidebar-menu__list--nested .layo
  * the existing dark/light preference, so the mechanism works on share and
  * public report views as well.
  */
+/**
+ * A pristine built-in theme must leave the configured preset untouched:
+ * palette() regenerates ramps from a seed and only approximates the stock
+ * Tailwind ramp, so the default look would not be HitKeep's own branding.
+ * Exported for tests; the service delegates to it inside apply().
+ */
+export function isStockAppearance(theme: HitkeepTheme): boolean {
+    return (
+        theme.id === DEFAULT_THEME_ID &&
+        theme.primary.trim().toLowerCase() === STOCK_PRIMARY &&
+        !theme.surface &&
+        !theme.accent &&
+        !theme.fontFamily?.trim() &&
+        !theme.fontSize?.trim() &&
+        (!theme.density || theme.density === 'comfortable') &&
+        (!theme.menuSpacing || theme.menuSpacing === 'default') &&
+        !theme.customCss?.trim()
+    );
+}
+
 @Service()
 export class ThemeManagerService {
     /**
@@ -51,6 +71,15 @@ export class ThemeManagerService {
     readonly version = signal(0);
 
     private readonly customThemes = signal<HitkeepTheme[]>(this.loadCustomThemes());
+
+    /**
+     * Whether the running session already mutated the configured preset.
+     * Preset mutations only live in the token CSS of the current page: a
+     * reload with the pristine default theme active boots without any, so
+     * restoring them is only needed for in-session switches back to stock.
+     */
+    private presetMutated = false;
+    private surfaceMutated = false;
 
     readonly themes = computed<HitkeepTheme[]>(() => [...BUILT_IN_THEMES, ...this.customThemes()]);
 
@@ -121,25 +150,54 @@ export class ThemeManagerService {
     }
 
     private apply(theme: HitkeepTheme): void {
-        // palette() is typed string | ColorScale but always returns the scale at runtime.
-        updatePrimaryPalette(palette(theme.primary) as Parameters<typeof updatePrimaryPalette>[0]);
-        if (theme.surface) {
-            updateSurfacePalette(palette(theme.surface) as Parameters<typeof updateSurfacePalette>[0]);
-        }
-        // Accent always resets (even without one) because updatePreset merges
-        // into the current preset: omitting it would keep the previous theme's accent.
-        updatePreset({
-            semantic: {
-                extend: {
-                    accent: palette(theme.accent ?? DEFAULT_ACCENT) as Record<string, string>
-                }
+        if (isStockAppearance(theme)) {
+            this.restoreStockPreset();
+        } else {
+            // palette() is typed string | ColorScale but always returns the scale at runtime.
+            updatePrimaryPalette(palette(theme.primary) as Parameters<typeof updatePrimaryPalette>[0]);
+            if (theme.surface) {
+                updateSurfacePalette(palette(theme.surface) as Parameters<typeof updateSurfacePalette>[0]);
             }
-        } as Parameters<typeof updatePreset>[0]);
+            // Accent always resets (even without one) because updatePreset merges
+            // into the current preset: omitting it would keep the previous theme's accent.
+            updatePreset({
+                semantic: {
+                    extend: {
+                        accent: palette(theme.accent ?? DEFAULT_ACCENT) as Record<string, string>
+                    }
+                }
+            } as Parameters<typeof updatePreset>[0]);
+            this.presetMutated = true;
+            this.surfaceMutated = Boolean(theme.surface);
+        }
         this.applyFontFamily(theme.fontFamily);
         this.applyFontSize(theme.fontSize);
         this.applyDensity(theme);
         this.applyCustomCss(theme.customCss);
         this.version.update((version) => version + 1);
+    }
+
+    /**
+     * Only a previously mutated session preset needs re-seeding here; a fresh
+     * page with the stock theme active never mutates in the first place.
+     */
+    private restoreStockPreset(): void {
+        if (!this.presetMutated) {
+            return;
+        }
+        updatePrimaryPalette(palette(STOCK_PRIMARY) as Parameters<typeof updatePrimaryPalette>[0]);
+        if (this.surfaceMutated) {
+            updateSurfacePalette(palette(STOCK_SURFACE) as Parameters<typeof updateSurfacePalette>[0]);
+            this.surfaceMutated = false;
+        }
+        updatePreset({
+            semantic: {
+                extend: {
+                    accent: palette(DEFAULT_ACCENT) as Record<string, string>
+                }
+            }
+        } as Parameters<typeof updatePreset>[0]);
+        this.presetMutated = false;
     }
 
     private applyFontFamily(fontFamily: string | undefined): void {
