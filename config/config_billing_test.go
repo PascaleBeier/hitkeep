@@ -32,7 +32,7 @@ func TestLoadCloudConfigFromEnv(t *testing.T) {
 		"HITKEEP_CLOUD_CHECKOUT_CANCEL_URL":      "https://cloud.hitkeep.eu/admin/team?checkout=cancelled",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}

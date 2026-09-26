@@ -1,3 +1,4 @@
+// Package reporting provides deterministic report scheduling and token primitives for HitKeep.
 package reporting
 
 import (

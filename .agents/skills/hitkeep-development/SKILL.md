@@ -18,6 +18,8 @@ Follow this connection order:
 3. If tools are absent or fail, inspect host MCP health and compare the configured server name, executable, and arguments with `./hk mcp manifest --output json`. Report whether registration, startup, workspace routing, or task reload is blocking MCP. Existing tasks may need a host reload before a corrected registration becomes callable.
 4. Obtain explicit user approval before invoking any equivalent structured CLI action. After approval, discover the command and flags through `./hk catalog commands --output json`, request `--output json`, and consume `schema_version`, `status`, `workspace_id`, `data`, and `error`. Stop on an unknown schema version instead of guessing.
 
+Fallback approval is scoped to the exact blocked operation. Resume only that operation and stop when it reaches a terminal state; do not treat fallback approval as authorization for another implementation slice or a broader persistent goal.
+
 Reserve direct `./hk` use for MCP bootstrap or repair, an explicitly approved fallback, and operations intentionally absent from MCP such as formatter or Go migration rewrites. Never guess a workspace or silently edit client-owned global configuration.
 
 Use the typed MCP surface rather than translating an action into shell yourself:
@@ -36,6 +38,7 @@ Start operations return accepted or reused state immediately. Poll `hk_dev_statu
 - Use `$hitkeep-qa` for gate selection, execution, investigation, and completion evidence.
 - Use `$hitkeep-i18n` when user-visible dashboard language or localized formatting changes.
 - Load only the relevant reference below for implementation guidance. Do not create or load area-specific HitKeep skills alongside this one.
+- Use one discovery owner per question. If Gortex has localized the exact files or symbols, do not delegate the same discovery. Use subagents only for independently executable work that can proceed in parallel or an explicitly requested independent review; do not reactivate a completed agent merely to read known text or repeat an established conclusion.
 
 ## Implementation References
 

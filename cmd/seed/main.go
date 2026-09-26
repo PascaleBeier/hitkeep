@@ -20,9 +20,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 
+	"hitkeep/assetstore"
 	"hitkeep/hklog"
 	"hitkeep/internal/api"
-	"hitkeep/internal/assetstore"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/worker"

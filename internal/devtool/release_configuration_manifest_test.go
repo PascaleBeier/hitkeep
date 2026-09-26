@@ -1,6 +1,7 @@
 package devtool
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +15,9 @@ func TestVerifySelfHostedReleaseArchiveRequiresConfigurationManifest(t *testing.
 	manifest := runtimeconfig.RenderConfigurationReleaseManifest(catalog, example)
 	archive := filepath.Join(t.TempDir(), "hitkeep_2.99.0_Linux_amd64.tar.gz")
 	members := releaseArchiveMembers("amd64", catalog, example, manifest)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(archive), "hitkeep-linux-amd64"), members[0].data, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	writeReleaseArchive(t, archive, members)
 	if err := verifySelfHostedReleaseArchive(archive, "2.99.0", "amd64", catalog, example, manifest); err != nil {
 		t.Fatalf("verifySelfHostedReleaseArchive() error = %v", err)
@@ -32,7 +36,11 @@ func TestVerifySelfHostedReleaseArchiveRejectsStaleConfigurationManifest(t *test
 	example := []byte("example\n")
 	staleManifest := runtimeconfig.RenderConfigurationReleaseManifest([]byte("old catalog\n"), example)
 	archive := filepath.Join(t.TempDir(), "hitkeep_2.99.0_Linux_amd64.tar.gz")
-	writeReleaseArchive(t, archive, releaseArchiveMembers("amd64", catalog, example, staleManifest))
+	members := releaseArchiveMembers("amd64", catalog, example, staleManifest)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(archive), "hitkeep-linux-amd64"), members[0].data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeReleaseArchive(t, archive, members)
 
 	err := verifySelfHostedReleaseArchive(archive, "2.99.0", "amd64", catalog, example, staleManifest)
 	if err == nil || !strings.Contains(err.Error(), runtimeconfig.ConfigurationCatalogFilename) {

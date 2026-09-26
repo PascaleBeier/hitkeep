@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/assetstore"
 	"hitkeep/hklog"
-	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
 )
 

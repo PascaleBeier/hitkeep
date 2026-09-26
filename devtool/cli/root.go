@@ -16,8 +16,8 @@ import (
 	"github.com/spf13/pflag"
 
 	runtimeconfig "hitkeep/config"
+	"hitkeep/devtool/devmcp"
 	"hitkeep/internal/devtool"
-	"hitkeep/internal/devtool/devmcp"
 	json "hitkeep/jsonapi"
 )
 

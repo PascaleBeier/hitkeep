@@ -23,10 +23,10 @@ import (
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/realtime"
 )
 
 const defaultImportChunkSize = 8 << 20

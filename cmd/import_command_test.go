@@ -2,47 +2,41 @@ package hitkeepcmd
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestImportCommandUsesCobraContextAndStreams(t *testing.T) {
-	type contextKey struct{}
-	ctx := context.WithValue(t.Context(), contextKey{}, "value")
-	var stdin, stdout, stderr bytes.Buffer
-	stdin.WriteString("yes\n")
-	called := false
-	root := newRootCommand(rootActions{
-		importData: func(got context.Context, args []string, in io.Reader, out, errOut io.Writer, configFile string) error {
-			if configFile != "/tmp/hitkeep.yaml" {
-				t.Fatalf("configFile = %q, want /tmp/hitkeep.yaml", configFile)
-			}
-			called = true
-			if got.Value(contextKey{}) != "value" {
-				t.Fatal("import command did not receive the Cobra context")
-			}
-			if gotArgs := "list --site site"; len(args) != 3 || args[0]+" "+args[1]+" "+args[2] != gotArgs {
-				t.Fatalf("args = %q, want %q", args, gotArgs)
-			}
-			if in != &stdin || out != &stdout || errOut != &stderr {
-				t.Fatal("import command did not receive command streams")
-			}
-			return nil
-		},
-	})
-	root.SetIn(&stdin)
+func TestImportCommandUsesRootConfigurationAndStreams(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/sites/site/imports" {
+			t.Errorf("request path = %q", r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"imports":[]}`)
+	}))
+	defer server.Close()
+
+	path := filepath.Join(t.TempDir(), "hitkeep.yaml")
+	if err := os.WriteFile(path, []byte("api-url: "+server.URL+"\napi-token: file-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	root := NewRootCommand(nil)
 	root.SetOut(&stdout)
 	root.SetErr(&stderr)
-	if err := ExecuteRoot(ctx, root, []string{"--config", "/tmp/hitkeep.yaml", "import", "list", "--site", "site"}); err != nil {
-		t.Fatalf("ExecuteContext() error = %v", err)
+	if err := ExecuteRoot(t.Context(), root, []string{"--config", path, "import", "list", "--site", "site"}); err != nil {
+		t.Fatalf("ExecuteRoot() error = %v", err)
 	}
-	if !called {
-		t.Fatal("import command was not called")
+	if got := stdout.String(); got != "" {
+		t.Errorf("stdout = %q, want empty", got)
+	}
+	if got := stderr.String(); got != "" {
+		t.Errorf("stderr = %q, want empty", got)
 	}
 }
 
@@ -53,11 +47,11 @@ func TestImportCommandUsesTypedConfigurationAndFlagOverrides(t *testing.T) {
 	}
 	t.Setenv("HITKEEP_API_URL", "http://api-env.example")
 	t.Setenv("HITKEEP_API_TOKEN", "env-token")
-	command, err := newImportCommand(t.Context(), nil, io.Discard, io.Discard, path, nil)
+	command, err := newImportExecutor(t.Context(), nil, io.Discard, io.Discard, path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	options, err := command.parseOptions([]string{"--site", "site", "--url", "http://flag.example", "--token", "flag-token"})
+	options, err := command.resolveOptions(importCLIOptions{siteID: "site", apiURL: "http://flag.example", token: "flag-token"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,36 +71,34 @@ func TestImportCommandPreservesHelpAndValidationExitSemantics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HITKEEP_API_TOKEN", "")
 			var stdout, stderr bytes.Buffer
-			command := importCommand{ctx: t.Context(), out: &stdout, errOut: &stderr, apiURL: defaultImportAPIURL}
-			err := command.run(tt.args)
+			command := newImportCommandRoute(nil)
+			command.SetOut(&stdout)
+			command.SetErr(&stderr)
+			command.SetArgs(tt.args)
+			err := command.ExecuteContext(t.Context())
 			if tt.want == 0 {
 				if err != nil {
-					t.Fatalf("run() error = %v", err)
+					t.Fatalf("ExecuteContext() error = %v", err)
 				}
-			} else if exitErr, ok := errors.AsType[*ExitError](err); !ok || exitErr.Code != tt.want {
-				t.Fatalf("run() error = %v, want ExitError code %d", err, tt.want)
+				if got := stdout.String(); !strings.Contains(got, "Usage:\n  import list [flags]\n") {
+					t.Errorf("help stdout = %q, want Cobra usage", got)
+				}
+				if got := stderr.String(); got != "" {
+					t.Errorf("help stderr = %q, want empty", got)
+				}
+				return
+			}
+			if exitErr, ok := errors.AsType[*ExitError](err); !ok || exitErr.Code != tt.want {
+				t.Fatalf("ExecuteContext() error = %v, want ExitError code %d", err, tt.want)
 			}
 			if got := stdout.String(); got != "" {
 				t.Errorf("stdout = %q, want empty", got)
 			}
-			if tt.want == 0 && !strings.HasPrefix(stderr.String(), "Usage of import:") {
-				t.Errorf("help stderr = %q, want stdlib usage", stderr.String())
-			}
-			if tt.want == 2 && stderr.String() != "--token or HITKEEP_API_TOKEN is required\n" {
-				t.Errorf("validation stderr = %q", stderr.String())
+			if got := stderr.String(); got != "--token or HITKEEP_API_TOKEN is required\n" {
+				t.Errorf("validation stderr = %q", got)
 			}
 		})
-	}
-}
-
-func TestImportCommandReturnsActionErrors(t *testing.T) {
-	want := errors.New("import failed")
-	root := newRootCommand(rootActions{
-		importData: func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error { return want },
-	})
-	root.SetArgs([]string{"import", "list"})
-	if err := root.ExecuteContext(t.Context()); !errors.Is(err, want) {
-		t.Fatalf("ExecuteContext() error = %v, want %v", err, want)
 	}
 }

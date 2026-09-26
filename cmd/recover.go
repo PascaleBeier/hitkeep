@@ -47,17 +47,18 @@ func recoveryFlagExit(err error) error {
 }
 
 type recoveryCommand struct {
-	ctx    context.Context
-	in     io.Reader
-	out    io.Writer
-	errOut io.Writer
-	logger *slog.Logger
+	ctx        context.Context
+	in         io.Reader
+	out        io.Writer
+	errOut     io.Writer
+	logger     *slog.Logger
+	configFile string
 }
 
 // Recover handles the "hitkeep recover <subcommand>" family of commands.
 // These are offline recovery operations that require HitKeep to be stopped
 // (DuckDB allows only one writer at a time).
-func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger) error {
+func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger, configFile string) error {
 	if logger == nil {
 		panic("hitkeepcmd: logger is required")
 	}
@@ -66,7 +67,7 @@ func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Wr
 		return recoveryExit(1)
 	}
 
-	r := recoveryCommand{ctx: ctx, in: in, out: out, errOut: errOut, logger: logger}
+	r := recoveryCommand{ctx: ctx, in: in, out: out, errOut: errOut, logger: logger, configFile: configFile}
 	switch args[0] {
 	case "disable-2fa":
 		return r.recoverDisable2FA(args[1:])
@@ -166,7 +167,10 @@ func (r recoveryCommand) recoverDisable2FA(args []string) error {
 
 	// Resolve DB path: flag overrides config default
 	if *dbPath == "" {
-		conf := config.Load(r.logger)
+		conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+		if err != nil {
+			return fmt.Errorf("load recovery configuration: %w", err)
+		}
 		*dbPath = conf.DBPath
 	}
 
@@ -314,7 +318,11 @@ func (r recoveryCommand) recoverRestoreDatabaseBundle(args []string) error {
 		return recoveryExit(1)
 	}
 	if strings.TrimSpace(*dbPath) == "" {
-		*dbPath = config.Load(r.logger).DBPath
+		conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+		if err != nil {
+			return fmt.Errorf("load recovery configuration: %w", err)
+		}
+		*dbPath = conf.DBPath
 	}
 
 	manifest, err := readDatabaseRecoveryBundle(*from)
@@ -537,7 +545,10 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 	}
 
 	// Resolve defaults from config.
-	conf := config.Load(r.logger)
+	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	if err != nil {
+		return fmt.Errorf("load recovery configuration: %w", err)
+	}
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -959,7 +970,10 @@ func (r recoveryCommand) recoverRebuildDefaultTenant(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return recoveryFlagExit(err)
 	}
-	conf := config.Load(r.logger)
+	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	if err != nil {
+		return fmt.Errorf("load recovery configuration: %w", err)
+	}
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}
@@ -1013,7 +1027,10 @@ func (r recoveryCommand) recoverImportArchives(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return recoveryFlagExit(err)
 	}
-	conf := config.Load(r.logger)
+	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	if err != nil {
+		return fmt.Errorf("load recovery configuration: %w", err)
+	}
 	if *dbPath == "" {
 		*dbPath = conf.DBPath
 	}

@@ -15,9 +15,9 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/realtime"
 )
 
 func testBatchLogger() *slog.Logger {

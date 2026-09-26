@@ -344,6 +344,11 @@ jobs:
       source_catalog_sha256: ${{ steps.dispatch.outputs.source_catalog_sha256 }}
       source_example_sha256: ${{ steps.dispatch.outputs.source_example_sha256 }}
       source_manifest_sha256: ${{ steps.dispatch.outputs.source_manifest_sha256 }}
+      docs_base_sha: ${{ steps.dispatch.outputs.docs_base_sha }}
+      docs_workflow_sha256: ${{ steps.dispatch.outputs.docs_workflow_sha256 }}
+      docs_run_id: ${{ steps.dispatch.outputs.docs_run_id }}
+      docs_run_attempt: ${{ steps.dispatch.outputs.docs_run_attempt }}
+      docs_attestation_artifact_sha256: ${{ steps.dispatch.outputs.docs_attestation_artifact_sha256 }}
     needs:
       - release-please
       - build-release
@@ -360,7 +365,8 @@ jobs:
         id: dispatch
         env:
           DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
-          DOCS_WORKFLOW_SHA256: 394bedb5cf9b30c79a9eff03ada1bc28b50f6d9fba495a7e2218f1a36e074fc8
+          # Finite v1→v2 transition: v1 remains receiver-only for in-flight callers.
+          DOCS_WORKFLOW_SHA256: 812c7896202be86362a5c384c17b8e87c461fac1353ec44210c79b15b4e58c08
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         shell: bash
@@ -400,6 +406,8 @@ jobs:
           printf 'source_catalog_sha256=%s\n' "$catalog_sha256" >> "$GITHUB_OUTPUT"
           printf 'source_example_sha256=%s\n' "$example_sha256" >> "$GITHUB_OUTPUT"
           printf 'source_manifest_sha256=%s\n' "$manifest_sha256" >> "$GITHUB_OUTPUT"
+          printf 'docs_base_sha=%s\n' "$docs_head_sha" >> "$GITHUB_OUTPUT"
+          printf 'docs_workflow_sha256=%s\n' "$docs_workflow_sha256" >> "$GITHUB_OUTPUT"
           source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
           gh workflow run sync-hitkeep-release.yml \
             --repo "$DOCS_REPOSITORY" \
@@ -407,6 +415,9 @@ jobs:
             -f tag="$TAG" \
             -f dry_run=false \
             -f prepublication=true \
+            -f attestation_schema=hitkeep.docs-attestation/v2 \
+            -f docs_base_sha="$docs_head_sha" \
+            -f docs_workflow_sha256="$docs_workflow_sha256" \
             -f source_run_id="$source_run_id" \
             -f source_head_sha="$GITHUB_SHA" \
             -f source_workflow_sha256="$source_workflow_sha256" \
@@ -440,22 +451,49 @@ jobs:
             .head_branch == "main" and .head_sha == $docs_head_sha and .status == "completed" and .conclusion == "success"
           ' "$workdir/docs-run.json" >/dev/null
           jq -e '.app.id == 15368 and .app.slug == "github-actions"' "$workdir/docs-check-suite.json" >/dev/null
-          gh run download "$docs_run_id" --repo "$DOCS_REPOSITORY" --name hitkeep-docs-release-attestation --dir "$workdir"
+          docs_run_attempt="$(jq -r '.run_attempt // empty' "$workdir/docs-run.json")"
+          if [[ ! "$docs_run_attempt" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'documentation attestation run has no attempt' >&2
+            exit 1
+          fi
+          artifact_name="hitkeep-docs-release-attestation-${docs_run_id}-${docs_run_attempt}"
+          gh api "repos/$DOCS_REPOSITORY/actions/runs/$docs_run_id/artifacts" > "$workdir/docs-artifacts.json"
+          docs_attestation_artifact_id="$(jq -r --arg name "$artifact_name" '[.artifacts[] | select(.name == $name and .expired == false and (.digest | test("^sha256:[a-f0-9]{64}$")))] | if length == 1 then .[0].id else empty end' "$workdir/docs-artifacts.json")"
+          docs_attestation_artifact_sha256="$(jq -r --argjson artifact_id "$docs_attestation_artifact_id" '[.artifacts[] | select(.id == $artifact_id)] | if length == 1 then .[0].digest | ltrimstr("sha256:") else empty end' "$workdir/docs-artifacts.json")"
+          if [[ ! "$docs_attestation_artifact_id" =~ ^[1-9][0-9]*$ || ! "$docs_attestation_artifact_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+            echo 'documentation attestation has no exact immutable artifact identity' >&2
+            exit 1
+          fi
+          gh api "repos/$DOCS_REPOSITORY/actions/artifacts/$docs_attestation_artifact_id/zip" > "$workdir/docs-attestation.zip"
+          if [[ "$(sha256sum "$workdir/docs-attestation.zip" | awk '{print $1}')" != "$docs_attestation_artifact_sha256" ]]; then
+            echo 'prepublication attestation artifact digest mismatch' >&2
+            exit 1
+          fi
           attestation="$workdir/hitkeep-docs-release-attestation.json"
+          unzip -p "$workdir/docs-attestation.zip" hitkeep-docs-release-attestation.json > "$attestation"
           jq -e --arg tag "$TAG" --arg source_commit "$GITHUB_SHA" --arg source_run_id "$source_run_id" \
-            --arg catalog_sha256 "$catalog_sha256" --arg example_sha256 "$example_sha256" --arg manifest_sha256 "$manifest_sha256" '
-            .schema_version == "hitkeep.docs-attestation/v1" and
+            --arg catalog_sha256 "$catalog_sha256" --arg example_sha256 "$example_sha256" --arg manifest_sha256 "$manifest_sha256" \
+            --arg docs_base_sha "$docs_head_sha" --arg docs_workflow_sha256 "$docs_workflow_sha256" \
+            --argjson docs_run_id "$docs_run_id" --argjson docs_run_attempt "$docs_run_attempt" '
+            .schema_version == "hitkeep.docs-attestation/v2" and
             .source.repository == "PascaleBeier/hitkeep" and .source.tag == $tag and
             .source.commit == $source_commit and .source.run_id == $source_run_id and
             .source.catalog_sha256 == $catalog_sha256 and .source.example_sha256 == $example_sha256 and
             .source.manifest_sha256 == $manifest_sha256 and .docs.repository == "PascaleBeier/hitkeep-docs" and
-            (.docs.commit | test("^[a-f0-9]{40}$"))
+            .docs.base_sha == $docs_base_sha and .docs.workflow_sha256 == $docs_workflow_sha256 and
+            .docs.run_id == $docs_run_id and .docs.run_attempt == $docs_run_attempt and
+            (.docs | has("attestation_artifact_sha256") | not)
           ' "$attestation" >/dev/null
-          docs_commit="$(jq -r '.docs.commit' "$attestation")"
-          [[ "$(gh api "repos/$DOCS_REPOSITORY/commits/$docs_commit" --jq .sha)" == "$docs_commit" ]]
+          printf 'docs_run_id=%s\n' "$docs_run_id" >> "$GITHUB_OUTPUT"
+          printf 'docs_run_attempt=%s\n' "$docs_run_attempt" >> "$GITHUB_OUTPUT"
+          printf 'docs_attestation_artifact_sha256=%s\n' "$docs_attestation_artifact_sha256" >> "$GITHUB_OUTPUT"
 
   finalize-release:
     name: Promote and publish release
+    outputs:
+      npm_status: ${{ steps.publish_tracker.outputs.status }}
+      image_status: ${{ steps.promote_image.outputs.status }}
+      github_release_status: ${{ steps.promote_github_release.outputs.status }}
     needs:
       - release-please
       - build-release
@@ -484,6 +522,7 @@ jobs:
           path: tracker-package
 
       - name: Publish verified tracker
+        id: publish_tracker
         env:
           VERSION: ${{ needs.release-please.outputs.version }}
         shell: bash
@@ -511,6 +550,7 @@ jobs:
             echo "@hitkeep/tracker latest is $latest; want $VERSION" >&2
             exit 1
           fi
+          echo 'status=verified' >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
@@ -528,6 +568,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Promote immutable image to mutable tags
+        id: promote_image
         env:
           CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -552,16 +593,38 @@ jobs:
               --tag "${base}:${major}" \
               --tag "${base}:${major}.${minor}" \
               "$source"
+            for tag in latest "$major" "$major.$minor"; do
+              actual="$(docker buildx imagetools inspect "${base}:${tag}" --format '{{.Manifest.Digest}}')"
+              if [[ "$actual" != "$CANDIDATE_DIGEST" ]]; then
+                echo "image tag ${base}:${tag} points to $actual; want $CANDIDATE_DIGEST" >&2
+                exit 1
+              fi
+            done
           done
+          echo 'status=verified' >> "$GITHUB_OUTPUT"
 
       - name: Promote GitHub release
+        id: promote_github_release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release edit "$TAG" --draft=false --latest
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest
+          gh release view "$TAG" --json isDraft,tagName | jq -e --arg tag "$TAG" '.isDraft == false and .tagName == $tag' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" | jq -e --arg tag "$TAG" '.tag_name == $tag' >/dev/null
+          echo 'status=verified' >> "$GITHUB_OUTPUT"
 
   sync-docs-release:
     name: Publish release and configuration metadata to docs
+    outputs:
+      docs_status: ${{ steps.dispatch.outputs.status }}
+      docs_base_sha: ${{ needs.docs-attestation.outputs.docs_base_sha }}
+      docs_workflow_sha256: ${{ needs.docs-attestation.outputs.docs_workflow_sha256 }}
+      docs_run_id: ${{ needs.docs-attestation.outputs.docs_run_id }}
+      docs_run_attempt: ${{ needs.docs-attestation.outputs.docs_run_attempt }}
+      docs_attestation_artifact_sha256: ${{ needs.docs-attestation.outputs.docs_attestation_artifact_sha256 }}
+      docs_recovery_subject: ${{ steps.dispatch.outputs.recovery_subject }}
     needs:
       - release-please
       - finalize-release
@@ -574,16 +637,25 @@ jobs:
       contents: read
     steps:
       - name: Dispatch hitkeep-docs release synchronization
+        id: dispatch
         env:
           DOWNSTREAM_REPOSITORY: PascaleBeier/hitkeep-docs
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
           SOURCE_WORKFLOW_SHA256: ${{ needs.docs-attestation.outputs.source_workflow_sha256 }}
+          DOCS_BASE_SHA: ${{ needs.docs-attestation.outputs.docs_base_sha }}
+          DOCS_WORKFLOW_SHA256: ${{ needs.docs-attestation.outputs.docs_workflow_sha256 }}
+          DOCS_RUN_ID: ${{ needs.docs-attestation.outputs.docs_run_id }}
+          DOCS_RUN_ATTEMPT: ${{ needs.docs-attestation.outputs.docs_run_attempt }}
+          DOCS_ATTESTATION_ARTIFACT_SHA256: ${{ needs.docs-attestation.outputs.docs_attestation_artifact_sha256 }}
           SOURCE_CATALOG_SHA256: ${{ needs.docs-attestation.outputs.source_catalog_sha256 }}
           SOURCE_EXAMPLE_SHA256: ${{ needs.docs-attestation.outputs.source_example_sha256 }}
           SOURCE_MANIFEST_SHA256: ${{ needs.docs-attestation.outputs.source_manifest_sha256 }}
         run: |
-          set -uo pipefail
+          set -euo pipefail
+          echo 'status=pending' >> "$GITHUB_OUTPUT"
+          recovery_subject="$(printf '%s\0' "$TAG" "$SOURCE_WORKFLOW_SHA256" "$SOURCE_CATALOG_SHA256" "$SOURCE_EXAMPLE_SHA256" "$SOURCE_MANIFEST_SHA256" "$DOCS_BASE_SHA" "$DOCS_WORKFLOW_SHA256" "$DOCS_RUN_ID" "$DOCS_RUN_ATTEMPT" "$DOCS_ATTESTATION_ARTIFACT_SHA256" | sha256sum | awk '{print $1}')"
+          echo "recovery_subject=$recovery_subject" >> "$GITHUB_OUTPUT"
 
           if [[ -z "$GH_TOKEN" ]]; then
             echo "::warning::Documentation synchronization was not dispatched because HITKEEP_DOCS_DISPATCH_TOKEN is unavailable"
@@ -592,6 +664,11 @@ jobs:
 
           if [[ ! "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ||
             ! "$SOURCE_WORKFLOW_SHA256" =~ ^[a-f0-9]{64}$ ||
+            ! "$DOCS_BASE_SHA" =~ ^[a-f0-9]{40}$ ||
+            ! "$DOCS_WORKFLOW_SHA256" =~ ^[a-f0-9]{64}$ ||
+            ! "$DOCS_RUN_ID" =~ ^[1-9][0-9]*$ ||
+            ! "$DOCS_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ||
+            ! "$DOCS_ATTESTATION_ARTIFACT_SHA256" =~ ^[a-f0-9]{64}$ ||
             ! "$SOURCE_CATALOG_SHA256" =~ ^[a-f0-9]{64}$ ||
             ! "$SOURCE_EXAMPLE_SHA256" =~ ^[a-f0-9]{64}$ ||
             ! "$SOURCE_MANIFEST_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
@@ -605,6 +682,12 @@ jobs:
             -f tag="${TAG}" \
             -f dry_run=false \
             -f prepublication=false \
+            -f attestation_schema=hitkeep.docs-attestation/v2 \
+            -f docs_base_sha="${DOCS_BASE_SHA}" \
+            -f docs_workflow_sha256="${DOCS_WORKFLOW_SHA256}" \
+            -f docs_run_id="${DOCS_RUN_ID}" \
+            -f docs_run_attempt="${DOCS_RUN_ATTEMPT}" \
+            -f docs_attestation_artifact_sha256="${DOCS_ATTESTATION_ARTIFACT_SHA256}" \
             -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
             -f source_head_sha="${GITHUB_SHA}" \
             -f source_workflow_sha256="${SOURCE_WORKFLOW_SHA256}" \
@@ -616,6 +699,8 @@ jobs:
           fi
 
           downstream_run_id=""
+          source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          expected_title="Finalize HitKeep $TAG (publish) · source $source_run_id"
           for attempt in {1..30}; do
             downstream_run_id="$(
               gh run list \
@@ -623,10 +708,8 @@ jobs:
                 --workflow sync-hitkeep-release.yml \
                 --event workflow_dispatch \
                 --limit 50 \
-                --json databaseId,displayTitle \
-                | jq -r --arg source_run_id "${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \
-                  '.[] | select(.displayTitle | endswith("source " + $source_run_id)) | .databaseId' \
-                | head -n 1
+                --json databaseId,displayTitle,createdAt \
+                | jq -r --arg title "$expected_title" 'map(select(.displayTitle == $title)) | sort_by(.createdAt) | last.databaseId // empty'
             )"
             if [[ -n "$downstream_run_id" ]]; then
               break
@@ -639,39 +722,153 @@ jobs:
             exit 0
           fi
 
-          downstream_url="$(
-            gh run view "$downstream_run_id" \
-              --repo "$DOWNSTREAM_REPOSITORY" \
-              --json url \
-              --jq .url
-          )"
+          gh run watch "$downstream_run_id" --repo "$DOWNSTREAM_REPOSITORY" --exit-status
+          gh api "repos/$DOWNSTREAM_REPOSITORY/actions/runs/$downstream_run_id" > downstream-run.json
+          downstream_run_attempt="$(jq -r '.run_attempt // empty' downstream-run.json)"
+          if [[ ! "$downstream_run_attempt" =~ ^[1-9][0-9]*$ ]]; then
+            echo 'documentation synchronization run has no attempt' >&2
+            exit 1
+          fi
+          jq -e --argjson run_id "$downstream_run_id" --argjson run_attempt "$downstream_run_attempt" --arg base "$DOCS_BASE_SHA" '
+            .id == $run_id and .run_attempt == $run_attempt and .repository.full_name == "PascaleBeier/hitkeep-docs" and
+            .path == ".github/workflows/sync-hitkeep-release.yml" and .event == "workflow_dispatch" and
+            .head_branch == "main" and .head_sha == $base and .status == "completed" and .conclusion == "success"
+          ' downstream-run.json >/dev/null
+          receipt_name="hitkeep-docs-postpublication-receipt-${downstream_run_id}-${downstream_run_attempt}"
+          gh api "repos/$DOWNSTREAM_REPOSITORY/actions/runs/$downstream_run_id/artifacts" > downstream-artifacts.json
+          receipt_id="$(jq -r --arg name "$receipt_name" '[.artifacts[] | select(.name == $name and .expired == false and (.digest | test("^sha256:[a-f0-9]{64}$")))] | if length == 1 then .[0].id else empty end' downstream-artifacts.json)"
+          receipt_digest="$(jq -r --argjson receipt_id "$receipt_id" '[.artifacts[] | select(.id == $receipt_id)] | if length == 1 then .[0].digest | ltrimstr("sha256:") else empty end' downstream-artifacts.json)"
+          if [[ ! "$receipt_id" =~ ^[1-9][0-9]*$ || ! "$receipt_digest" =~ ^[a-f0-9]{64}$ ]]; then
+            echo 'missing exact postpublication receipt artifact' >&2
+            exit 1
+          fi
+          gh api "repos/$DOWNSTREAM_REPOSITORY/actions/artifacts/$receipt_id/zip" > downstream-receipt.zip
+          if [[ "$(sha256sum downstream-receipt.zip | awk '{print $1}')" != "$receipt_digest" ]]; then
+            echo 'postpublication receipt digest mismatch' >&2
+            exit 1
+          fi
+          unzip -p downstream-receipt.zip hitkeep-docs-postpublication-receipt.json > downstream-receipt.json
+          jq -e --arg tag "$TAG" --arg source_run_id "$source_run_id" --arg source_commit "$GITHUB_SHA" \
+            --arg source_workflow_sha256 "$SOURCE_WORKFLOW_SHA256" --arg catalog_sha256 "$SOURCE_CATALOG_SHA256" \
+            --arg example_sha256 "$SOURCE_EXAMPLE_SHA256" --arg manifest_sha256 "$SOURCE_MANIFEST_SHA256" \
+            --arg docs_base_sha "$DOCS_BASE_SHA" --arg docs_workflow_sha256 "$DOCS_WORKFLOW_SHA256" \
+            --arg docs_attestation_artifact_sha256 "$DOCS_ATTESTATION_ARTIFACT_SHA256" \
+            --argjson docs_run_id "$DOCS_RUN_ID" --argjson docs_run_attempt "$DOCS_RUN_ATTEMPT" \
+            --argjson receipt_run_id "$downstream_run_id" --argjson receipt_run_attempt "$downstream_run_attempt" '
+            .schema_version == "hitkeep.docs-postpublication-receipt/v1" and
+            .source.repository == "PascaleBeier/hitkeep" and .source.tag == $tag and
+            .source.run_id == $source_run_id and .source.commit == $source_commit and
+            .source.workflow_sha256 == $source_workflow_sha256 and .source.catalog_sha256 == $catalog_sha256 and
+            .source.example_sha256 == $example_sha256 and .source.manifest_sha256 == $manifest_sha256 and
+            .docs.repository == "PascaleBeier/hitkeep-docs" and .docs.base_sha == $docs_base_sha and
+            .docs.workflow_sha256 == $docs_workflow_sha256 and .docs.prepublication_run_id == $docs_run_id and
+            .docs.prepublication_run_attempt == $docs_run_attempt and
+            .docs.prepublication_attestation_artifact_sha256 == $docs_attestation_artifact_sha256 and
+            .receipt.run_id == $receipt_run_id and .receipt.run_attempt == $receipt_run_attempt
+          ' downstream-receipt.json >/dev/null
+          downstream_url="$(jq -r .html_url downstream-run.json)"
           echo "Documentation synchronization is owned by the downstream repository: ${downstream_url}"
+          echo 'status=verified' >> "$GITHUB_OUTPUT"
 
   deploy-cloud:
     name: Trigger cloud deploy
+    outputs:
+      aws_status: ${{ steps.dispatch.outputs.status }}
+      artifact_url: ${{ steps.dispatch.outputs.artifact_url }}
+      artifact_sha256: ${{ steps.dispatch.outputs.artifact_sha256 }}
     needs:
       - release-please
       - finalize-release
-    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' }}
+      - docs-attestation
+    if: ${{ needs.release-please.outputs.release_created == 'true' && needs.finalize-release.result == 'success' && needs.docs-attestation.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - name: Dispatch hitkeep-infra release deploy
+        id: dispatch
         env:
           GH_TOKEN: ${{ secrets.GHT }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
           set -euo pipefail
 
-          artifact_url="https://github.com/PascaleBeier/hitkeep/releases/download/${TAG}/hitkeep-cloud-linux-arm64"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid stable release version: $TAG" >&2
+            exit 1
+          fi
+          artifact="hitkeep-cloud-linux-arm64"
+          checksum_dir="$(mktemp -d)"
+          trap 'rm -rf "$checksum_dir"' EXIT
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_dir" --pattern checksums.txt
+          ARTIFACT_SHA256="$(awk -v artifact="$artifact" '$2 == artifact || $2 == "*" artifact { print $1 }' "$checksum_dir/checksums.txt")"
+          if [[ ! "$ARTIFACT_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "missing exact release checksum for $artifact" >&2
+            exit 1
+          fi
+          artifact_url="https://github.com/PascaleBeier/hitkeep/releases/download/${TAG}/${artifact}"
 
           gh workflow run release-deploy.yml \
             --repo PascaleBeier/hitkeep-infra \
             --ref main \
             -f stack=both \
             -f artifact_url="${artifact_url}" \
+            -f artifact_sha256="${ARTIFACT_SHA256}" \
             -f release_version="${TAG}" \
             -f mode=deploy
 
           echo "Triggered hitkeep-infra release deploy for ${TAG}: ${artifact_url}"
+          echo 'status=dispatched' >> "$GITHUB_OUTPUT"
+          echo "artifact_url=$artifact_url" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha256=$ARTIFACT_SHA256" >> "$GITHUB_OUTPUT"
+
+  release-summary:
+    name: Summarize publication state
+    needs:
+      - release-please
+      - finalize-release
+      - sync-docs-release
+      - deploy-cloud
+    if: ${{ always() && needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      npm_status: ${{ steps.summary.outputs.npm_status }}
+      image_status: ${{ steps.summary.outputs.image_status }}
+      github_release_status: ${{ steps.summary.outputs.github_release_status }}
+      docs_status: ${{ steps.summary.outputs.docs_status }}
+      aws_status: ${{ steps.summary.outputs.aws_status }}
+    steps:
+      - name: Write publication state
+        id: summary
+        env:
+          NPM_STATUS: ${{ needs.finalize-release.outputs.npm_status || 'pending' }}
+          IMAGE_STATUS: ${{ needs.finalize-release.outputs.image_status || 'pending' }}
+          GITHUB_RELEASE_STATUS: ${{ needs.finalize-release.outputs.github_release_status || 'pending' }}
+          DOCS_STATUS: ${{ needs.sync-docs-release.outputs.docs_status || 'pending' }}
+          AWS_STATUS: ${{ needs.deploy-cloud.outputs.aws_status || 'pending' }}
+          DOCS_BASE_SHA: ${{ needs.sync-docs-release.outputs.docs_base_sha }}
+          DOCS_WORKFLOW_SHA256: ${{ needs.sync-docs-release.outputs.docs_workflow_sha256 }}
+          DOCS_RUN_ID: ${{ needs.sync-docs-release.outputs.docs_run_id }}
+          DOCS_RUN_ATTEMPT: ${{ needs.sync-docs-release.outputs.docs_run_attempt }}
+          DOCS_ATTESTATION_ARTIFACT_SHA256: ${{ needs.sync-docs-release.outputs.docs_attestation_artifact_sha256 }}
+          DOCS_RECOVERY_SUBJECT: ${{ needs.sync-docs-release.outputs.docs_recovery_subject }}
+          ARTIFACT_URL: ${{ needs.deploy-cloud.outputs.artifact_url }}
+          ARTIFACT_SHA256: ${{ needs.deploy-cloud.outputs.artifact_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for output in npm_status image_status github_release_status docs_status aws_status; do
+            value="${output^^}"
+            value="${!value}"
+            echo "$output=$value" >> "$GITHUB_OUTPUT"
+          done
+          {
+            echo '## Release publication state'
+            echo
+            echo "- npm: $NPM_STATUS"
+            echo "- images: $IMAGE_STATUS"
+            echo "- GitHub release: $GITHUB_RELEASE_STATUS"
+            echo "- docs: $DOCS_STATUS (subject=$DOCS_RECOVERY_SUBJECT base=$DOCS_BASE_SHA workflow=$DOCS_WORKFLOW_SHA256 run=$DOCS_RUN_ID.$DOCS_RUN_ATTEMPT artifact=$DOCS_ATTESTATION_ARTIFACT_SHA256)"
+            echo "- AWS: $AWS_STATUS (artifact=$ARTIFACT_URL sha256=$ARTIFACT_SHA256)"
+          } >> "$GITHUB_STEP_SUMMARY"

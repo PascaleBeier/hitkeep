@@ -1,3 +1,4 @@
+// Package assetstore owns QR-code assets below a configured data root.
 package assetstore
 
 import (

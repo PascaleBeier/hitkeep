@@ -49,12 +49,10 @@ func ExecuteRoot(ctx context.Context, root *cobra.Command, args []string) error 
 }
 
 type rootActions struct {
-	run                func([]string, string) error
-	runContext         func(context.Context, []string, string) error
-	recover            func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
-	updateSpamLists    func(context.Context, []string, io.Writer, io.Writer, string) error
-	updateAIAgentLists func(context.Context, []string, io.Writer, io.Writer, string) error
-	importData         func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error
+	run        func([]string, string) error
+	runContext func(context.Context, []string, string) error
+	recover    func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
+	importData func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error
 }
 
 func (actions rootActions) runWithContext(ctx context.Context, args []string, configFile string) error {
@@ -77,59 +75,97 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 			return runContext(ctx, logger, args, configFile)
 		},
 		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
-			return Recover(ctx, args, in, out, errOut, logger)
-		},
-		updateSpamLists: func(ctx context.Context, args []string, out, errOut io.Writer, configFile string) error {
-			return UpdateSpamLists(ctx, args, out, errOut, configFile, logger)
-		},
-		updateAIAgentLists: func(ctx context.Context, args []string, out, errOut io.Writer, configFile string) error {
-			return UpdateAIAgentLists(ctx, args, out, errOut, configFile, logger)
-		},
-		importData: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, configFile string) error {
-			return Import(ctx, args, in, out, errOut, configFile, logger)
+			return Recover(ctx, args, in, out, errOut, logger, rootConfigFile(ctx))
 		},
 	}
 	root := newRootCommand(actions)
-	root.AddCommand(newConfigCommand(afero.NewOsFs(), logger, func(command *cobra.Command, args []string) error {
-		return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
-	}))
+	root.AddCommand(
+		newImportCommandRoute(logger),
+		newUpdateSpamListsCommand(logger),
+		newUpdateAIAgentListsCommand(logger),
+		newConfigCommand(afero.NewOsFs(), logger, func(command *cobra.Command, args []string) error {
+			return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
+		}),
+	)
 	return root
 }
 
-func newImportCommandRoute(run func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error) *cobra.Command {
-	return &cobra.Command{
-		Use:                "import",
-		Short:              "Import historical analytics data",
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		RunE: func(command *cobra.Command, args []string) error {
-			return run(command.Context(), args, command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
-		},
-	}
+func writeUpdateListUsage(command *cobra.Command) {
+	out := command.OutOrStdout()
+	command.SetOut(command.ErrOrStderr())
+	defer command.SetOut(out)
+	_ = command.Usage()
 }
 
-func newUpdateSpamListsCommand(run func(context.Context, []string, io.Writer, io.Writer, string) error) *cobra.Command {
-	return &cobra.Command{
-		Use:                "update-spam-lists",
-		Short:              "Update spam filter lists",
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		RunE: func(command *cobra.Command, args []string) error {
-			return run(command.Context(), args, command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
-		},
-	}
+func updateListFlagError(command *cobra.Command, err error) error {
+	_, _ = fmt.Fprintln(command.ErrOrStderr(), err)
+	writeUpdateListUsage(command)
+	return &ExitError{Code: 2}
 }
 
-func newUpdateAIAgentListsCommand(run func(context.Context, []string, io.Writer, io.Writer, string) error) *cobra.Command {
-	return &cobra.Command{
-		Use:                "update-ai-agent-lists",
-		Short:              "Update AI agent lists",
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		RunE: func(command *cobra.Command, args []string) error {
-			return run(command.Context(), args, command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()))
+type updateListCommandSpec struct {
+	use               string
+	short             string
+	outputDefault     string
+	outputDescription string
+	run               func(context.Context, string, *runtimeconfig.Config, io.Writer, io.Writer, *slog.Logger) error
+}
+
+func newUpdateListCommand(logger *slog.Logger, spec updateListCommandSpec) *cobra.Command {
+	outputPath := spec.outputDefault
+	command := &cobra.Command{
+		Use:          spec.use,
+		Short:        spec.short,
+		Args:         cobra.ArbitraryArgs,
+		SilenceUsage: true,
+		RunE: func(command *cobra.Command, _ []string) error {
+			conf, err := runtimeconfig.LoadArgs(nil, rootConfigFile(command.Context()), logger)
+			if err != nil {
+				return err
+			}
+			return spec.run(
+				command.Context(),
+				outputPath,
+				conf,
+				command.OutOrStdout(),
+				command.ErrOrStderr(),
+				logger,
+			)
 		},
 	}
+	command.Flags().StringVar(&outputPath, "output", spec.outputDefault, spec.outputDescription)
+	command.SetFlagErrorFunc(updateListFlagError)
+	command.SetHelpFunc(func(command *cobra.Command, _ []string) { writeUpdateListUsage(command) })
+	return command
+}
+
+func newUpdateSpamListsCommand(logger *slog.Logger) *cobra.Command {
+	return newUpdateListCommand(logger, updateListCommandSpec{
+		use:               "update-spam-lists",
+		short:             "Update spam filter lists",
+		outputDescription: "Output path for the compiled spam filter cache",
+		run: func(ctx context.Context, outputPath string, conf *runtimeconfig.Config, out, errOut io.Writer, logger *slog.Logger) error {
+			if outputPath == "" {
+				outputPath = conf.SpamFilterPath
+				if outputPath == "" {
+					outputPath = conf.DataPath + "/spam-filter.json"
+				}
+			}
+			return UpdateSpamLists(ctx, outputPath, out, errOut, logger)
+		},
+	})
+}
+
+func newUpdateAIAgentListsCommand(logger *slog.Logger) *cobra.Command {
+	return newUpdateListCommand(logger, updateListCommandSpec{
+		use:               "update-ai-agent-lists",
+		short:             "Update AI agent lists",
+		outputDefault:     "internal/aianalytics/default_ai_agents.json",
+		outputDescription: "Output path for the assembled AI agent master list",
+		run: func(ctx context.Context, outputPath string, _ *runtimeconfig.Config, out, errOut io.Writer, logger *slog.Logger) error {
+			return UpdateAIAgentLists(ctx, outputPath, out, errOut, logger)
+		},
+	})
 }
 
 func newHealthcheckCommand(run func(context.Context, []string, string) error) *cobra.Command {
@@ -172,11 +208,8 @@ func newConfigInitCommand(fs afero.Fs) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("create configuration file %q: %w", outputPath, err)
 			}
-			closeFile := func() {
-				_ = file.Close()
-			}
 			if _, err := file.Write(runtimeconfig.RenderExampleYAML()); err != nil {
-				closeFile()
+				_ = file.Close()
 				return fmt.Errorf("write configuration file %q: %w", outputPath, err)
 			}
 			if err := file.Close(); err != nil {
@@ -237,12 +270,7 @@ func newRootCommand(actions rootActions) *cobra.Command {
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
-	root.AddCommand(
-		newHealthcheckCommand(actions.runWithContext),
-		newImportCommandRoute(actions.importData),
-		newUpdateSpamListsCommand(actions.updateSpamLists),
-		newUpdateAIAgentListsCommand(actions.updateAIAgentLists),
-	)
+	root.AddCommand(newHealthcheckCommand(actions.runWithContext))
 	root.SetHelpCommand(&cobra.Command{
 		Use:                "help",
 		Hidden:             true,

@@ -29,8 +29,8 @@ func TestProductionBuildsExcludeDeveloperPlatform(t *testing.T) {
 	dependencies := "\n" + string(output)
 	for _, expected := range []string{
 		"hitkeep/internal/devtool",
-		"hitkeep/internal/devtool/cli",
-		"hitkeep/internal/devtool/devmcp",
+		"hitkeep/devtool/devmcp",
+		"hitkeep/devtool/cli",
 	} {
 		if !strings.Contains(dependencies, "\n"+expected+"\n") {
 			t.Errorf("hk dependency graph does not contain %s", expected)

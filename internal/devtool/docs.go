@@ -324,6 +324,43 @@ func validateReleaseWorkflowGraph(raw []byte) error {
 	if !postPublicationSync {
 		return fmt.Errorf("release workflow post-publication documentation synchronization must use the attested immutable inputs")
 	}
+	if strings.Contains(workflowText, "docs_recovery_subject") {
+		receiptOffset := strings.Index(workflowText, "receipt_name=")
+		if receiptOffset < 0 {
+			return fmt.Errorf("release workflow post-publication receipt verifier is incomplete")
+		}
+		receiptVerifier := workflowText[receiptOffset:]
+		for _, fragment := range []string{
+			`receipt_name="hitkeep-docs-postpublication-receipt-${downstream_run_id}-${downstream_run_attempt}"`,
+			`receipt_id="$(jq -r --arg name "$receipt_name" '[.artifacts[] | select(.name == $name and .expired == false and (.digest | test("^sha256:[a-f0-9]{64}$")))] | if length == 1 then .[0].id else empty end' downstream-artifacts.json)"`,
+			`receipt_digest="$(jq -r --argjson receipt_id "$receipt_id" '[.artifacts[] | select(.id == $receipt_id)] | if length == 1 then .[0].digest | ltrimstr("sha256:") else empty end' downstream-artifacts.json)"`,
+			`"$(sha256sum downstream-receipt.zip | awk '{print $1}')" != "$receipt_digest"`,
+			"actions/runs/$downstream_run_id/artifacts",
+			"actions/artifacts/$receipt_id/zip",
+			"postpublication receipt digest mismatch",
+			`.schema_version == "hitkeep.docs-postpublication-receipt/v1"`,
+			`.source.repository == "PascaleBeier/hitkeep"`,
+			".source.run_id == $source_run_id",
+			".source.commit == $source_commit",
+			".source.tag == $tag",
+			".source.workflow_sha256 == $source_workflow_sha256",
+			".source.catalog_sha256 == $catalog_sha256",
+			".source.example_sha256 == $example_sha256",
+			".source.manifest_sha256 == $manifest_sha256",
+			`.docs.repository == "PascaleBeier/hitkeep-docs"`,
+			".docs.base_sha == $docs_base_sha",
+			".docs.workflow_sha256 == $docs_workflow_sha256",
+			".docs.prepublication_run_id == $docs_run_id",
+			".docs.prepublication_run_attempt == $docs_run_attempt",
+			".docs.prepublication_attestation_artifact_sha256 == $docs_attestation_artifact_sha256",
+			".receipt.run_id == $receipt_run_id",
+			".receipt.run_attempt == $receipt_run_attempt",
+		} {
+			if !strings.Contains(receiptVerifier, fragment) {
+				return fmt.Errorf("release workflow post-publication receipt verifier is incomplete")
+			}
+		}
+	}
 	return nil
 }
 
@@ -789,8 +826,10 @@ func validateReleaseMetadata(root string) error {
 			"hitkeep-configuration-manifest.json",
 			"release_tag: $tag",
 			"release_version: $version",
-			"printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude",
-			"github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish",
+			"pattern: binaries-linux-*",
+			"name: release-inputs-${{ inputs.version }}",
+			"tar --format=posix",
+			"gzip -n",
 		},
 		".github/workflows/release.yml": {
 			"finalize-release:",
@@ -810,18 +849,6 @@ func validateReleaseMetadata(root string) error {
 		if name == ".github/workflows/pipeline.yml" && bytes.Contains(raw, []byte("./hk ci build-binaries")) {
 			return fmt.Errorf(".github/workflows/pipeline.yml must not run ./hk ci build-binaries")
 		}
-	}
-	pipelineRaw, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
-	if err != nil {
-		return err
-	}
-	pipeline := string(pipelineRaw)
-	const runnerLocalExclude = "printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude"
-	if strings.Count(pipeline, ".git/info/exclude") != 1 || !strings.Contains(pipeline, runnerLocalExclude) {
-		return fmt.Errorf(".github/workflows/pipeline.yml must write exactly the generated configuration JSON inputs to .git/info/exclude")
-	}
-	if strings.Index(pipeline, runnerLocalExclude) >= strings.Index(pipeline, "github.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish") {
-		return fmt.Errorf(".github/workflows/pipeline.yml must write generated configuration JSON inputs to .git/info/exclude before tagged GoReleaser")
 	}
 	goreleaserManifest, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
 	if err != nil {
@@ -851,7 +878,7 @@ func validateReleaseMetadata(root string) error {
 		return fmt.Errorf("decode release workflow: %w", err)
 	}
 	for _, step := range parsedReleaseWorkflow.Jobs["sync-docs-release"].Steps {
-		for _, fragment := range []string{"gh run watch", "--log-failed", "::error::hitkeep-docs"} {
+		for _, fragment := range []string{"--log-failed", "::error::hitkeep-docs"} {
 			if strings.Contains(step.Run, fragment) {
 				return fmt.Errorf("release workflow post-publication docs notification must not surface downstream failures through %q", fragment)
 			}

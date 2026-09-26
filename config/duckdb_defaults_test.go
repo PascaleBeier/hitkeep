@@ -77,7 +77,7 @@ func TestDeriveDuckDBMemoryLimitBytes(t *testing.T) {
 }
 
 func TestLoadDerivesDuckDBDefaults(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -95,7 +95,7 @@ func TestLoadDuckDBExplicitValuesAndOptOut(t *testing.T) {
 		"HITKEEP_DUCKDB_MEMORY_LIMIT": "3GB",
 		"HITKEEP_DUCKDB_THREADS":      "6",
 	}
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -105,7 +105,7 @@ func TestLoadDuckDBExplicitValuesAndOptOut(t *testing.T) {
 		t.Fatalf("expected explicit values to pass through, got %q / %d", conf.DuckDBMemoryLimit, conf.DuckDBThreads)
 	}
 
-	conf = load([]string{}, func(key, fallback string) string {
+	conf = mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if key == "HITKEEP_DUCKDB_MEMORY_LIMIT" {
 			return "none"
 		}

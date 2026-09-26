@@ -31,7 +31,7 @@ This is not one large refactor. It is a sequence of independently releasable 2.x
 | Issue #288 | Candidate recreation, quiescent legacy rollback, all-19-boundary forced process-kill recovery, and parallel Docker/Compose/Helm release wiring implemented | transitive release-finalizer interruption dependency and authenticated disposable-cluster Helm execution |
 | GoReleaser | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, native version checks, and exact-SHA snapshot publication proven | one stabilization release plus Darwin/Windows CGO and package-manager lifecycle feasibility |
 | Filesystem policy | Bounded Afero/fileflow adoption implemented | complete operation inventory and further waves only where semantics fit |
-| Flat Go layout | Eight move-only foundations completed (`appurl`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`); approximately 30 direct `internal/` domain families remain | complete the owner/dependency/filesystem manifests before another wave, then resume dependency-ordered moves and final active-path audit |
+| Flat Go layout | Eight move-only foundations completed (`appurl`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`) plus the developer CLI leaf `internal/devtool/cli` → `devtool/cli`; approximately 30 direct `internal/` domain families remain | complete the owner/dependency/filesystem manifests before another wave, then resume dependency-ordered moves and final active-path audit |
 
 ## 2. Why this work is necessary
 
@@ -125,12 +125,12 @@ cmd/
   root.go               # production Cobra routing; retain the existing package
   hitkeep/main.go       # signal context, NewRootCommand, print one error, exit
   hk/main.go            # signal context, developer root factory, print one error, exit
-devtool/cli/            # developer Cobra routing after its move-only internal/ wave
+devtool/cli/            # developer Cobra routing; moved from internal/devtool/cli
 config/                 # typed config, Viper assembly, catalog, validation
 server/ database/ ...   # domain behavior
 ```
 
-Retain the existing production `cmd` package; renaming it to `hitkeepcmd` adds no ownership or cycle benefit. Confirm the developer routing destination against import-cycle analysis before its move-only wave. Do not create generic `cli`, `common`, `utils`, `service`, or `repository` packages. Command packages may define small function fields for test seams; do not introduce single-implementation interfaces.
+Retain the existing production `cmd` package; renaming it to `hitkeepcmd` adds no ownership or cycle benefit. The developer routing move is complete; future developer-package moves still require import-cycle analysis before authorization. Do not create generic `cli`, `common`, `utils`, `service`, or `repository` packages. Command packages may define small function fields for test seams; do not introduce single-implementation interfaces.
 
 The production root must preserve no-subcommand startup. Every existing production configuration flag and deprecated alias remains a root persistent flag so `hitkeep --flag`, healthcheck, and recovery compatibility invocations retain the same reach and sequential last-occurrence-wins behavior; only truly command-specific operational flags are local. Recovery and healthcheck become explicit Cobra commands or compatibility flags only where their current invocation contract requires it. Cobra built-ins should own help, version, completion, argument validation, flag relationships, and error propagation when doing so preserves output compatibility.
 
@@ -373,6 +373,8 @@ Rollback is per wave. Never change the on-disk layout merely to adopt an abstrac
 ### Phase 10 — Flatten `internal/` in dependency-order waves
 
 Moving out of `internal/` changes compile-time visibility, not just paths. This plan explicitly accepts that root packages become importable while declaring that HitKeep remains an application and does not offer a supported Go library API. Add package documentation and the public contribution policy stating that these imports carry no compatibility promise; do not market them or publish library examples. There is no replacement in Go for compiler-enforced `internal` visibility: if non-importability is required, the goal to remove `internal/` must be reconsidered rather than simulated with a nested module or wrapper maze. Enforce only the boundary HitKeep itself controls—production code must exclude `hkcmd` and developer packages—using a transitive import-graph test. Adding importable packages is additive in 2.x; any future decision to promise a public library API requires a separate API baseline and release policy.
+
+The current leaf-utility wave includes completed no-shim moves `internal/assetstore` → `assetstore`, `internal/cluster` → `cluster`, `internal/realtime` → `realtime`, and `internal/reporting` → `reporting`; their exact inventories, importers, interface boundaries, rollback steps, focused proof, and remaining lifecycle gaps remain in the configuration-refactor ledger.
 
 For each wave:
 

@@ -31,9 +31,6 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 		{name: "missing config path", args: []string{"--config"}, wantErr: true},
 		{name: "empty config path", args: []string{"--config="}, wantErr: true},
 		{name: "recover", args: []string{"recover", "disable-2fa", "-email", "user@example.com"}, wantCall: "recover", wantArgs: []string{"disable-2fa", "-email", "user@example.com"}},
-		{name: "spam update", args: []string{"update-spam-lists", "-output", "spam.json"}, wantCall: "spam", wantArgs: []string{"-output", "spam.json"}},
-		{name: "AI update", args: []string{"update-ai-agent-lists", "-output", "agents.json"}, wantCall: "ai", wantArgs: []string{"-output", "agents.json"}},
-		{name: "import", args: []string{"import", "status", "--import-id", "123"}, wantCall: "import", wantArgs: []string{"status", "--import-id", "123"}},
 	}
 
 	for _, tt := range tests {
@@ -41,14 +38,6 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 			var called string
 			var gotArgs []string
 			var gotConfig string
-			record := func(name string) func(context.Context, []string, io.Writer, io.Writer, string) error {
-				return func(_ context.Context, args []string, _, _ io.Writer, configFile string) error {
-					called = name
-					gotArgs = append([]string(nil), args...)
-					gotConfig = configFile
-					return nil
-				}
-			}
 			recordRecover := func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer) error {
 				called = "recover"
 				gotArgs = append([]string(nil), args...)
@@ -61,9 +50,7 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 					gotConfig = configFile
 					return nil
 				},
-				recover:            recordRecover,
-				updateSpamLists:    record("spam"),
-				updateAIAgentLists: record("ai"),
+				recover: recordRecover,
 				importData: func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer, configFile string) error {
 					called = "import"
 					gotArgs = append([]string(nil), args...)

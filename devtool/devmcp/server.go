@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,13 +15,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/internal/devtool"
-	json "hitkeep/jsonapi"
 )
 
 const (
 	maxRequestedLogLines = 200
 	mcpListCacheTTL      = 24 * time.Hour
-	centralMCPConnectTTL = 30 * time.Second
 )
 
 type workspaceInput struct {
@@ -79,34 +75,30 @@ func (resolver staticAppResolver) Resolve(_ context.Context, selector string) (*
 	return nil, fmt.Errorf("workspace %q is outside the configured worktree", selector)
 }
 
-type workspaceMCPConnector func(context.Context, context.Context, *devtool.App, *mcp.ClientOptions) (*mcp.ClientSession, error)
-
 type centralAppResolver struct {
 	fallback string
-	connect  workspaceMCPConnector // retained for compatibility tests; normal dispatch is in-process
 	loadApp  func(string) (*devtool.App, error)
 	registry *workspaceRegistry
 }
 
-func newCentralAppResolver(fallback string, connect workspaceMCPConnector) *centralAppResolver {
-	resolver := &centralAppResolver{fallback: fallback, connect: connect}
+func newCentralAppResolver(fallback string) *centralAppResolver {
+	resolver := &centralAppResolver{fallback: fallback}
 	resolver.registry = newWorkspaceRegistry(fallback)
 	return resolver
 }
 
-func (resolver *centralAppResolver) connector() workspaceMCPConnector {
-	if resolver.connect != nil {
-		return resolver.connect
-	}
-	return connectWorkspaceMCP
-}
-
 func (resolver *centralAppResolver) Resolve(ctx context.Context, selector string) (*devtool.App, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	app, _, err := resolver.registry.resolve(ctx, selector, resolver.appForPath)
 	return app, err
 }
 
 func (resolver *centralAppResolver) ResolveFresh(ctx context.Context, selector string) (*devtool.App, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return resolver.registry.resolveFresh(ctx, selector, resolver.appForPath)
 }
 
@@ -135,180 +127,7 @@ func samePath(left, right string) bool {
 	return leftErr == nil && rightErr == nil && leftAbs == rightAbs
 }
 
-func (resolver *centralAppResolver) DelegateTool(ctx context.Context, request *mcp.CallToolRequest, command string, input workspaceScoped) (*mcp.CallToolResult, envelopeOutput, error) {
-	app, err := resolver.Resolve(ctx, input.workspaceSelector())
-	if err != nil {
-		return output(nil, command, nil, err)
-	}
-	arguments := map[string]any{}
-	if request.Params != nil && len(request.Params.Arguments) > 0 {
-		if err := json.Unmarshal(request.Params.Arguments, &arguments); err != nil {
-			return output(app, command, nil, fmt.Errorf("decode delegated tool input: %w", err))
-		}
-	}
-	delete(arguments, "workspace")
-	callParams := &mcp.CallToolParams{Name: request.Params.Name, Arguments: arguments}
-	if progressToken := request.Params.GetProgressToken(); progressToken != nil {
-		if delegatedToken, ok := delegatedProgressToken(progressToken); ok {
-			callParams.SetProgressToken(delegatedToken)
-		}
-	}
-	result, err := resolver.callTool(ctx, app, request, callParams)
-	if err != nil {
-		return output(app, command, nil, fmt.Errorf("workspace MCP tool %s: %w", request.Params.Name, err))
-	}
-	envelope, err := delegatedEnvelope(result.StructuredContent, command, app.WorkspaceID(), result.IsError)
-	if err != nil {
-		return output(app, command, nil, err)
-	}
-	return result, envelopeOutput{Envelope: envelope}, nil
-}
-
-// delegatedProgressToken converts JSON-decoded numeric tokens into a form the
-// Go MCP SDK accepts. The broker restores the original outer token when it
-// forwards child progress notifications, so using its exact string form for
-// the request-scoped child connection preserves the client-facing identity.
-func delegatedProgressToken(token any) (any, bool) {
-	switch token := token.(type) {
-	case int, int32, int64, string:
-		return token, true
-	case float32:
-		return strconv.FormatFloat(float64(token), 'g', -1, 32), true
-	case float64:
-		return strconv.FormatFloat(token, 'g', -1, 64), true
-	case fmt.Stringer:
-		raw := json.RawMessage(token.String())
-		if !raw.IsValid() || raw.Kind() != '0' {
-			return nil, false
-		}
-		return string(raw), true
-	default:
-		return nil, false
-	}
-}
-
-func (resolver *centralAppResolver) DelegateResource(ctx context.Context, request *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-	selector, uri, err := workspaceResourceURI(request.Params.URI)
-	if err != nil {
-		return nil, err
-	}
-	app, err := resolver.Resolve(ctx, selector)
-	if err != nil {
-		return nil, err
-	}
-	return resolver.callResource(ctx, app, uri)
-}
-
-func (resolver *centralAppResolver) callTool(ctx context.Context, app *devtool.App, request *mcp.CallToolRequest, params *mcp.CallToolParams) (*mcp.CallToolResult, error) {
-	connectContext, cancel := context.WithTimeout(ctx, centralMCPConnectTTL)
-	defer cancel()
-	session, err := resolver.connector()(connectContext, ctx, app, resolver.clientOptions(request))
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
-	return session.CallTool(ctx, params)
-}
-
-func (resolver *centralAppResolver) callResource(ctx context.Context, app *devtool.App, uri string) (*mcp.ReadResourceResult, error) {
-	connectContext, cancel := context.WithTimeout(ctx, centralMCPConnectTTL)
-	defer cancel()
-	session, err := resolver.connector()(connectContext, ctx, app, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer session.Close()
-	return session.ReadResource(ctx, &mcp.ReadResourceParams{URI: uri})
-}
-
-func (resolver *centralAppResolver) clientOptions(request *mcp.CallToolRequest) *mcp.ClientOptions {
-	var outerToken any
-	if request != nil && request.Params != nil {
-		outerToken = request.Params.GetProgressToken()
-	}
-	return &mcp.ClientOptions{ProgressNotificationHandler: func(ctx context.Context, notification *mcp.ProgressNotificationClientRequest) {
-		if request == nil || request.Session == nil || notification == nil || notification.Params == nil || outerToken == nil {
-			return
-		}
-		params := *notification.Params
-		params.ProgressToken = outerToken
-		_ = request.Session.NotifyProgress(ctx, &params)
-	}}
-}
-
 func (resolver *centralAppResolver) Close() {}
-
-func workspaceResourceURI(raw string) (selector, localURI string, err error) {
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme != "hitkeep-dev" {
-		return "", "", errors.New("unknown developer resource")
-	}
-	if parsed.Host != "workspaces" {
-		return "", raw, nil
-	}
-	// Split the escaped path so an absolute selector such as %2Ftmp%2Fhitkeep
-	// remains one workspace segment instead of being mistaken for nested URI
-	// components. The URI templates reserve the first segment for the selector.
-	parts := strings.Split(strings.Trim(parsed.EscapedPath(), "/"), "/")
-	if len(parts) < 2 || strings.TrimSpace(parts[0]) == "" {
-		return "", "", errors.New("workspace resource URI must include a workspace selector")
-	}
-	selector, err = url.PathUnescape(parts[0])
-	if err != nil || strings.TrimSpace(selector) == "" {
-		return "", "", errors.New("workspace resource URI has an invalid workspace selector")
-	}
-	localURI = "hitkeep-dev://" + strings.Join(parts[1:], "/")
-	if parsed.RawQuery != "" {
-		localURI += "?" + parsed.RawQuery
-	}
-	return selector, localURI, nil
-}
-
-func connectWorkspaceMCP(connectContext, lifetimeContext context.Context, app *devtool.App, options *mcp.ClientOptions) (*mcp.ClientSession, error) {
-	launcher := filepath.Join(app.Root(), "hk")
-	info, err := os.Lstat(launcher)
-	if err != nil {
-		return nil, fmt.Errorf("resolve workspace hk launcher: %w", err)
-	}
-	if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-		return nil, fmt.Errorf("workspace hk launcher must be a regular executable file: %s", launcher)
-	}
-	command := exec.CommandContext(lifetimeContext, launcher, "--workspace", app.Root(), "mcp", "serve") //nolint:gosec // launcher is confined to the selected HitKeep root
-	client := mcp.NewClient(&mcp.Implementation{Name: "hitkeep-developer-broker", Version: "1"}, options)
-	session, err := client.Connect(connectContext, &mcp.CommandTransport{Command: command}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("connect workspace MCP: %w", err)
-	}
-	return session, nil
-}
-
-func delegatedEnvelope(value any, command, workspaceID string, isError bool) (devtool.Envelope, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return devtool.Envelope{}, fmt.Errorf("encode workspace MCP result: %w", err)
-	}
-	var envelope devtool.Envelope
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return devtool.Envelope{}, fmt.Errorf("decode workspace MCP result: %w", err)
-	}
-	if envelope.SchemaVersion != devtool.SchemaVersion {
-		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned schema %q, want %q", envelope.SchemaVersion, devtool.SchemaVersion)
-	}
-	if envelope.Command != command {
-		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned command %q, want %q", envelope.Command, command)
-	}
-	if envelope.WorkspaceID != workspaceID {
-		return devtool.Envelope{}, fmt.Errorf("workspace MCP returned workspace %q, want %q", envelope.WorkspaceID, workspaceID)
-	}
-	wantStatus := "ok"
-	if isError {
-		wantStatus = "error"
-	}
-	if envelope.Status != wantStatus || isError && envelope.Error == "" {
-		return devtool.Envelope{}, errors.New("workspace MCP returned an inconsistent structured envelope")
-	}
-	return envelope, nil
-}
 
 func newHitKeepApp(path string) (*devtool.App, error) {
 	app, err := devtool.NewApp(path)
@@ -341,7 +160,7 @@ func NewServer(app *devtool.App, version string) *mcp.Server {
 // NewCentralServer returns one stateless broker that delegates each request to
 // the configured fallback worktree or an explicitly selected catalogued worktree.
 func NewCentralServer(fallbackWorkspace, version string) *mcp.Server {
-	return newServer(newCentralAppResolver(fallbackWorkspace, nil), version)
+	return newServer(newCentralAppResolver(fallbackWorkspace), version)
 }
 
 func newServer(resolver appResolver, version string) *mcp.Server {
@@ -662,15 +481,7 @@ func RunStdio(ctx context.Context, app *devtool.App, version string) error {
 }
 
 func RunCentralStdio(ctx context.Context, fallbackWorkspace, version string) error {
-	resolver := newCentralAppResolver(fallbackWorkspace, nil)
+	resolver := newCentralAppResolver(fallbackWorkspace)
 	defer resolver.Close()
 	return newServer(resolver, version).Run(ctx, &mcp.StdioTransport{})
-}
-
-func ParseLimit(value string) (int, error) {
-	limit, err := strconv.Atoi(value)
-	if err != nil || limit < 1 || limit > maxRequestedLogLines {
-		return 0, errors.New("limit must be between 1 and 200")
-	}
-	return limit, nil
 }

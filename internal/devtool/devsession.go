@@ -74,9 +74,6 @@ func (a *App) StartDevDetached(ctx context.Context, request DevRequest) (DevStar
 }
 
 func (a *App) StartDevDetachedObserved(ctx context.Context, request DevRequest, observer func(DevEvent)) (DevStartResult, error) {
-	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
-		return DevStartResult{}, err
-	}
 	request = normalizeDevRequest(request)
 	if err := ValidateDevRequest(request); err != nil {
 		return DevStartResult{}, err

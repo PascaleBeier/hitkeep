@@ -9,7 +9,8 @@ func TestRejectDeveloperDependencies(t *testing.T) {
 	for _, dependency := range []string{
 		"hitkeep/internal/devtool",
 		"hitkeep/internal/devtool/cli",
-		"hitkeep/internal/devtool/devmcp",
+		"hitkeep/devtool/devmcp",
+		"hitkeep/devtool/cli",
 	} {
 		if err := rejectDeveloperDependencies("cloud", dependency+"\n"); err == nil {
 			t.Fatalf("developer dependency %q was accepted", dependency)

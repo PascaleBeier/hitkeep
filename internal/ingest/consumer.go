@@ -12,9 +12,9 @@ import (
 	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/realtime"
 )
 
 type Consumer struct {

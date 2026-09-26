@@ -201,7 +201,7 @@ func testBearingGoPackages(output []byte, variantID string) ([]string, error) {
 func cloudTestPackages(packages []string) []string {
 	selected := make([]string, 0, len(packages))
 	for _, packageName := range packages {
-		if strings.Contains(packageName, "/node_modules/") || packageName == "hitkeep/cmd/hk" || packageName == developerPackagePrefix || strings.HasPrefix(packageName, developerPackagePrefix+"/") {
+		if strings.Contains(packageName, "/node_modules/") || packageName == "hitkeep/cmd/hk" || isDeveloperPackage(packageName) {
 			continue
 		}
 		selected = append(selected, packageName)

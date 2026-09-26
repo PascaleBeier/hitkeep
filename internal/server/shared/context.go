@@ -16,12 +16,12 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/socialauth"
 	"hitkeep/internal/sso"
 	"hitkeep/internal/takeout"
 	"hitkeep/internal/webhooks"
+	"hitkeep/realtime"
 )
 
 type contextKey string

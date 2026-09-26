@@ -234,11 +234,15 @@ func verifySelfHostedReleaseArchive(path, version, arch string, catalog, example
 		return err
 	}
 	defer gzipReader.Close()
+	native, err := os.ReadFile(filepath.Join(filepath.Dir(path), "hitkeep-linux-"+arch))
+	if err != nil {
+		return fmt.Errorf("read native release binary: %w", err)
+	}
 	expected := map[string]struct {
 		mode int64
 		data []byte
 	}{
-		"hitkeep-linux-" + arch:                            {mode: 0o755},
+		"hitkeep-linux-" + arch:                            {mode: 0o755, data: native},
 		"LICENSE":                                          {mode: 0o644},
 		"README.md":                                        {mode: 0o644},
 		"internal/duckdbextensions/LICENSE.aws":            {mode: 0o644},

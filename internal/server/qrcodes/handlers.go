@@ -23,9 +23,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/appurl"
+	"hitkeep/assetstore"
 	"hitkeep/exportfmt"
 	"hitkeep/internal/api"
-	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
 	"hitkeep/internal/ipmeta"

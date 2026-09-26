@@ -1,6 +1,8 @@
 package reporting
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -121,6 +123,23 @@ func TestPeriodBoundsUseReportTimezone(t *testing.T) {
 	}
 }
 
+func TestNewConfirmationTokenUses32RandomBytes(t *testing.T) {
+	token, err := NewConfirmationToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		t.Fatalf("decode confirmation token: %v", err)
+	}
+	if len(raw) != ConfirmationTokenBytes {
+		t.Fatalf("confirmation token bytes = %d, want %d", len(raw), ConfirmationTokenBytes)
+	}
+	if got, want := len(ConfirmationTokenHash(token)), sha256.Size*2; got != want {
+		t.Fatalf("confirmation token hash length = %d, want %d", got, want)
+	}
+}
+
 func TestUnsubscribeTokenRoundTripAndTamperResistance(t *testing.T) {
 	reportID := uuid.New()
 	userID := uuid.New()
@@ -131,6 +150,9 @@ func TestUnsubscribeTokenRoundTripAndTamperResistance(t *testing.T) {
 	}
 	if _, _, ok := VerifyUnsubscribeToken("wrong-secret", token); ok {
 		t.Fatal("token verified with the wrong secret")
+	}
+	if _, _, ok := VerifyUnsubscribeToken("test-secret", token+"A"); ok {
+		t.Fatal("tampered token verified")
 	}
 	if UnsubscribeTokenHash(token) == token {
 		t.Fatal("stored token hash must not equal the opaque token")

@@ -1,3 +1,4 @@
+// Package realtime publishes site-scoped in-memory analytics change events.
 package realtime
 
 import (

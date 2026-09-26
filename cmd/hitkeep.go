@@ -16,32 +16,26 @@ import (
 	"github.com/nsqio/nsq/nsqd"
 	"golang.org/x/sync/errgroup"
 
+	"hitkeep/cluster"
 	"hitkeep/config"
 	"hitkeep/hklog"
-	"hitkeep/internal/cluster"
 	"hitkeep/internal/database"
 	"hitkeep/internal/duckdbextensions"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/ingest"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server"
 	"hitkeep/internal/webhookdispatcher"
 	"hitkeep/internal/worker"
 	"hitkeep/public"
+	"hitkeep/realtime"
 )
 
 var Version = "snapshot"
 
 func check(err error) {
 	if err != nil {
-		panic(err)
-	}
-}
-
-func Run(logger *slog.Logger) {
-	if err := run(logger, os.Args[1:], ""); err != nil {
 		panic(err)
 	}
 }

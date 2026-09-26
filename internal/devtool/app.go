@@ -139,7 +139,7 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 		},
 		func(ctx context.Context) Check { return checkCommand(ctx, "buildx", "docker", "buildx", "version") },
 		func(ctx context.Context) Check {
-			return checkExactCommand(ctx, "zizmor", ToolVersion("zizmor"), ToolVersion("zizmor"), "zizmor", "--version")
+			return checkCommand(ctx, "zizmor", "zizmor", "--version")
 		},
 	}
 	checks := make([]Check, len(probes))
@@ -161,9 +161,6 @@ func (a *App) Doctor(ctx context.Context) DoctorReport {
 }
 
 func (a *App) QAPlan(ctx context.Context, profile, baseRef string) (QAPlan, error) {
-	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
-		return QAPlan{}, err
-	}
 	return a.buildQAPlan(ctx, profile, baseRef)
 }
 

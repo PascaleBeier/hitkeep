@@ -18,7 +18,7 @@ func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
 		"HITKEEP_MCP_DOCS_URL": "secret-value",
 	}
 
-	load(nil, func(key, fallback string) string {
+	mustLoadConfig(t, nil, func(key, fallback string) string {
 		if value, ok := env[key]; ok {
 			return value
 		}
@@ -28,6 +28,15 @@ func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
 	if strings.Contains(logs.String(), "secret-value") {
 		t.Fatalf("config validation logs raw environment values: %s", logs.String())
 	}
+}
+
+func mustLoadConfig(t *testing.T, args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {
+	t.Helper()
+	conf, err := loadViper(args, getEnv, nil, "", loggerArgs...)
+	if err != nil {
+		t.Fatalf("load configuration: %v", err)
+	}
+	return conf
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -134,7 +143,7 @@ func TestLoadConfig(t *testing.T) {
 			}
 
 			// Run Logic
-			conf := load(tc.args, mockEnv)
+			conf := mustLoadConfig(t, tc.args, mockEnv)
 
 			if !tc.check(conf) {
 				t.Errorf("%s: %s", tc.name, tc.errMessage)
@@ -144,7 +153,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestJWTSecretGeneratedWhenMissing(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 	if conf.JWTSecret == "" {
@@ -173,7 +182,7 @@ func TestNormalizeAuthSessionConfig(t *testing.T) {
 }
 
 func TestLoadAIConfigDefaultsDisabled(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -217,7 +226,7 @@ func TestLoadAIConfigFromEnv(t *testing.T) {
 		"HITKEEP_AI_TOKEN_LIMIT":     "50000",
 		"HITKEEP_AI_BUDGET_WINDOW":   "60",
 	}
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -245,7 +254,7 @@ func TestLoadAIConfigFromEnv(t *testing.T) {
 }
 
 func TestTrustedProxiesDefaultIsWildcard(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -280,7 +289,7 @@ func TestLoadDuckDBSettingsFromEnv(t *testing.T) {
 		"HITKEEP_DUCKDB_THREADS":      "4",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -296,7 +305,7 @@ func TestLoadDuckDBSettingsFromEnv(t *testing.T) {
 }
 
 func TestLoadS3ConfigDefaults(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -331,7 +340,7 @@ func TestLoadS3ConfigFromEnv(t *testing.T) {
 		"HITKEEP_S3_USE_SSL":           "false",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -362,7 +371,7 @@ func TestLoadS3ConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadBackupConfigDefaults(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -384,7 +393,7 @@ func TestLoadBackupConfigFromEnv(t *testing.T) {
 		"HITKEEP_BACKUP_RETENTION": "48",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -403,7 +412,7 @@ func TestLoadBackupConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadMCPConfigDefaults(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -437,7 +446,7 @@ func TestLoadMCPConfigFromEnvAndFlags(t *testing.T) {
 		"HITKEEP_MCP_DOCS_CACHE_MINUTES": "15",
 	}
 
-	conf := load([]string{"-mcp-path", "/custom-mcp"}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{"-mcp-path", "/custom-mcp"}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -472,7 +481,7 @@ func TestLoadMCPConfigNormalizesInvalidValues(t *testing.T) {
 		"HITKEEP_MCP_DOCS_CACHE_MINUTES": "0",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -498,7 +507,7 @@ func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
 		"HITKEEP_MCP_PATH": "/",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -511,7 +520,7 @@ func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
 }
 
 func TestDeprecatedFlagsStillWork(t *testing.T) {
-	conf := load([]string{"-http", ":3000", "-db", "/tmp/test.db"}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{"-http", ":3000", "-db", "/tmp/test.db"}, func(key, fallback string) string {
 		return fallback
 	})
 	if conf.HTTPAddr != ":3000" {
@@ -542,7 +551,7 @@ func TestNewAndDeprecatedFlagsFollowArgumentOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			conf := load(tt.args, func(key, fallback string) string {
+			conf := mustLoadConfig(t, tt.args, func(key, fallback string) string {
 				return fallback
 			})
 			if conf.HTTPAddr != tt.want {
@@ -560,7 +569,7 @@ func TestEnvMappedToCorrectFields(t *testing.T) {
 		"HITKEEP_MCP_ENABLED":      "true",
 		"HITKEEP_SPAM_FILTER_PATH": "/data/spam.json",
 	}
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -673,7 +682,7 @@ func TestLoadSocialAuthConfigFromEnv(t *testing.T) {
 		"HITKEEP_SOCIAL_MICROSOFT_TENANT":        "organizations",
 		"HITKEEP_SOCIAL_SIGNUP_ENABLED":          "true",
 	}
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if value, ok := env[key]; ok {
 			return value
 		}
@@ -694,7 +703,7 @@ func TestLoadSocialAuthConfigFromEnv(t *testing.T) {
 }
 
 func TestSocialAuthDefaultsAreClosed(t *testing.T) {
-	conf := load([]string{}, func(_ string, fallback string) string { return fallback })
+	conf := mustLoadConfig(t, []string{}, func(_ string, fallback string) string { return fallback })
 	if conf.SocialSignupEnabled {
 		t.Fatal("social signup should default to disabled")
 	}
@@ -710,7 +719,7 @@ func TestLoadGoogleSearchConsoleConfigFromEnv(t *testing.T) {
 		"HITKEEP_GOOGLE_SEARCH_CONSOLE_REDIRECT_URL":  "https://analytics.example.com/api/integrations/google-search-console/oauth/callback",
 	}
 
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -742,7 +751,7 @@ func TestFlagHealthcheckRegistered(t *testing.T) {
 }
 
 func TestHealthcheckLoadSkipsRuntimeNormalization(t *testing.T) {
-	conf := load([]string{"-healthcheck", "-http-addr", ":9090"}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{"-healthcheck", "-http-addr", ":9090"}, func(key, fallback string) string {
 		return fallback
 	})
 
@@ -764,14 +773,14 @@ func TestHealthcheckLoadSkipsRuntimeNormalization(t *testing.T) {
 }
 
 func TestLogValueDefaultConfig(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 	_ = conf.LogValue() // must not panic
 }
 
 func TestS3UseSSLDefaultsTrue(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 	if !conf.S3UseSSL {
@@ -780,7 +789,7 @@ func TestS3UseSSLDefaultsTrue(t *testing.T) {
 }
 
 func TestS3UseSSLCanBeDisabledByEnv(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if key == "HITKEEP_S3_USE_SSL" {
 			return "false"
 		}
@@ -792,7 +801,7 @@ func TestS3UseSSLCanBeDisabledByEnv(t *testing.T) {
 }
 
 func TestCustomTrackingConfigNormalizesTLSModeAndTarget(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		switch key {
 		case "HITKEEP_PUBLIC_URL":
 			return "https://Analytics.Example.com/hitkeep/"
@@ -814,7 +823,7 @@ func TestCustomTrackingConfigNormalizesTLSModeAndTarget(t *testing.T) {
 }
 
 func TestCustomTrackingDNSTargetDefaultsToPublicURLHost(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if key == "HITKEEP_PUBLIC_URL" {
 			return "https://Analytics.Example.com/hitkeep/"
 		}
@@ -833,7 +842,7 @@ func TestCustomTrackingDNSTargetDefaultsToPublicURLHost(t *testing.T) {
 }
 
 func TestInvalidEnvVarValueLogsWarning(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if key == "HITKEEP_MAIL_PORT" {
 			return "not-a-number"
 		}
@@ -845,7 +854,7 @@ func TestInvalidEnvVarValueLogsWarning(t *testing.T) {
 }
 
 func TestLogValueExcludesCloudFields(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		return fallback
 	})
 	logVal := conf.LogValue()
@@ -891,13 +900,13 @@ func isIPInNetworksForTest(ip netip.Addr, networks []netip.Prefix) bool {
 }
 
 func TestLoadDBCompactOnStartFromEnv(t *testing.T) {
-	conf := load([]string{}, func(key, fallback string) string { return fallback })
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string { return fallback })
 	if !conf.DBCompactOnStart {
 		t.Fatal("expected DBCompactOnStart to default to true")
 	}
 
 	env := map[string]string{"HITKEEP_DB_COMPACT_ON_START": "false"}
-	conf = load([]string{}, func(key, fallback string) string {
+	conf = mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}
@@ -909,7 +918,7 @@ func TestLoadDBCompactOnStartFromEnv(t *testing.T) {
 }
 
 func TestLoadDatabaseRecoverySettings(t *testing.T) {
-	defaults := load([]string{}, func(key, fallback string) string { return fallback })
+	defaults := mustLoadConfig(t, []string{}, func(key, fallback string) string { return fallback })
 	if !defaults.DBAutoRecover {
 		t.Fatal("expected automatic database recovery to default to enabled")
 	}
@@ -929,7 +938,7 @@ func TestLoadDatabaseRecoverySettings(t *testing.T) {
 		"HITKEEP_DB_CHECKPOINT_INTERVAL": "0",
 		"HITKEEP_DB_RECOVERY_PATH":       "/srv/hitkeep/recovery",
 	}
-	conf := load([]string{}, func(key, fallback string) string {
+	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
 		if val, ok := env[key]; ok {
 			return val
 		}

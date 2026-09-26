@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/assetstore"
 	"hitkeep/internal/api"
-	"hitkeep/internal/assetstore"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"

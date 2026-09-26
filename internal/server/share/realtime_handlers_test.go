@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/config"
-	"hitkeep/internal/realtime"
+	"hitkeep/realtime"
 )
 
 func TestHandleGetShareRealtimeScopesToShareTokenSite(t *testing.T) {

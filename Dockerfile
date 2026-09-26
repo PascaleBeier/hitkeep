@@ -48,6 +48,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 COPY analyticscatalog ./analyticscatalog
 COPY appurl ./appurl
+COPY assetstore ./assetstore
+COPY cluster ./cluster
 COPY cmd ./cmd
 COPY config ./config
 COPY exportfmt ./exportfmt
@@ -55,6 +57,8 @@ COPY hklog ./hklog
 COPY internal ./internal
 COPY jsonapi ./jsonapi
 COPY localization ./localization
+COPY realtime ./realtime
+COPY reporting ./reporting
 COPY skills ./skills
 COPY public/embed.go ./public/embed.go
 COPY --from=frontend-builder /workspace/public/ ./public/

@@ -3,11 +3,10 @@ package hitkeepcmd
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	runtimeconfig "hitkeep/config"
 	"hitkeep/internal/api"
@@ -37,6 +38,8 @@ func (r *repeatedStrings) Set(value string) error {
 	return nil
 }
 
+func (*repeatedStrings) Type() string { return "stringSlice" }
+
 type importCommand struct {
 	ctx    context.Context
 	in     io.Reader
@@ -46,82 +49,116 @@ type importCommand struct {
 	token  string
 }
 
-func Import(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) error {
-	command, err := newImportCommand(ctx, in, out, errOut, configFile, logger)
-	if err != nil {
-		return err
-	}
-	return command.run(args)
+type importCLIOptions struct {
+	siteID   string
+	importID string
+	files    repeatedStrings
+	dir      string
+	apiURL   string
+	token    string
+	wait     bool
+	yes      bool
 }
 
-func newImportCommand(ctx context.Context, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) (importCommand, error) {
+type importOperation func(importCommand, importCLIOptions, []string) error
+
+func newImportCommandRoute(logger *slog.Logger) *cobra.Command {
+	command := &cobra.Command{
+		Use:           "import",
+		Short:         "Import historical analytics data",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+	}
+	command.AddCommand(
+		newImportOperationCommand("validate <provider>", "Validate an import", cobra.ExactArgs(1), logger, func(c importCommand, opts importCLIOptions, args []string) error {
+			return c.runValidate(args[0], opts)
+		}),
+		newImportOperationCommand("plausible", "Import Plausible analytics data", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runProvider("plausible", opts)
+		}),
+		newImportOperationCommand("simpleanalytics", "Import Simple Analytics data", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runProvider("simpleanalytics", opts)
+		}),
+		newImportOperationCommand("start", "Start a validated import", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runStart(opts)
+		}),
+		newImportOperationCommand("status", "Show import status", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runStatus(opts)
+		}),
+		newImportOperationCommand("list", "List imports", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runList(opts)
+		}),
+		newImportOperationCommand("delete", "Delete an import", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+			return c.runDelete(opts)
+		}),
+	)
+	return command
+}
+
+func newImportOperationCommand(use, short string, args cobra.PositionalArgs, logger *slog.Logger, operation importOperation) *cobra.Command {
+	var opts importCLIOptions
+	command := &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  args,
+		RunE: func(command *cobra.Command, args []string) error {
+			importer, err := newImportExecutor(command.Context(), command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()), logger)
+			if err != nil {
+				return err
+			}
+			opts, err = importer.resolveOptions(opts)
+			if err != nil {
+				return err
+			}
+			return operation(importer, opts, args)
+		},
+	}
+	bindImportFlags(command, &opts)
+	return command
+}
+
+func bindImportFlags(command *cobra.Command, opts *importCLIOptions) {
+	command.Flags().StringVar(&opts.siteID, "site", "", "Site ID")
+	command.Flags().StringVar(&opts.importID, "import-id", "", "Import ID")
+	command.Flags().Var(&opts.files, "file", "ZIP or CSV file (repeatable)")
+	command.Flags().StringVar(&opts.dir, "dir", "", "Directory containing import CSV or ZIP files")
+	command.Flags().StringVar(&opts.apiURL, "url", "", "HitKeep base URL")
+	command.Flags().StringVar(&opts.apiURL, "api-url", "", "HitKeep API URL (deprecated alias for --url)")
+	command.Flags().StringVar(&opts.token, "token", "", "API client token")
+	command.Flags().BoolVar(&opts.wait, "wait", false, "Wait for import completion")
+	command.Flags().BoolVar(&opts.yes, "yes", false, "Start without confirmation")
+}
+
+func newImportExecutor(ctx context.Context, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) (importCommand, error) {
 	conf, err := runtimeconfig.LoadArgs(nil, configFile, logger)
 	if err != nil {
 		return importCommand{}, fmt.Errorf("load import configuration: %w", err)
 	}
-	apiURL := conf.ImportAPIURL
-	if apiURL == "" {
-		apiURL = conf.PublicURL
-	}
-	return importCommand{ctx: ctx, in: in, out: out, errOut: errOut, apiURL: normalizeImportAPIURL(apiURL), token: conf.ImportAPIToken}, nil
+	return importCommand{
+		ctx:    ctx,
+		in:     in,
+		out:    out,
+		errOut: errOut,
+		apiURL: normalizeImportAPIURL(cmp.Or(conf.ImportAPIURL, conf.PublicURL)),
+		token:  conf.ImportAPIToken,
+	}, nil
 }
 
-func (c importCommand) run(args []string) error {
-	if len(args) == 0 {
-		printImportUsage(c.errOut)
-		return &ExitError{Code: 2}
+func (c importCommand) resolveOptions(opts importCLIOptions) (importCLIOptions, error) {
+	opts.apiURL = normalizeImportAPIURL(cmp.Or(opts.apiURL, c.apiURL))
+	opts.token = cmp.Or(opts.token, c.token)
+	if opts.siteID == "" {
+		_, _ = fmt.Fprintln(c.errOut, "--site is required")
+		return opts, &ExitError{Code: 2}
 	}
-
-	switch args[0] {
-	case "validate":
-		return c.runValidate(args[1:])
-	case "plausible":
-		return c.runProvider("plausible", args[1:])
-	case "simpleanalytics":
-		return c.runProvider("simpleanalytics", args[1:])
-	case "start":
-		return c.runStart(args[1:])
-	case "status":
-		return c.runStatus(args[1:])
-	case "list":
-		return c.runList(args[1:])
-	case "delete":
-		return c.runDelete(args[1:])
-	default:
-		printImportUsage(c.errOut)
-		return &ExitError{Code: 2}
+	if opts.token == "" {
+		_, _ = fmt.Fprintln(c.errOut, "--token or HITKEEP_API_TOKEN is required")
+		return opts, &ExitError{Code: 2}
 	}
+	return opts, nil
 }
 
-func printImportUsage(errOut io.Writer) {
-	_, _ = fmt.Fprintln(errOut, `Usage:
-  hitkeep import validate plausible --site <site-id> --file export.zip
-  hitkeep import validate plausible --site <site-id> --file imported_visitors.csv --file imported_custom_events.csv
-  hitkeep import validate plausible --site <site-id> --dir ./plausible-export
-  hitkeep import validate simpleanalytics --site <site-id> --file datapoints.csv
-  hitkeep import plausible --site <site-id> --file export.zip --wait
-  hitkeep import simpleanalytics --site <site-id> --file datapoints.csv --wait
-  hitkeep import start --site <site-id> --import-id <import-id> --wait
-  hitkeep import status --site <site-id> --import-id <import-id>
-  hitkeep import list --site <site-id>
-  hitkeep import delete --site <site-id> --import-id <import-id>
-
-Environment:
-  HITKEEP_API_TOKEN  API client token with site.manage_data
-  HITKEEP_PUBLIC_URL reused when present; otherwise defaults to http://localhost:8080
-  HITKEEP_API_URL    optional compatibility override for remote API targets`)
-}
-
-func (c importCommand) runValidate(args []string) error {
-	if len(args) == 0 {
-		_, _ = fmt.Fprintln(c.errOut, "validate requires an importer")
-		return &ExitError{Code: 2}
-	}
-	provider := args[0]
-	opts, err := c.parseOptions(args[1:])
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runValidate(provider string, opts importCLIOptions) error {
 	paths, err := c.paths(opts)
 	if err != nil {
 		return err
@@ -134,11 +171,7 @@ func (c importCommand) runValidate(args []string) error {
 	return nil
 }
 
-func (c importCommand) runProvider(provider string, args []string) error {
-	opts, err := c.parseOptions(args)
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runProvider(provider string, opts importCLIOptions) error {
 	client := newImportAPIClient(opts.apiURL, opts.token)
 	paths, err := c.paths(opts)
 	if err != nil {
@@ -167,11 +200,7 @@ func (c importCommand) runProvider(provider string, args []string) error {
 	return nil
 }
 
-func (c importCommand) runStart(args []string) error {
-	opts, err := c.parseOptions(args)
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runStart(opts importCLIOptions) error {
 	if opts.importID == "" {
 		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
 		return &ExitError{Code: 2}
@@ -191,11 +220,7 @@ func (c importCommand) runStart(args []string) error {
 	return nil
 }
 
-func (c importCommand) runStatus(args []string) error {
-	opts, err := c.parseOptions(args)
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runStatus(opts importCLIOptions) error {
 	if opts.importID == "" {
 		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
 		return &ExitError{Code: 2}
@@ -208,11 +233,7 @@ func (c importCommand) runStatus(args []string) error {
 	return nil
 }
 
-func (c importCommand) runList(args []string) error {
-	opts, err := c.parseOptions(args)
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runList(opts importCLIOptions) error {
 	list, err := newImportAPIClient(opts.apiURL, opts.token).list(c.ctx, opts.siteID)
 	if err := c.check(err); err != nil {
 		return err
@@ -223,11 +244,7 @@ func (c importCommand) runList(args []string) error {
 	return nil
 }
 
-func (c importCommand) runDelete(args []string) error {
-	opts, err := c.parseOptions(args)
-	if err != nil || opts.help {
-		return err
-	}
+func (c importCommand) runDelete(opts importCLIOptions) error {
 	if opts.importID == "" {
 		_, _ = fmt.Fprintln(c.errOut, "--import-id is required")
 		return &ExitError{Code: 2}
@@ -237,52 +254,6 @@ func (c importCommand) runDelete(args []string) error {
 	}
 	_, _ = fmt.Fprintln(c.out, "Import deleted.")
 	return nil
-}
-
-type importCLIOptions struct {
-	siteID   string
-	importID string
-	files    repeatedStrings
-	dir      string
-	apiURL   string
-	token    string
-	wait     bool
-	yes      bool
-	help     bool
-}
-
-func (c importCommand) parseOptions(args []string) (importCLIOptions, error) {
-	opts := importCLIOptions{apiURL: c.apiURL, token: c.token}
-
-	fs := flag.NewFlagSet("import", flag.ContinueOnError)
-	fs.SetOutput(c.errOut)
-	fs.StringVar(&opts.siteID, "site", "", "Site ID")
-	fs.StringVar(&opts.importID, "import-id", "", "Import ID")
-	fs.Var(&opts.files, "file", "ZIP or CSV file (repeatable)")
-	fs.StringVar(&opts.dir, "dir", "", "Directory containing import CSV or ZIP files")
-	fs.StringVar(&opts.apiURL, "url", opts.apiURL, "HitKeep base URL")
-	fs.StringVar(&opts.apiURL, "api-url", opts.apiURL, "HitKeep API URL (deprecated alias for --url)")
-	fs.StringVar(&opts.token, "token", opts.token, "API client token")
-	fs.BoolVar(&opts.wait, "wait", false, "Wait for import completion")
-	fs.BoolVar(&opts.yes, "yes", false, "Start without confirmation")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			opts.help = true
-			return opts, nil
-		}
-		return opts, &ExitError{Code: 2}
-	}
-	opts.apiURL = normalizeImportAPIURL(opts.apiURL)
-
-	if opts.siteID == "" {
-		_, _ = fmt.Fprintln(c.errOut, "--site is required")
-		return opts, &ExitError{Code: 2}
-	}
-	if opts.token == "" {
-		_, _ = fmt.Fprintln(c.errOut, "--token or HITKEEP_API_TOKEN is required")
-		return opts, &ExitError{Code: 2}
-	}
-	return opts, nil
 }
 
 func (c importCommand) paths(o importCLIOptions) ([]string, error) {

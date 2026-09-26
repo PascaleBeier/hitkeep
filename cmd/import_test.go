@@ -154,7 +154,7 @@ func TestResolveImportAPIURLUsesExistingHitKeepConfig(t *testing.T) {
 	t.Setenv("HITKEEP_URL", "")
 	t.Setenv("HITKEEP_PUBLIC_URL", "https://analytics.example.com/")
 
-	command, err := newImportCommand(t.Context(), nil, nil, nil, "", nil)
+	command, err := newImportExecutor(t.Context(), nil, nil, nil, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestResolveImportAPIURLPrecedence(t *testing.T) {
 	t.Setenv("HITKEEP_URL", "https://short.example.com/")
 	t.Setenv("HITKEEP_PUBLIC_URL", "https://public.example.com/")
 
-	command, err := newImportCommand(t.Context(), nil, nil, nil, "", nil)
+	command, err := newImportExecutor(t.Context(), nil, nil, nil, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"hitkeep/internal/devtool/cli"
+	"hitkeep/devtool/cli"
 )
 
 var version = "snapshot"

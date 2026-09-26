@@ -15,15 +15,14 @@ import (
 	"github.com/nsqio/go-nsq"
 	"golang.org/x/time/rate"
 
+	"hitkeep/cluster"
 	"hitkeep/config"
 	hitai "hitkeep/internal/ai"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/cluster"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/mcpserver"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/searchconsole"
 	"hitkeep/internal/server/admin"
 	"hitkeep/internal/server/aifetch"
@@ -49,6 +48,7 @@ import (
 	"hitkeep/internal/sso"
 	"hitkeep/internal/takeout"
 	"hitkeep/internal/webhookdispatcher"
+	"hitkeep/realtime"
 )
 
 const (

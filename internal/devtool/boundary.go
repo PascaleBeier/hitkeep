@@ -8,7 +8,17 @@ import (
 )
 
 const productionCommandPackage = "./cmd/hitkeep"
-const developerPackagePrefix = "hitkeep/internal/devtool"
+
+var developerPackagePrefixes = []string{"hitkeep/internal/devtool", "hitkeep/devtool"}
+
+func isDeveloperPackage(packageName string) bool {
+	for _, prefix := range developerPackagePrefixes {
+		if packageName == prefix || strings.HasPrefix(packageName, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
 
 // ValidateProductionBoundary proves that no canonical production build variant
 // can reach the developer platform through the Go package dependency graph.
@@ -34,7 +44,7 @@ func (a *App) ValidateProductionBoundary(ctx context.Context) error {
 func rejectDeveloperDependencies(variantID, dependencies string) error {
 	for dependency := range strings.Lines(dependencies) {
 		dependency = strings.TrimSpace(dependency)
-		if dependency == developerPackagePrefix || strings.HasPrefix(dependency, developerPackagePrefix+"/") {
+		if isDeveloperPackage(dependency) {
 			return fmt.Errorf("production variant %s depends on developer-only package %s", variantID, dependency)
 		}
 	}

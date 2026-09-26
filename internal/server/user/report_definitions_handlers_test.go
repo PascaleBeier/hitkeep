@@ -17,9 +17,9 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/reporting"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/reporting"
 )
 
 type reportCaptureDriver struct {

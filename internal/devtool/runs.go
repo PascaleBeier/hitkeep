@@ -28,9 +28,6 @@ const maxLogLines = 200
 
 func (a *App) StartRun(ctx context.Context, request RunRequest) (RunStart, error) {
 	request = normalizeRunRequest(request)
-	if err := VerifyDeveloperSource(a.workspace.Root); err != nil {
-		return RunStart{}, err
-	}
 	if err := ValidateRunRequest(request); err != nil {
 		return RunStart{}, err
 	}
@@ -517,10 +514,6 @@ func (a *App) watchRunCancellation(ctx context.Context, runID string, cancel con
 		case <-ticker.C:
 		}
 	}
-}
-
-func (a *App) WaitRun(ctx context.Context, runID string) (Run, error) {
-	return a.WaitRunObserved(ctx, runID, nil)
 }
 
 func (a *App) WaitRunObserved(ctx context.Context, runID string, observer func(Run)) (Run, error) {

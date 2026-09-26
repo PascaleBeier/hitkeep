@@ -11,21 +11,9 @@ import (
 	"strings"
 )
 
-// EmbeddedDeveloperSourceFingerprint is set by the root launcher when it builds hk.
-var EmbeddedDeveloperSourceFingerprint string
-
-type DeveloperServerStaleError struct {
-	Expected string
-	Current  string
-}
-
-func (err *DeveloperServerStaleError) Error() string {
-	return fmt.Sprintf("developer_server_stale: central hk source %s does not match workspace source %s; reload the registered MCP host", err.Current, err.Expected)
-}
-
 func DeveloperSourceFingerprint(root string) (string, error) {
 	var lines []string
-	for _, directory := range []string{"cmd/hk", "internal/devtool"} {
+	for _, directory := range []string{"cmd/hk", "devtool", "internal/devtool"} {
 		err := filepath.WalkDir(filepath.Join(root, directory), func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
@@ -112,20 +100,6 @@ func (a *App) validateWorkerProtocol() error {
 	}
 	if os.Getenv("HK_SOURCE_FINGERPRINT") != fingerprint {
 		return fmt.Errorf("worker source fingerprint mismatch")
-	}
-	return nil
-}
-
-func VerifyDeveloperSource(root string) error {
-	if EmbeddedDeveloperSourceFingerprint == "" {
-		return nil
-	}
-	expected, err := DeveloperSourceFingerprint(root)
-	if err != nil {
-		return fmt.Errorf("fingerprint developer source: %w", err)
-	}
-	if expected != EmbeddedDeveloperSourceFingerprint {
-		return &DeveloperServerStaleError{Expected: expected, Current: EmbeddedDeveloperSourceFingerprint}
 	}
 	return nil
 }

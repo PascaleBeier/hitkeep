@@ -145,7 +145,7 @@ func TestDoctorUsesManagedToolchainsWithoutHostGoOrNode(t *testing.T) {
 		"git":    "git version 2.50.0",
 		"cc":     "cc 1.0",
 		"docker": "27.0.0",
-		"zizmor": ToolVersion("zizmor"),
+		"zizmor": "1.29.0",
 	}
 	for name, output := range hostCommands {
 		if err := os.WriteFile(filepath.Join(fakeBin, name), []byte("#!/bin/sh\nprintf '%s\\n' '"+output+"'\n"), 0o700); err != nil {

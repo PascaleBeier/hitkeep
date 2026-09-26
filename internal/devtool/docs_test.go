@@ -93,61 +93,21 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
-	t.Run("generated configuration inputs must remain runner-local ignores", func(t *testing.T) {
+	t.Run("release inputs must be transported", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
 		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", strings.Replace(string(workflow), " >> .git/info/exclude", "", 1))
-		err = validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), ".git/info/exclude") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("runner-local configuration excludes reject missing paths", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		invalid := strings.Replace(string(workflow), "hitkeep-configuration.json hitkeep-configuration-manifest.json", "hitkeep-configuration-manifest.json", 1)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", invalid)
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", strings.Replace(string(workflow), "name: release-inputs-${{ inputs.version }}", "name: missing-release-inputs", 1))
 		if err := validateReleaseMetadata(root); err == nil {
-			t.Fatal("validateReleaseMetadata() accepted a missing runner-local configuration exclude")
-		}
-	})
-
-	t.Run("runner-local configuration excludes reject additional paths", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", string(workflow)+"\nprintf '%s\\n' unrelated-path >> .git/info/exclude\n")
-		if err := validateReleaseMetadata(root); err == nil {
-			t.Fatal("validateReleaseMetadata() accepted an additional runner-local configuration exclude")
-		}
-	})
-
-	t.Run("runner-local configuration excludes precede tagged release", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		const exclude = "printf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude"
-		invalid := strings.Replace(string(workflow), exclude, "", 1) + "\n" + exclude + "\n"
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", invalid)
-		if err := validateReleaseMetadata(root); err == nil {
-			t.Fatal("validateReleaseMetadata() accepted a late runner-local configuration exclude")
+			t.Fatal("validateReleaseMetadata() accepted a missing release input artifact")
 		}
 	})
 
 	t.Run("manual release build is rejected", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n./hk ci build-binaries\n")
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n./hk ci build-binaries\n")
 		err := validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), ".github/workflows/pipeline.yml must not run ./hk ci build-binaries") {
 			t.Fatalf("unexpected error: %v", err)
@@ -156,7 +116,7 @@ func TestValidateReleaseMetadata(t *testing.T) {
 
 	t.Run("missing example configuration release asset", func(t *testing.T) {
 		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n")
+		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n")
 		err := validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "hitkeep.example.yaml"`) {
 			t.Fatalf("unexpected error: %v", err)
@@ -169,7 +129,7 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		invalid := strings.Replace(string(workflow), "  deploy-cloud:", "      - name: Watch downstream docs\n        run: gh run watch\n  deploy-cloud:", 1)
+		invalid := strings.Replace(string(workflow), "  deploy-cloud:", "      - name: Surface downstream docs failure\n        run: gh run watch --log-failed\n  deploy-cloud:", 1)
 		writeFixtureFile(t, root, ".github/workflows/release.yml", invalid)
 		err = validateReleaseMetadata(root)
 		if err == nil || !strings.Contains(err.Error(), "post-publication docs notification must not surface downstream failures") {
@@ -309,7 +269,7 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, "charts/hitkeep/README.md", "tag: 2.12.0 # x-release-please-version\n")
 	writeFixtureFile(t, root, "release-please-config.json", fixtureReleasePleaseConfig())
 	writeFixtureFile(t, root, ".goreleaser.yaml", "files:\n  - hitkeep-configuration.json\n  - hitkeep.example.yaml\n  - hitkeep-configuration-manifest.json\n")
-	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\nprintf '%s\\n' hitkeep-configuration.json hitkeep-configuration-manifest.json >> .git/info/exclude\ngithub.com/goreleaser/goreleaser/v2@v2.18.0 release --clean --skip=publish\n")
+	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n")
 	writeFixtureFile(t, root, ".github/workflows/release.yml", `# sync-hitkeep-release.yml
 jobs:
   release-please: {}

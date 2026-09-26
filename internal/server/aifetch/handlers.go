@@ -17,9 +17,9 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/blocking"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/realtime"
 )
 
 type handler struct {

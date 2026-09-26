@@ -17,7 +17,7 @@ import (
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	opportunitysvc "hitkeep/internal/opportunities"
-	"hitkeep/internal/reporting"
+	"hitkeep/reporting"
 )
 
 // ReportContentRequest contains the recipient- and occurrence-specific inputs

@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/assetstore"
 	"hitkeep/internal/api"
-	"hitkeep/internal/assetstore"
 	"hitkeep/internal/database"
 	"hitkeep/internal/importables"
 	"hitkeep/internal/testutil/testdb"

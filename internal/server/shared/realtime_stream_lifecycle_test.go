@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/realtime"
+	"hitkeep/realtime"
 )
 
 type deadlineBlockingRealtimeWriter struct {

@@ -3,15 +3,11 @@ package devmcp
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,61 +18,19 @@ import (
 	"hitkeep/mcptest"
 )
 
-func TestDelegatedEnvelopeRejectsMismatchedResults(t *testing.T) {
-	valid := devtool.SuccessEnvelope("dev status", "workspace-id", map[string]any{"state": "ready"})
-	if _, err := delegatedEnvelope(valid, "dev status", "workspace-id", false); err != nil {
-		t.Fatalf("valid delegated envelope was rejected: %v", err)
-	}
-	tests := map[string]devtool.Envelope{
-		"schema":    valid,
-		"command":   valid,
-		"workspace": valid,
-		"status":    valid,
-	}
-	broken := tests["schema"]
-	broken.SchemaVersion = "hk.dev/v1"
-	tests["schema"] = broken
-	broken = tests["command"]
-	broken.Command = "workspace status"
-	tests["command"] = broken
-	broken = tests["workspace"]
-	broken.WorkspaceID = "other-workspace"
-	tests["workspace"] = broken
-	broken = tests["status"]
-	broken.Status = "error"
-	tests["status"] = broken
-	for name, envelope := range tests {
-		t.Run(name, func(t *testing.T) {
-			if _, err := delegatedEnvelope(envelope, "dev status", "workspace-id", false); err == nil {
-				t.Fatalf("mismatched envelope was accepted: %+v", envelope)
-			}
-		})
-	}
-}
-
-func TestWorkspaceResourceURIUnescapesAbsoluteSelector(t *testing.T) {
-	raw := "hitkeep-dev://workspaces/" + url.PathEscape("/tmp/hitkeep-worktree") + "/catalog/variants"
-	selector, localURI, err := workspaceResourceURI(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if selector != "/tmp/hitkeep-worktree" || localURI != "hitkeep-dev://catalog/variants" {
-		t.Fatalf("workspace resource URI = selector %q uri %q", selector, localURI)
-	}
-}
-
 func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	ctx := context.Background()
 	root := testRepository(t)
+	if _, err := os.Stat(filepath.Join(root, "hk")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("test repository unexpectedly has an hk launcher: %v", err)
+	}
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	app, err := devtool.NewApp(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	connector := &testWorkspaceMCPConnector{}
-	defer connector.Close()
-	serverSession, err := newServer(newCentralAppResolver(root, connector.Connect), "test").Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(newCentralAppResolver(root), "test").Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,57 +74,50 @@ func TestCentralDeveloperMCPUsesConfiguredFallback(t *testing.T) {
 	if err != nil || result.IsError {
 		t.Fatalf("second request failed: %v %#v", err, result)
 	}
-	if got := connector.connects.Load(); got != 0 {
-		t.Fatalf("in-process routing opened %d child connections", got)
-	}
 
 }
 
 func TestCentralDeveloperMCPForwardsJSONProgressToken(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	root := testRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	server := NewCentralServer(root, "test")
+	addTestProgressTool(server, newCentralAppResolver(root))
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	connector := &testWorkspaceMCPConnector{}
-	defer connector.Close()
-	serverSession, err := newServer(newCentralAppResolver(root, connector.Connect), "test").Connect(ctx, serverTransport, nil)
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer serverSession.Close()
-	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).Connect(ctx, clientTransport, nil)
+
+	progress := make(chan any, 1)
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, &mcp.ClientOptions{
+		ProgressNotificationHandler: func(_ context.Context, notification *mcp.ProgressNotificationClientRequest) {
+			progress <- notification.Params.ProgressToken
+		},
+	})
+	clientSession, err := client.Connect(ctx, clientTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clientSession.Close()
 
-	params := &mcp.CallToolParams{
-		Meta:      mcp.Meta{"progressToken": float64(1)},
-		Name:      "hk_context",
+	const wantToken = 1.25
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Meta:      mcp.Meta{"progressToken": wantToken},
+		Name:      "test_progress",
 		Arguments: map[string]any{},
-	}
-	result, err := clientSession.CallTool(ctx, params)
+	})
 	if err != nil || result.IsError {
-		t.Fatalf("JSON numeric progress token failed: %v %#v", err, result)
+		t.Fatalf("numeric progress-token request failed: %v %#v", err, result)
 	}
-	result, err = clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
-	if err != nil || result.IsError {
-		t.Fatalf("transport did not survive progress-token call: %v %#v", err, result)
-	}
-}
-
-type progressTokenStringer string
-
-func (token progressTokenStringer) String() string { return string(token) }
-
-func TestDelegatedProgressTokenValidatesStringerAsJSONNumber(t *testing.T) {
-	if got, ok := delegatedProgressToken(progressTokenStringer("1.25e2")); !ok || got != "1.25e2" {
-		t.Fatalf("numeric stringer = (%v, %v), want (1.25e2, true)", got, ok)
-	}
-	for _, token := range []progressTokenStringer{"not-a-number", `"string"`, "1 2"} {
-		if got, ok := delegatedProgressToken(token); ok {
-			t.Fatalf("invalid numeric stringer %q = (%v, true), want rejected", token, got)
+	select {
+	case got := <-progress:
+		if got != wantToken {
+			t.Fatalf("progress token = %#v (%T), want %#v (%T)", got, got, wantToken, wantToken)
 		}
+	case <-time.After(time.Second):
+		t.Fatal("request-aware handler emitted no progress notification")
 	}
 }
 
@@ -180,9 +127,7 @@ func TestCentralDeveloperMCPRejectsUncataloguedWorkspace(t *testing.T) {
 	other := testRepository(t)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	connector := &testWorkspaceMCPConnector{}
-	defer connector.Close()
-	serverSession, err := newServer(newCentralAppResolver(fallback, connector.Connect), "test").Connect(ctx, serverTransport, nil)
+	serverSession, err := newServer(newCentralAppResolver(fallback), "test").Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,52 +149,217 @@ func TestCentralDeveloperMCPRejectsUncataloguedWorkspace(t *testing.T) {
 	}
 }
 
-func TestCentralDeveloperMCPCommandTransportSurvivesChildClose(t *testing.T) {
-	ctx := context.Background()
+func TestCentralDeveloperMCPMatchesLocalEnvelope(t *testing.T) {
 	root := testRepository(t)
-	t.Setenv("HITKEEP_MCP_TEST_BINARY", os.Args[0])
-	launcher := filepath.Join(root, "hk")
-	launcherScript := fmt.Sprintf("#!/bin/sh\nexport HITKEEP_MCP_COMMAND_HELPER=1\nexport HITKEEP_MCP_WORKSPACE=%q\nexec %q -test.run '^TestMCPCommandHelper$'\n", root, os.Args[0])
-	if err := os.WriteFile(launcher, []byte(launcherScript), 0o700); err != nil {
-		t.Fatalf("write MCP helper launcher: %v", err)
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := devtool.NewApp(root)
+	if err != nil {
+		t.Fatal(err)
 	}
 
+	local := contextEnvelope(t, NewServer(app, "test"))
+	central := contextEnvelope(t, NewCentralServer(root, "test"))
+	for _, field := range []string{"schema_version", "command", "status", "workspace_id"} {
+		if central[field] != local[field] {
+			t.Fatalf("central envelope %s = %#v, local = %#v", field, central[field], local[field])
+		}
+	}
+}
+
+func TestCentralDeveloperMCPConcurrentWorkspaceCallsIsolateCancellation(t *testing.T) {
+	ctx := t.Context()
+	fallback := testRepository(t)
+	other := testWorktree(t, fallback)
 	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+
+	fallbackApp, err := devtool.NewApp(fallback)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherApp, err := devtool.NewApp(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fallbackWorkspace, err := fallbackApp.Workspace(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherWorkspace, err := otherApp.Workspace(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	server := NewCentralServer(fallback, "test")
+	addTestWorkspaceTool(server, newCentralAppResolver(fallback), entered, release)
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := newServer(newCentralAppResolver(root, nil), "test").Connect(ctx, serverTransport, nil)
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer serverSession.Close()
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
-	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).Connect(ctx, clientTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer clientSession.Close()
 
-	for range 2 {
-		result, callErr := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
-		if callErr != nil || result.IsError {
-			t.Fatalf("command-transport request failed after child lifecycle: %v %#v", callErr, result)
+	defer close(release)
+	canceled, cancel := context.WithCancel(ctx)
+	defer cancel()
+	first := make(chan testToolCall, 1)
+	go func() {
+		result, err := clientSession.CallTool(canceled, &mcp.CallToolParams{
+			Name: "test_workspace", Arguments: map[string]any{"workspace": fallbackApp.WorkspaceID(), "block": true},
+		})
+		first <- testToolCall{result: result, err: err}
+	}()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("canceled request did not reach its selected workspace handler")
+	}
+
+	second, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "test_workspace", Arguments: map[string]any{"workspace": otherApp.WorkspaceID()},
+	})
+	if err != nil || second.IsError {
+		t.Fatalf("parallel selected-workspace request failed: %v %#v", err, second)
+	}
+	assertWorkspaceToolResult(t, second, otherWorkspace)
+
+	cancel()
+	select {
+	case call := <-first:
+		if !errors.Is(call.err, context.Canceled) {
+			t.Fatalf("canceled request error = %v, want context cancellation", call.err)
 		}
-		if got := result.StructuredContent.(map[string]any)["workspace_id"]; got == "" {
-			t.Fatalf("command-transport response omitted workspace ID: %#v", result.StructuredContent)
+	case <-time.After(time.Second):
+		t.Fatal("canceled selected-workspace request did not return")
+	}
+
+	if fallbackWorkspace.ID == otherWorkspace.ID || fallbackWorkspace.Root == otherWorkspace.Root || fallbackWorkspace.StateDir == otherWorkspace.StateDir {
+		t.Fatalf("test worktrees are not distinct: fallback=%+v other=%+v", fallbackWorkspace, otherWorkspace)
+	}
+}
+
+type testWorkspaceToolInput struct {
+	Workspace string `json:"workspace,omitempty"`
+	Block     bool   `json:"block,omitempty"`
+}
+
+func (input testWorkspaceToolInput) workspaceSelector() string { return input.Workspace }
+
+type testToolCall struct {
+	result *mcp.CallToolResult
+	err    error
+}
+
+func addTestProgressTool(server *mcp.Server, resolver appResolver) {
+	mcp.AddTool(server, &mcp.Tool{Name: "test_progress"}, routedRequestHandler(resolver, "test progress", func(ctx context.Context, request *mcp.CallToolRequest, app *devtool.App, _ workspaceInput) (any, error) {
+		if request == nil || request.Params == nil || request.Session == nil {
+			return nil, errors.New("missing MCP request session")
+		}
+		if err := request.Session.NotifyProgress(ctx, &mcp.ProgressNotificationParams{
+			ProgressToken: request.Params.GetProgressToken(),
+			Progress:      1,
+			Total:         1,
+		}); err != nil {
+			return nil, err
+		}
+		workspace, err := app.Workspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"id": workspace.ID}, nil
+	}))
+}
+
+func addTestWorkspaceTool(server *mcp.Server, resolver appResolver, entered chan<- struct{}, release <-chan struct{}) {
+	mcp.AddTool(server, &mcp.Tool{Name: "test_workspace"}, routedRequestHandler(resolver, "test workspace", func(ctx context.Context, _ *mcp.CallToolRequest, app *devtool.App, input testWorkspaceToolInput) (any, error) {
+		if input.Block {
+			entered <- struct{}{}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-release:
+				return nil, context.Canceled
+			}
+		}
+		workspace, err := app.Workspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"id": workspace.ID, "root": workspace.Root, "state_dir": workspace.StateDir}, nil
+	}))
+}
+
+func assertWorkspaceToolResult(t *testing.T, result *mcp.CallToolResult, want devtool.Workspace) {
+	t.Helper()
+	envelope, ok := result.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("workspace tool envelope type = %T", result.StructuredContent)
+	}
+	if got := envelope["workspace_id"]; got != want.ID {
+		t.Fatalf("workspace envelope ID = %#v, want %q", got, want.ID)
+	}
+	data, ok := envelope["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("workspace tool data type = %T", envelope["data"])
+	}
+	for field, expected := range map[string]string{"id": want.ID, "root": want.Root, "state_dir": want.StateDir} {
+		if got := data[field]; got != expected {
+			t.Fatalf("workspace tool %s = %#v, want %q", field, got, expected)
 		}
 	}
 }
 
-func TestMCPCommandHelper(t *testing.T) {
-	if os.Getenv("HITKEEP_MCP_COMMAND_HELPER") != "1" {
-		return
+func testWorktree(t *testing.T, root string) string {
+	t.Helper()
+	for _, arguments := range [][]string{
+		{"-C", root, "add", "--all"},
+		{"-C", root, "-c", "user.email=test@example.com", "-c", "user.name=HitKeep Test", "commit", "-m", "test workspace base"},
+	} {
+		command := exec.CommandContext(t.Context(), "git", arguments...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("prepare test worktree: %v\n%s", err, output)
+		}
 	}
-	app, err := devtool.NewApp(os.Getenv("HITKEEP_MCP_WORKSPACE"))
+	worktree := filepath.Join(t.TempDir(), "worktree")
+	command := exec.CommandContext(t.Context(), "git", "-C", root, "worktree", "add", "--detach", worktree, "HEAD")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("create test worktree: %v\n%s", err, output)
+	}
+	return worktree
+}
+
+func contextEnvelope(t *testing.T, server *mcp.Server) map[string]any {
+	t.Helper()
+	ctx := t.Context()
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	serverSession, err := server.Connect(ctx, serverTransport, nil)
 	if err != nil {
-		os.Exit(2)
+		t.Fatal(err)
 	}
-	if err := RunStdio(context.Background(), app, "test-child"); err != nil {
-		os.Exit(3)
+	defer serverSession.Close()
+	clientSession, err := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil).Connect(ctx, clientTransport, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer clientSession.Close()
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "hk_context", Arguments: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IsError {
+		t.Fatalf("hk_context failed: %#v", result.StructuredContent)
+	}
+	envelope, ok := result.StructuredContent.(map[string]any)
+	if !ok {
+		t.Fatalf("structured result type: %T", result.StructuredContent)
+	}
+	return envelope
 }
 
 func TestDeveloperMCPContract(t *testing.T) {
@@ -328,6 +438,20 @@ func TestDeveloperMCPContract(t *testing.T) {
 	}
 	if len(prompts.Prompts) != 0 {
 		t.Fatalf("developer MCP unexpectedly exposes prompts: %d", len(prompts.Prompts))
+	}
+	resources, err := clientSession.ListResources(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListResources: %v", err)
+	}
+	if len(resources.Resources) != 0 {
+		t.Fatalf("developer MCP unexpectedly exposes resources: %+v", resources.Resources)
+	}
+	templates, err := clientSession.ListResourceTemplates(ctx, nil)
+	if err != nil {
+		t.Fatalf("ListResourceTemplates: %v", err)
+	}
+	if len(templates.ResourceTemplates) != 0 {
+		t.Fatalf("developer MCP unexpectedly exposes resource templates: %+v", templates.ResourceTemplates)
 	}
 }
 
@@ -422,55 +546,4 @@ func testRepository(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return root
-}
-
-type testWorkspaceMCPConnector struct {
-	connects  atomic.Int32
-	failFirst int32
-	delay     time.Duration
-	mu        sync.Mutex
-	servers   []*mcp.ServerSession
-}
-
-func (connector *testWorkspaceMCPConnector) Connect(connectContext, lifetimeContext context.Context, app *devtool.App, options *mcp.ClientOptions) (*mcp.ClientSession, error) {
-	connectionNumber := connector.connects.Add(1)
-	if connector.delay > 0 {
-		timer := time.NewTimer(connector.delay)
-		defer timer.Stop()
-		select {
-		case <-connectContext.Done():
-			return nil, connectContext.Err()
-		case <-lifetimeContext.Done():
-			return nil, lifetimeContext.Err()
-		case <-timer.C:
-		}
-	}
-	if connectionNumber <= connector.failFirst {
-		return nil, errors.New("injected workspace MCP connection failure")
-	}
-	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	serverSession, err := NewServer(app, "test-child").Connect(connectContext, serverTransport, nil)
-	if err != nil {
-		return nil, err
-	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-broker", Version: "test"}, options)
-	clientSession, err := client.Connect(connectContext, clientTransport, nil)
-	if err != nil {
-		_ = serverSession.Close()
-		return nil, err
-	}
-	connector.mu.Lock()
-	connector.servers = append(connector.servers, serverSession)
-	connector.mu.Unlock()
-	return clientSession, nil
-}
-
-func (connector *testWorkspaceMCPConnector) Close() {
-	connector.mu.Lock()
-	servers := slices.Clone(connector.servers)
-	connector.servers = nil
-	connector.mu.Unlock()
-	for _, server := range servers {
-		_ = server.Close()
-	}
 }

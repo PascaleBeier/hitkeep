@@ -2,6 +2,11 @@ name: Publish MCP Registry Metadata
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Stable tag whose registry metadata to publish
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -13,19 +18,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Validate release tag and source
+        id: release
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_tag="$REQUESTED_RELEASE_TAG"
+          [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch --no-tags origin "refs/tags/$release_tag:refs/tags/$release_tag"
+          git checkout --detach "refs/tags/$release_tag"
+          source_sha="$(git rev-parse "refs/tags/$release_tag^{commit}")"
+          tag_version="${release_tag#v}"
+          server_version="$(jq -r '.version' server.json)"
+          if [[ "$tag_version" != "$server_version" ]]; then
+            echo "Tag version ${tag_version} does not match server.json version ${server_version}." >&2
+            exit 1
+          fi
+          printf 'source_sha=%s\n' "$source_sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: false
@@ -35,23 +61,30 @@ jobs:
       - name: Validate MCP registry metadata
         run: ./hk qa pr --gate mcp-schema
 
-      - name: Verify tag matches server version
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag_version="${GITHUB_REF_NAME#v}"
-          server_version="$(jq -r '.version' server.json)"
-          if [[ "$tag_version" != "$server_version" ]]; then
-            echo "Tag version ${tag_version} does not match server.json version ${server_version}." >&2
-            exit 1
-          fi
+  publish:
+    needs: validate
+    if: needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.source_sha }}
+          persist-credentials: false
 
       - name: Install mcp-publisher
         shell: bash
         run: |
           set -euo pipefail
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          publisher_archive="mcp-publisher_linux_amd64.tar.gz"
+          publisher_url="https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/$publisher_archive"
+          publisher_sha256="a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
+          curl --fail --silent --show-error --location "$publisher_url" --output "$publisher_archive"
+          printf '%s  %s\n' "$publisher_sha256" "$publisher_archive" | sha256sum --check --status
+          tar xz "$publisher_archive" mcp-publisher
 
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc

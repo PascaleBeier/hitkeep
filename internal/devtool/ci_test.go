@@ -129,6 +129,7 @@ func TestCloudTestsExcludeDeveloperAndFrontendDependencyPackages(t *testing.T) {
 		"hitkeep/internal/database",
 		"hitkeep/internal/devtool",
 		"hitkeep/internal/devtool/cli",
+		"hitkeep/devtool/cli",
 		"hitkeep/frontend/dashboard/node_modules/flatted/golang/pkg/flatted",
 		"hitkeep/skills",
 	}

@@ -10,7 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/auth"
-	"hitkeep/internal/reporting"
+	"hitkeep/reporting"
 )
 
 func TestReportDefinitionMigrationPreservesLegacyUTC0800Subscriptions(t *testing.T) {

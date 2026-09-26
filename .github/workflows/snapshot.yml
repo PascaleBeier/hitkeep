@@ -3,13 +3,10 @@ name: Snapshot
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   main-snapshot:
@@ -41,42 +38,6 @@ jobs:
         - `snapshot`
         - `main`
       docker_sha_tag_prefix: sha-
-    secrets:
-      token: ${{ secrets.GHT }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
-  pr-snapshot:
-    if: "${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository && contains(fromJSON('[\"OWNER\",\"MEMBER\",\"COLLABORATOR\"]'), github.event.pull_request.author_association) }}"
-    uses: $/.github/workflows/pipeline.yml
-    permissions:
-      contents: write
-      packages: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
-    with:
-      version: snapshot-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-      # Build the PR merge commit so base-branch workflow files and checked-out
-      # source stay in sync for branches created before CI config changes.
-      checkout_ref: ${{ github.sha }}
-      meta_config: |
-        type=raw,value=pr-${{ github.event.pull_request.number }}
-        type=sha,prefix=pr-${{ github.event.pull_request.number }}-sha-,format=short
-      upload_to_release: true
-      release_prerelease: true
-      release_tag_name: snapshot-pr-${{ github.event.pull_request.number }}
-      release_target_sha: ${{ github.event.pull_request.head.sha }}
-      release_title: "Snapshot PR #${{ github.event.pull_request.number }}"
-      release_notes: |
-        Automated prerelease build for PR #${{ github.event.pull_request.number }}.
-
-        - Pull request: ${{ github.event.pull_request.html_url }}
-        - Commit: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.pull_request.head.sha }}
-        - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      docker_tags_summary: |
-        - `pr-${{ github.event.pull_request.number }}`
-      docker_sha_tag_prefix: pr-${{ github.event.pull_request.number }}-sha-
     secrets:
       token: ${{ secrets.GHT }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

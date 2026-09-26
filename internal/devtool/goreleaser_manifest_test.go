@@ -73,17 +73,16 @@ func TestGoReleaserReleaseWorkflowContract(t *testing.T) {
 	workflow := string(contents)
 	for _, want := range []string{
 		"build-release-archives:",
-		"runs-on: ubuntu-22.04",
-		"gcc-aarch64-linux-gnu g++-aarch64-linux-gnu",
-		"goreleaser/v2@v2.18.0 release --clean --skip=publish --config .goreleaser.yaml",
-		"--clean",
-		"--skip=publish",
-		"sha256sum --check goreleaser-SHA256SUMS",
+		"- build-binaries",
+		"pattern: binaries-linux-*",
+		"name: release-inputs-${{ inputs.version }}",
+		"--format=posix --owner=0 --group=0 --numeric-owner --mtime=\"@${timestamp}\"",
+		"--pax-option=delete=atime,delete=ctime",
+		"| gzip -n > \"$archive\"",
+		"test \"$(sha256sum \"hitkeep-linux-${arch}\" | awk '{print $1}')\" = \\",
+		"sha256sum hitkeep_*.tar.gz | LC_ALL=C sort > goreleaser-SHA256SUMS",
 		"./hk ci release-checksums",
 		"goreleaser-SHA256SUMS",
-		"hitkeep-cloud-linux-amd64",
-		"hitkeep-linux-amd64",
-		"./hk catalog configuration-manifest",
 		"hitkeep-configuration-manifest.json",
 		"release-archives-${{ inputs.version }}",
 		"hitkeep_${release_version}_Linux_amd64.tar.gz",
@@ -121,6 +120,12 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	workflow := string(contents)
+	start := strings.Index(workflow, "  build-release-archives:\n")
+	end := strings.Index(workflow[start:], "\n  upload-release-binaries:")
+	if start < 0 || end < 0 {
+		t.Fatal("release archive job missing")
+	}
+	archiveJob := workflow[start : start+end]
 	for _, want := range []string{
 		"if: ${{ !cancelled() }}",
 		"fetch-depth: 0",
@@ -129,23 +134,19 @@ func TestGoReleaserBranchArchiveWorkflowContract(t *testing.T) {
 		"ref: ${{ inputs.release_source_tag || inputs.checkout_ref || github.sha }}",
 		"git rev-parse --verify \"refs/tags/${RELEASE_SOURCE_TAG}^{commit}\"",
 		"test \"$tag_commit\" = \"$RELEASE_SOURCE_SHA\"",
-		"HITKEEP_ARCHIVE_VERSION=\"${RELEASE_TAG_NAME#v}\" env -u GOROOT go run github.com/goreleaser/goreleaser/v2@v2.18.0 release --snapshot --clean --skip=publish --config .goreleaser.yaml",
-		"HITKEEP_ARCHIVE_VERSION=\"${RELEASE_TAG_NAME#v}\"",
-		"runner.temp",
-		"runner.temp }}/public-assets",
-		"build_metadata=\"$(go version -m \"$binary\")\"",
-		"GOOS=linux",
-		"GOARCH=${arch}",
-		"amd64)\n                version_output=\"$(\"$binary\" --version)\"",
-		"arm64)\n                if ! strings \"$binary\" | grep -Fxq \"$HITKEEP_VERSION\"; then",
-		"binary version mismatch for %s: got %q, want %q",
+		"pattern: binaries-linux-*",
+		"name: release-inputs-${{ inputs.version }}",
+		"tar --format=posix",
+		"gzip -n",
 	} {
-		if !strings.Contains(workflow, want) {
+		if !strings.Contains(archiveJob, want) {
 			t.Errorf("branch archive workflow missing %q", want)
 		}
 	}
-	if strings.Contains(workflow, "qemu-aarch64") {
-		t.Error("release archive verification must not rely on QEMU runtime execution")
+	for _, forbidden := range []string{"actions/setup-go", "go run", "goreleaser/v2@", "apt-get", "gcc-aarch64", "qemu-aarch64"} {
+		if strings.Contains(archiveJob, forbidden) {
+			t.Errorf("release archive job must not compile: found %q", forbidden)
+		}
 	}
 }
 
@@ -244,27 +245,55 @@ func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
 			"reintroduces unenforced/unserialized over-cap site creation and transfer",
 			"Disposition: decomposition required / stay internal / blocked",
 		},
-		"### `internal/devtool`":     {"decomposition required / stay internal", "native PID/lock/process/toolchain/cancellation state"},
+		"### `internal/devtool`": {"decomposition required / stay internal", "native PID/lock/process/toolchain/cancellation state"},
+		"### `devtool/cli`": {
+			"moved `internal/devtool/cli` → `devtool/cli` in the authorized Phase 10 move-only slice",
+			"exactly three Go files: `human.go`, `root.go`, and `root_test.go`",
+			"`cmd/hk/main.go` is its sole runtime importer",
+			"`hitkeep/internal/devtool` and `hitkeep/devtool/devmcp`",
+			"`cmd/hk/boundary_test.go`, `internal/devtool/boundary_test.go`, and `internal/devtool/ci_test.go`",
+			"No reverse import or Go import cycle is currently evidenced",
+			"`GITHUB_STEP_SUMMARY`",
+			"`devtool.Run.LogPath`",
+			"Afero, fileflow, and pathologize do not fit",
+			"`Execute`, `ExitCode`, command paths, streams, contexts, JSON/NDJSON envelopes, help, detached-run behavior, MCP routing, and exit codes",
+			"TestTerminalQARendererWritesGitHubStepSummary",
+			"TestFollowRunLogStreamsEveryStoredLine",
+			"moved in the authorized Phase 10 move-only slice",
+		},
+		"### `devtool/devmcp`": {
+			"`internal/devtool/devmcp` → `devtool/devmcp`; exact three-file inventory remains `registry.go`, `server.go`, and `server_test.go`",
+			"moved developer adapter / no public-reuse commitment",
+			"sole runtime importer is `devtool/cli/root.go`",
+			"calls `RunStdio` and `RunCentralStdio`",
+			"depends inward on `internal/devtool` application/workspace/run state and `newWorkspaceRegistry`",
+			"no build tags, OS-specific files, direct CGO, `go:embed`, or generated source are evidenced",
+			"MCP stdio transport",
+			"Central routing resolves the selected workspace in process and dispatches through typed `devtool.App` handlers",
+			"neither needs an `hk` launcher nor starts nested workspace MCP subprocesses",
+			"developer-only, non-reusable adapter",
+			"absent resources/resource-templates contracts",
+			"Rollback moves this exact package and its CLI import back atomically",
+			"moved developer adapter / no public-reuse commitment",
+		},
 		"### `internal/importables`": {"`os.Open(source.Path)`", "`zip.OpenReader(source.Path)`", "untrusted staging/source-path containment boundary", "stay internal / blocked"},
-		"### `internal/assetstore`":  {"`internal/assetstore` → `internal/assetstore`; no move is approved", "direct imports are stdlib `errors`, `fmt`, `mime`, `os`, `path/filepath`, `strings`, and `syscall`, plus `github.com/google/uuid`", "seven direct dependent files", "no import cycle; reconfirm that result before any move", "user/site-derived QR paths", "only `PutQRCodeAsset` creates the configured root", "os.OpenRoot", "os.OpenInRoot", "Rooted traversal and ancestor-symlink escapes are rejected", "`Open` rejects a final-file escape symlink", "`Delete` unlinks it and rooted `Rename` replaces it without touching its target", "bind-mount, device-file, fsync/durability, or cross-platform atomic-replacement isolation", "TestStoreMissingRootOperationsHaveNoSideEffects", "TestStorePutOpenDeleteRoundTrip", "TestPutQRCodeAssetCleansTemporaryFileAfterRenameFailure", "TestStoreRejectsSymlinkEscapes", "outside sentinels remain unchanged", "No compatibility shim or forwarding package is justified", "stay internal / blocked"},
-		"### `internal/realtime`":    {"exact three-file package inventory is `broker.go`, `broker_test.go`, and `broker_lifecycle_test.go`", "`internal/server/shared/realtime_stream_lifecycle_test.go` and `internal/server/server_realtime_shutdown_test.go`", "exact 14 external importer files", "`cmd/hitkeep.go`, `internal/ingest/consumer.go`, `internal/ingest/consumer_test.go`", "`internal/server/aifetch/handlers.go`, `internal/server/goals/handlers.go`, `internal/server/imports/handlers.go`, `internal/server/opportunities/handlers.go`, `internal/server/server.go`, `internal/server/server_realtime_shutdown_test.go`", "`internal/server/share/realtime_handlers_test.go`, `internal/server/shared/context.go`, `internal/server/shared/realtime_stream.go`, `internal/server/shared/realtime_stream_lifecycle_test.go`, and `internal/server/sites/realtime_handlers_test.go`", "full direct import union, including package tests, is stdlib `strconv`, `sync`, `testing`, `testing/synctest`, and `time`, plus `github.com/google/uuid`", "no build tags, generated inputs, filesystem, network, process, environment, `go:embed`, OS, or CGO ownership", "bounded graph reports no Go import cycle", "wider consumer closure remains a lower bound", "mutex serializes lifecycle transitions and global event IDs", "retained only while that site has an active subscriber", "invalid nonempty and newer-than-retained `Last-Event-ID` values resync", "slow subscribers also receive resync", "`Broker.Close` is idempotent", "`Server.Shutdown` closes the broker before import/filter/limiter shutdown", "fixed one-minute cutoff and response write deadline before subscription, prelude, resync, or replay output", "native `EventSource` reconnects and re-authorizes", "Revocation exposure is bounded by reconnect, not immediate", "mock has no `Last-Event-ID` simulation", "no persistence/cross-leader replay or exact broader-consumer closure is proven", "TestBrokerCloseClosesAllSubscriptionsAndRejectsNewWork", "TestServeRealtimeStreamSetsDeadlineBeforePrelude", "TestShutdownClosesRealtimeBeforeBlockingImportStop", "go test -race ./internal/realtime ./internal/ingest ./internal/server ./internal/server/share ./internal/server/shared ./internal/server/sites -count=1", "coordinated rollback reverts this record, README/sentinel wiring, `internal/realtime/broker.go`", "reintroduces shutdown, replay, privacy/revocation, and memory-retention defects", "future move carries server, ingest, and realtime handlers together", "no compatibility shim is justified", "Disposition: decomposition required / stay internal / blocked"},
-		"### `internal/reporting`": {
-			"exact three-file package inventory is `schedule.go`, `schedule_test.go`, and `tokens.go`",
+		"### `assetstore`":           {"`internal/assetstore` → `assetstore`", "exactly `assetstore.go` and `assetstore_test.go`", "seven current direct importers", "no `assetstore` import cycle", "user/site-derived QR paths", "only `PutQRCodeAsset` creates the configured root", "os.OpenRoot", "os.OpenInRoot", "Rooted traversal and ancestor-symlink escapes are rejected", "`Open` rejects a final-file escape symlink", "`Delete` unlinks it and rooted `Rename` replaces it without touching its target", "bind-mount, device-file, fsync/durability, or cross-platform atomic-replacement isolation", "TestStoreMissingRootOperationsHaveNoSideEffects", "TestStorePutOpenDeleteRoundTrip", "TestPutQRCodeAssetCleansTemporaryFileAfterRenameFailure", "TestStoreRejectsSymlinkEscapes", "No compatibility shim is justified", "Phase 10 move-only wave authorized"},
+		"### `reporting`": {
+			"`internal/reporting` → `reporting`",
+			"moves exactly `schedule.go`, `schedule_test.go`, and `tokens.go`",
 			"exactly eight direct external importer files",
 			"`internal/database/store_report_confirmations.go`, `internal/database/store_report_definitions.go`, `internal/database/store_report_definitions_test.go`, `internal/database/store_report_delivery.go`",
 			"`internal/server/user/report_definitions_handlers.go`, `internal/server/user/report_definitions_handlers_test.go`, `internal/worker/reports_scheduler.go`, and `internal/worker/reports_test.go`",
-			"The full direct import union is stdlib `errors`, `fmt`, `strconv`, `strings`, `time`, `crypto/hmac`, `crypto/rand`, `crypto/sha256`, `encoding/base64`, and `encoding/hex`; `hitkeep/internal/api`; and `github.com/google/uuid`",
-			"bounded direct graph reports no import cycle; exhaustive transitive closure remains unproven",
-			"no package-local filesystem, network, process, environment, persistence, `go:embed`, or build-tag ownership is evidenced",
+			"No current or proposed Go import cycle is evidenced",
+			"no package-local filesystem, network, process, environment, persistence, `go:embed`, build tag, OS/CGO file, or generated input is evidenced",
+			"application-internal code rather than a supported external Go library API",
 			"`ValidateSchedule`, `NextOccurrence`, `PeriodBounds`, and `CatchUpWindow`",
-			"confirmation-token generation reads exactly 32 random bytes",
-			"HMAC-SHA256 values bound to the report and recipient UUIDs",
-			"tamper coverage rejects altered tokens",
-			"No concrete runtime defect was found in this bounded evidence",
-			"go test -race ./internal/reporting ./internal/database ./internal/server/user ./internal/worker -count=1",
-			"rollback of this documentation/sentinel decision is removal of this record and its README/sentinel anchors",
+			"exactly 32 cryptographically random bytes",
+			"HMAC-SHA256",
+			"verification uses `hmac.Equal`",
+			"go test -race ./reporting ./internal/database ./internal/server/user ./internal/worker -count=1",
 			"no compatibility shim or forwarding package is justified",
-			"Disposition: decomposition required / stay internal / blocked",
+			"Moved in the authorized Phase 10 move-only slice",
 		},
 		"### `internal/searchconsole`":                          {"exact three-file package inventory is `client.go`, `client_test.go`, and `client_lifecycle_test.go`", "exact nine direct external importer files", "`cmd/hitkeep.go`, `cmd/seed/google_search_console.go`, `internal/server/server.go`, `internal/server/shared/context.go`, and `internal/server/system/api_docs_schemas.go`", "`internal/server/user/google_search_console_handlers.go`, `internal/server/user/google_search_console_handlers_test.go`, `internal/worker/search_console.go`, and `internal/worker/search_console_test.go`", "No build tags, generated inputs, filesystem, process, environment, `go:embed`, OS-specific, or CGO ownership was observed", "OAuth and Google API network calls remain package-owned", "bounded graph reports no import cycle", "wider consumer closure is a lower bound", "one-minute operation deadline", "one-minute due-run deadline", "preserving earlier caller cancellation", "25,000 rows", "250,000 rows", "100 pages", "rather than silently truncating", "TestGoogleOperationContextPreservesParentCancellation", "TestGoogleClientOperationsHaveDeadline", "TestGoogleClientQuerySearchAnalyticsCeilingsReturnErrors", "TestSearchConsoleSyncWorkerStartStopsBlockedSyncWhenContextExpires", "Live Google OAuth/API behavior, rate-limit/backoff behavior, exact broader-consumer closure, and per-request pagination fixtures remain unproven", "go test -race ./internal/searchconsole ./internal/worker ./internal/server/user ./internal/server/shared ./internal/server ./cmd ./cmd/hitkeep -count=1", "Coordinated rollback reverts this record, README/sentinel wiring, `internal/searchconsole/client.go`, `internal/searchconsole/client_lifecycle_test.go`, `internal/worker/search_console.go`, and `internal/worker/search_console_test.go`", "reintroduces unbounded provider and worker calls plus unbounded pagination", "future move must carry server wiring, worker, and API handlers atomically", "no compatibility shim is justified", "Disposition: decomposition required / stay internal / blocked"},
 		"### `internal/analyticstools`":                         {"exactly `tools.go`", "zero local test files", "`internal/mcpserver/tools.go`, `internal/opportunities/tool_bridge.go`, and `internal/server/askai/handlers.go`", "The full direct import union is stdlib `context`, `fmt`, `strings`, and `time`; `github.com/google/uuid`; `github.com/zendev-sh/goai`; and `hitkeep/analyticscatalog`, `hitkeep/internal/api`, `hitkeep/internal/database`, and `hitkeep/jsonapi`", "no direct filesystem, network, subprocess, environment, `go:embed`, generator, or build-tag ownership", "bounded direct graph returns no import cycle", "`Config` carries caller-provided site/user scope, time range, filters, and `BeforeExecute`", "event-breakdown tool maximum is 25, built-in ecommerce and web-vitals limits are 10, and the correlation window maximum is 90 days", "`EventNamesData`/`toolJSON` name-set bounds, exported-helper output bounds", "go test -race ./internal/mcpserver ./internal/opportunities ./internal/server/askai", "direct `internal/analyticstools` package proof", "Rollback for this documentation/sentinel decision is removal of this record", "A future move must restore the old package and imports atomically", "no compatibility shim or forwarding package is justified", "decomposition required / stay internal / blocked"},
@@ -273,7 +302,8 @@ func TestFilesystemLayoutManifestPinsReviewedFamilyRecords(t *testing.T) {
 		"### `internal/database`":                               {"`internal/database` → `internal/database`; no move is approved", "`TenantStoreManager`", "Exact direct-importer count and exhaustive transitive closure are not claimed", "exact combined import list and complete cycle result are not established", "direct CGO status", "`recoverCompactionSwap`", "`os.Rename`", "`syncDirectory`", "`.wal` artifact cleanup", "do not prove package-wide fsync, atomic-replacement, no-clobber, or WAL guarantees", "No subprocess ownership is evidenced", "`ReplaceSearchConsoleFacts`", "Exhaustive test closure is not claimed", "No compatibility shim or forwarding package is justified", "decomposition required / stay internal / blocked"},
 		"### `internal/server`":                                 {"`internal/server` → `internal/server`; no move is approved", "Required decomposition", "Gortex returned 50 files", "bounded result", "confirmed bounded outward impact reaches `cmd/hitkeep`", "inward dependencies or integration surfaces", "bounded direct-importer inventory is unavailable", "heterogeneous imports", "complete cycle proof is unavailable", "concrete focused subpackage targets", "affected-consumer closure", "direct rollback", "no compatibility shim", "inbound HTTP", "database/store", "network-facing integrations", "billing/OSS variants", "Unix-specific disk-usage", "Complete build-tag, OS, CGO, generated, and embed closure is not established", "exact test closure is incomplete", "No compatibility shim or forwarding package is justified", "decomposition required / stay internal / blocked"},
 		"### `internal/worker`":                                 {"exactly 21 indexed files", "no move is approved", "backup", "retention/archive", "rollup/backfill", "reports/Search Console", "import-stage cleanup", "cloud billing/OSS variants", "lifecycle.go::waitForDelay", "bounded direct importer list", "exhaustive transitive closure is not claimed", "native DuckDB export", "local/S3 archive", "DuckDB retention queries/deletes", "cancellation-aware timer", "8 indexed test files", "affected-package/test closure", "billing/OSS build matrix", "no import cycle is proven", "embedded assets", "generated inputs", "build-tag/CGO matrix", "OS-specific", "no compatibility shim", "decomposition required / stay internal / blocked"},
-		"### `internal/cluster`":                                {"the two direct importers", "no move is approved", "memberlist", "in-memory", "bounded transitive impact", "No import cycle is evidenced", "no build tags", "OS/CGO split", "generated source", "embedded assets", "test closure", "no compatibility shim", "stay internal / blocked"},
+		"### `cluster`":                                         {"completed the authorized Phase 10 atomic move `internal/cluster` → `cluster`", "exactly `cluster.go` and `cluster_test.go`", "`internal/server/shared.ClusterState`", "the exact direct importers are `cmd/hitkeep.go` and `internal/server/server.go`", "No import cycle is evidenced", "no build tags, OS-specific files, direct CGO, generated source, or embedded assets", "TestEventDelegateMaintainsDeterministicLeaderState", "TestEventDelegateConcurrentUpdates", "Constructor/bind parsing, `HasPeers`, and join-failure cleanup remain explicit", "`eventDelegate.NotifyUpdate`", "leader-address mapping stale", "no injection seam or live-network test", "no forwarding package or compatibility shim", "moved in the authorized Phase 10 move-only slice"},
+		"### `realtime`":                                        {"completed the authorized Phase 10 atomic move `internal/realtime` → `realtime`", "exactly `broker.go`, `broker_test.go`, and `broker_lifecycle_test.go`", "exact 14 external importer files", "`internal/server/shared/context.go`", "bounded graph reports no Go import cycle", "no build tags, generated inputs, filesystem, network, process, environment, `go:embed`, OS, or CGO ownership", "The broker is in-memory only", "`Broker.Close` is idempotent", "`ServeRealtimeStream` sets its fixed one-minute cutoff", "no persistence/cross-leader replay", "no forwarding package or compatibility shim", "Moved in the authorized Phase 10 move-only slice"},
 		"### `internal/mcpserver`":                              {"`internal/mcpserver` → `internal/mcpserver`; no move is approved", "the exact direct importer is `internal/server/server.go`", "91 affected symbols lower bound", "No Go import cycle is evidenced", "six production Go files and two test files", "owns no filesystem, subprocess, or package-local persistence boundary", "uses a 10-second timeout", "caps responses at 2 MiB", "46 `Test*` functions", "`user_id` and `owner_email`", "general non-default-tenant routing", "No compatibility shim or forwarding package is justified", "decomposition required / stay internal / blocked"},
 		"### `internal/opportunities`":                          {"`internal/opportunities` → `internal/opportunities`; no move is approved", "deterministic detector/evidence core", "`internal/opportunities/smokegate`", "`cmd/opportunities-smoke` is an external", "Exact direct-importer count and exhaustive transitive closure are not claimed", "exact combined import list and complete cycle result are not established", "Exact build tags, OS/CGO files, generated inputs, embedded assets", "Direct filesystem, subprocess, and network ownership are not established", "belong to external `cmd/opportunities-smoke`", "opportunity persistence/schema remains `internal/database`-owned", "`loadOpportunitySignals`", "does not prove caller authorization", "`TestLoadOpportunitySignalsCanProvideSetupEvidenceSnapshot`", "Exhaustive test closure is not claimed", "No compatibility shim or forwarding package is justified", "decomposition required / stay internal / blocked"},
 		"### `internal/blocking`":                               {"`internal/blocking` → `internal/blocking`; no move is approved", "the exact nine-file inventory", "`cidr.go`, `cidr_test.go`, `default_spam_filter.json`, `ip_filter.go`, `ip_filter_test.go`, `spam_data.go`, `spam_filter.go`, `spam_filter_test.go`, and `spam_updater.go`", "exactly 11 direct importer files", "cmd/update_spam_lists.go", "internal/server/shared/exclusion_rule.go", "bounded graph establishes no import cycle", "full direct import union", "`bytes`", "`github.com/google/uuid`", "`hitkeep/internal/database`", "go:embed", "scripts/update-default-spam-filter.sh", ".github/workflows/spam-list-refresh.yml", "same-directory temporary file created 0600", "No fsync/durability or cross-platform atomic-replacement claim is made", "final symlink is replaced rather than followed", "exactly 10 MiB is accepted", "larger body is rejected as an invalid response", "original response body closes on status, read, parser, success, and oversize paths", "No speculative SSRF layer is justified", "holds a channel-based context-aware transition gate across fetch, cancellation recheck, cache save, and in-memory apply", "public `RefreshFromDisk()` uses a background context and takes the same transition gate", "TestSpamFilterQueuedTransitionCancellationReleasesGate", "TestSaveSpamFeedDataWritesNewFile0600AndReplacesFinalSymlink", "TestSpamFilterSerializesWholeUpdateGeneration", "leader remote refresh starts asynchronously", "decomposition required / stay internal / blocked"},
@@ -431,19 +461,19 @@ func TestGoReleaserReleaseArchiveAssetsStayInWorkspace(t *testing.T) {
 		archiveJob = archiveJob[:end]
 	}
 	for _, want := range []string{
-		"path: ${{ runner.temp }}/public-assets",
-		"PUBLIC_ASSETS_DIR: ${{ runner.temp }}/public-assets",
-		"PUBLIC_ASSETS_ARCHIVE: public/.public-assets.tar.gz",
-		"cp \"$archive\" \"$PUBLIC_ASSETS_ARCHIVE\"",
-		"./hk ci restore-dashboard --archive \"$PUBLIC_ASSETS_ARCHIVE\"",
-		"rm -f \"$PUBLIC_ASSETS_ARCHIVE\"",
+		"pattern: binaries-linux-*",
+		"name: release-inputs-${{ inputs.version }}",
+		"path: .",
+		"cp \"hitkeep-linux-${arch}\" LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json \"$staging/\"",
 	} {
 		if !strings.Contains(archiveJob, want) {
-			t.Errorf("release archive assets setup missing %q", want)
+			t.Errorf("release archive artifact setup missing %q", want)
 		}
 	}
-	if strings.Contains(archiveJob, "artifacts/public") {
-		t.Error("release archive job must not stage public assets in artifacts/public")
+	for _, forbidden := range []string{"public-assets", "restore-dashboard", "prepare-public-image"} {
+		if strings.Contains(archiveJob, forbidden) {
+			t.Errorf("release archive job must package downloaded release artifacts only: found %q", forbidden)
+		}
 	}
 }
 
@@ -457,11 +487,15 @@ func TestGoReleaserReleaseConfigUsesProductionCommand(t *testing.T) {
 	for _, want := range []string{
 		"./hk catalog configuration --output json",
 		"env -u GOROOT go run ./cmd/hitkeep config init --output \"$release_inputs/hitkeep.example.yaml\"",
-		"cmp \"$release_inputs/hitkeep.example.yaml\" hitkeep.example.yaml",
+		"name: release-inputs-${{ inputs.version }}",
+		"path: ${{ runner.temp }}/hitkeep-release-inputs",
 	} {
 		if !strings.Contains(workflow, want) {
 			t.Errorf("release configuration generation missing %q", want)
 		}
+	}
+	if strings.Count(workflow, "./hk catalog configuration --output json") != 1 || strings.Count(workflow, "go run ./cmd/hitkeep config init") != 1 {
+		t.Error("release configuration inputs must be generated once and transported unchanged")
 	}
 	if strings.Contains(workflow, "./hk config init") {
 		t.Error("release configuration generation must use the production Cobra config init command")

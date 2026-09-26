@@ -14,10 +14,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-func TestLoadUsesViperWithLegacyParity(t *testing.T) {
-	originalArgs := os.Args
-	t.Cleanup(func() { os.Args = originalArgs })
-
+func TestLoadArgsUsesViperWithLegacyParity(t *testing.T) {
 	getEnv := func(key, fallback string) string {
 		if value := os.Getenv(key); value != "" {
 			return value
@@ -34,23 +31,29 @@ func TestLoadUsesViperWithLegacyParity(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("HITKEEP_HEALTHCHECK", tt.healthcheckEnv)
-			os.Args = []string{"hitkeep", "--healthcheck"}
-
-			if got, want := Load(), load(os.Args[1:], getEnv); !reflect.DeepEqual(got, want) {
-				t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+			args := []string{"--healthcheck"}
+			got, err := LoadArgs(args, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := loadLegacy(args, getEnv); !reflect.DeepEqual(got, want) {
+				t.Fatalf("LoadArgs() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
 			}
 		})
 	}
 
 	t.Run("HTTP address CLI flag overrides environment", func(t *testing.T) {
 		t.Setenv("HITKEEP_HTTP_ADDR", ":8181")
-		os.Args = []string{"hitkeep", "--http-addr=:9191"}
-
-		got, want := Load(), load(os.Args[1:], getEnv)
+		args := []string{"--http-addr=:9191"}
+		got, err := LoadArgs(args, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := loadLegacy(args, getEnv)
 		gotComparable := comparableConfig(t, got, "JWTSecret", "NodeName")
 		wantComparable := comparableConfig(t, want, "JWTSecret", "NodeName")
 		if !reflect.DeepEqual(&gotComparable, &wantComparable) {
-			t.Fatalf("Load() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
+			t.Fatalf("LoadArgs() differs from legacy loader:\n got: %#v\nwant: %#v", got, want)
 		} else if got.HTTPAddr != ":9191" {
 			t.Fatalf("HTTPAddr = %q, want :9191", got.HTTPAddr)
 		}
@@ -136,7 +139,7 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 				}
 				return attr
 			}}
-			legacy := load(tt.args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
+			legacy := loadLegacy(tt.args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
 			shadow, err := loadViper(tt.args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
 			if err != nil {
 				t.Fatal(err)
@@ -403,7 +406,7 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string, g
 		}
 		return attr
 	}}
-	legacy := load(args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
+	legacy := loadLegacy(args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
 	shadow, err := loadViper(args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
 	if err != nil {
 		t.Fatal(err)

@@ -16,6 +16,8 @@ Use `hk_qa_plan` whenever it is callable. If it is absent or fails, report wheth
 - Use `pr` only for exact unchanged CI parity.
 - Use `full` when release risk, cloud-tagged behavior, container behavior, or the request explicitly requires exhaustive validation.
 
+Before starting an expensive completion profile after source edits, run the smallest cheap hygiene selection from the same source-bound plan unless that unchanged source snapshot already has passing hygiene evidence. This preflight is not completion evidence; it prevents expensive shards from running against source already known to fail basic checks.
+
 Honor planner escalation. Query `hitkeep-dev://catalog/qa` or the structured CLI catalog for current profiles and gate definitions rather than guessing or copying commands.
 
 Use `hk_run_status` to observe the returned run and request bounded cursor-addressed run or gate logs. Use `hk_run_cancel` only for the intended exact observed active run.
@@ -28,6 +30,8 @@ Use `hk_run_status` to observe the returned run and request bounded cursor-addre
 4. On failure, request the bounded run tail, then a bounded gate-specific view from `hk_run_status`. Open the complete local artifact only when that context is insufficient.
 5. Fix the root cause and rerun the smallest relevant selection from the live catalog before rerunning the required profile.
 6. Let all selected gates finish; one failure must not hide independent results. Cancel only the intended validated run.
+
+Reuse a passing required-profile run only when its source snapshot is unchanged. A fallback approval resumes only the blocked plan or run; when that operation reaches a terminal state, report and stop unless the user explicitly requested broader implementation work.
 
 QA source checks never rewrite files. When they report formatting or Go migration drift, route the explicit write through the developer CLI, review the changed paths, and then rerun the failed gate.
 

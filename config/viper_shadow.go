@@ -112,8 +112,13 @@ func loadViper(
 
 	flags := flag.NewFlagSet("hitkeep", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
-	registerFlags(flags, &conf)
-	registerCloudFlags(flags, &conf)
+	for _, setting := range settings {
+		field := configValue.FieldByName(setting.Field)
+		for _, alias := range setting.DeprecatedFlags {
+			registerFlagVar(flags, field, alias, "(deprecated, use --"+setting.Flag+")")
+		}
+		registerFlagVar(flags, field, setting.Flag, setting.Description)
+	}
 	_ = flags.Parse(args)
 
 	if conf.Healthcheck {

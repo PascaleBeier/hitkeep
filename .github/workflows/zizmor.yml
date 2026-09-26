@@ -33,7 +33,7 @@ jobs:
         id: tool-version
         shell: bash
         run: |
-          echo "version=$(jq -r '.zizmor' internal/devtool/tool-versions.json)" >> "$GITHUB_OUTPUT"
+          echo "version=1.29.0" >> "$GITHUB_OUTPUT"
           ./hk ci qa-matrix --profile pr --group zizmor --output json >/dev/null
 
       - name: Run zizmor

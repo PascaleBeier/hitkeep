@@ -13,11 +13,11 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	"hitkeep/internal/realtime"
 	"hitkeep/internal/server/filterparams"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/realtime"
 )
 
 type handler struct {

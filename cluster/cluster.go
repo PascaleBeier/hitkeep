@@ -1,3 +1,4 @@
+// Package cluster implements HitKeep's memberlist cluster runtime. It is application code, not a supported external Go library API; external consumers must not rely on a compatibility contract.
 package cluster
 
 import (
