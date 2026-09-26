@@ -10,8 +10,8 @@
 }
 
 .page-frame__body {
-    width: min(100%, 72rem);
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
 }
 
 .page-frame__heading {

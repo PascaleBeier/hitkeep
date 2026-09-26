@@ -5,10 +5,11 @@ import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import type { ECharts, EChartsCoreOption, EChartsInitOpts } from 'echarts/core';
 import { ChartDesignToggle } from '@components/chart-design-toggle/chart-design-toggle';
-import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, resolveChartColor, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
 import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { ChartDesignPreferencesService } from '@services/chart-design-preferences.service';
 import { PreferencesService } from '@services/preferences.service';
+import { ThemeManagerService } from '@services/theme-manager.service';
 import { injectSkeletonGate } from '@services/report-subject.service';
 
 export type SeriesChartPoint = Record<string, number | string> & { time: string };
@@ -77,6 +78,7 @@ export class SeriesChart {
     protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
     private readonly chartInstance = signal<ECharts | null>(null);
     private prefs = inject(PreferencesService);
+    private themeManager = inject(ThemeManagerService);
     private designPrefs = inject(ChartDesignPreferencesService);
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
@@ -101,6 +103,7 @@ export class SeriesChart {
 
     protected chartFrameOptions = computed((): EChartsCoreOption => {
         this.activeLanguage();
+        this.themeManager.version();
         return buildHitkeepChartOptions({
             ariaLabel: this.transloco.translate(this.ariaLabelKey(), { count: 0 }),
             design: this.effectiveDesign(),
@@ -113,6 +116,7 @@ export class SeriesChart {
 
     protected chartMergeOptions = computed((): EChartsCoreOption => {
         this.activeLanguage();
+        this.themeManager.version();
         const raw = this.data() || [];
         const cmp = this.comparisonData() || [];
         const bucketLabel = this.bucketLabelFormatter();
@@ -159,7 +163,7 @@ export class SeriesChart {
             id: s.key,
             label: s.label,
             data: raw.map((d) => Number(d[s.key] ?? 0)),
-            color: s.color,
+            color: resolveChartColor(s.color),
             gradientFrom: s.gradientFrom,
             gradientTo: s.gradientTo,
             design: s.design,

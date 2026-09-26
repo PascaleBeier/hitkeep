@@ -32,4 +32,33 @@ describe('PreferencesService', () => {
         service.toggleTheme();
         expect(service.isDarkMode()).not.toBe(initial);
     });
+
+    it('should follow the system preference in auto mode', () => {
+        vi.spyOn(window, 'matchMedia').mockReturnValue({
+            matches: true,
+            addEventListener: vi.fn()
+        } as unknown as MediaQueryList);
+        localStorage.setItem('hk_theme_mode', 'auto');
+
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({
+            providers: [PreferencesService]
+        });
+        const autoService = TestBed.inject(PreferencesService);
+
+        expect(autoService.colorMode()).toBe('auto');
+        expect(autoService.isDarkMode()).toBe(true);
+
+        autoService.setColorMode('light');
+        expect(autoService.isDarkMode()).toBe(false);
+    });
+
+    it('should expose three color modes', () => {
+        service.setColorMode('auto');
+        expect(service.colorMode()).toBe('auto');
+        service.setColorMode('dark');
+        expect(service.isDarkMode()).toBe(true);
+        service.setColorMode('light');
+        expect(service.isDarkMode()).toBe(false);
+    });
 });

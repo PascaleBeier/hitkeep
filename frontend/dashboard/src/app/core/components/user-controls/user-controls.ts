@@ -1,18 +1,27 @@
-import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { AvatarModule } from '@openng/optimus-ui/avatar';
 import { MenuModule } from '@openng/optimus-ui/menu';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PreferencesService } from '@services/preferences.service';
 import { UserMenuService } from '@services/user-menu.service';
 import { UserProfileService } from '@services/user-profile.service';
+import { ThemeDialog } from '@components/theme-dialog/theme-dialog';
 
 @Component({
     selector: 'app-user-controls',
     standalone: true,
-    imports: [AvatarModule, MenuModule, TranslocoPipe],
+    imports: [AvatarModule, MenuModule, TranslocoPipe, ThemeDialog],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex items-center gap-1">
+            <button
+                type="button"
+                (click)="themeDialogVisible.set(true)"
+                class="cursor-pointer rounded-full p-2 text-muted-color hover:bg-surface-100 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:hover:bg-surface-800"
+                [attr.aria-label]="'theme.openDialogAria' | transloco"
+            >
+                <i class="pi pi-palette" aria-hidden="true"></i>
+            </button>
             <button
                 type="button"
                 (click)="prefs.toggleTheme()"
@@ -41,11 +50,13 @@ import { UserProfileService } from '@services/user-profile.service';
                 <p-menu #profileMenu [model]="userMenu.menuItems()" [popup]="true" appendTo="body" />
             }
         </div>
+        <app-theme-dialog [(visible)]="themeDialogVisible" />
     `
 })
 export class UserControls {
     showMenu = input<boolean>(true);
 
+    protected themeDialogVisible = signal(false);
     protected prefs = inject(PreferencesService);
     protected userMenu = inject(UserMenuService);
     protected profile = inject(UserProfileService);
