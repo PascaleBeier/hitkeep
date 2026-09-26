@@ -16,7 +16,7 @@ exclude (
 require (
 	github.com/Boostport/mjml-go v0.16.0
 	github.com/DataDog/zstd v1.5.7
-	github.com/aws/aws-sdk-go-v2 v1.45.1
+	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/aws/aws-sdk-go-v2/config v1.33.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.2
 	github.com/coreos/go-oidc/v3 v3.21.0
