@@ -13,11 +13,17 @@ func NewProvider(conf *config.Config) Provider {
 		return NewDefaultProvider()
 	}
 
+	planEntitlements := CloudPlanEntitlements(strings.TrimSpace(conf.CloudPlanCode))
+	if planEntitlements == nil {
+		planEntitlements = CloudPlanEntitlements(PlanCodeFree)
+	}
+
 	return NewStaticProvider(Entitlements{
 		MaxTeams:                      conf.CloudMaxTeams,
 		MaxSitesPerTeam:               conf.CloudMaxSitesPerTeam,
 		MaxRetentionDays:              conf.CloudMaxRetentionDays,
 		MaxTeamMembers:                conf.CloudMaxTeamMembers,
+		MaxAskAIAnswersPerDay:         planEntitlements.MaxAskAIAnswersPerDay,
 		AllowSSO:                      conf.CloudAllowSSO,
 		AllowCustomBranding:           conf.CloudAllowCustomBranding,
 		AllowExternalReportRecipients: strings.TrimSpace(conf.CloudPlanCode) != "" && strings.TrimSpace(conf.CloudPlanCode) != PlanCodeFree,

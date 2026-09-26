@@ -12,7 +12,9 @@ export const DOCS_LINKS = {
     npmPackage: `${DOCS_BASE}/guides/tracking/npm-package/`,
     serverSideTracking: `${DOCS_BASE}/guides/tracking/server-side-tracking/`,
     wordpress: `${DOCS_BASE}/guides/integrations/wordpress/`,
-    apiClients: `${DOCS_BASE}/guides/security/api-clients/`
+    apiClients: `${DOCS_BASE}/guides/security/api-clients/`,
+    mcp: `${DOCS_BASE}/guides/integrations/mcp/`,
+    aiModelConfiguration: `${DOCS_BASE}/guides/admin/ai-model-configuration/`
 } as const;
 
 /** Public WordPress plugin directory listing for the first-party HitKeep plugin. */

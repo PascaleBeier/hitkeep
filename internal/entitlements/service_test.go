@@ -144,6 +144,46 @@ func TestServiceTeamSiteLimit(t *testing.T) {
 	}
 }
 
+func TestServiceTeamAskAIDailyLimit(t *testing.T) {
+	env := newServiceEnv(t)
+	ctx := context.Background()
+	memberID := env.createMember(t, "ask-ai-limit-owner@example.test")
+	team, err := env.store.CreateTenant(ctx, memberID, "Ask AI team", "")
+	if err != nil {
+		t.Fatalf("create regular team: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		limit int
+	}{{"free", 1}, {"pro", 100}, {"business", 500}, {"unlimited", 0}} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := entitlements.NewStaticProvider(entitlements.Entitlements{MaxAskAIAnswersPerDay: tc.limit}, entitlements.PlanInfo{Code: tc.name})
+			limits := env.service(provider)
+			if got := limits.TeamAskAIDailyLimit(ctx, memberID, team.ID); got != tc.limit {
+				t.Fatalf("expected team limit %d, got %d", tc.limit, got)
+			}
+			if got := limits.TeamAskAIDailyLimit(ctx, env.ownerID, team.ID); got != 0 {
+				t.Fatalf("expected instance operator bypass, got %d", got)
+			}
+			if got := limits.TeamAskAIDailyLimit(ctx, memberID, env.teamID); got != 0 {
+				t.Fatalf("expected operator-owned team bypass, got %d", got)
+			}
+		})
+	}
+
+	custom := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxAskAIAnswersPerDay: 7}, entitlements.PlanInfo{Code: entitlements.PlanCodeFree}))
+	if got := custom.TeamAskAIDailyLimit(ctx, memberID, team.ID); got != 7 {
+		t.Fatalf("expected effective entitlement to override plan code, got %d", got)
+	}
+
+	env.cfg.CloudHosted = false
+	limited := env.service(entitlements.NewStaticProvider(entitlements.Entitlements{MaxAskAIAnswersPerDay: 1}, entitlements.PlanInfo{}))
+	if got := limited.TeamAskAIDailyLimit(ctx, memberID, team.ID); got != 0 {
+		t.Fatalf("expected self-hosted Ask AI to have no daily cap, got %d", got)
+	}
+}
+
 func TestServiceTeamPlan(t *testing.T) {
 	env := newServiceEnv(t)
 	ctx := context.Background()

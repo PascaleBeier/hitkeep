@@ -544,6 +544,11 @@ func TestGenerateAskAIUsesStrictMantleStructuredOutputAndRequiredTools(t *testin
 	if capturedParams.ToolChoice != goaisdk.ToolChoiceRequired {
 		t.Fatalf("expected required tool choice for Mantle Ask AI, got %q", capturedParams.ToolChoice)
 	}
+	if !strings.Contains(capturedParams.System, "Answer only questions about the scoped HitKeep site's analytics") ||
+		!strings.Contains(capturedParams.System, "Code is in scope when it helps implement or diagnose HitKeep tracking") ||
+		!strings.Contains(capturedParams.System, "do not answer that task") {
+		t.Fatal("Ask AI provider request is missing the scope and redirect policy")
+	}
 }
 
 func TestGenerateAskAIReturnsRunIDOnInvalidOutput(t *testing.T) {

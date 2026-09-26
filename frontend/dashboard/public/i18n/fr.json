@@ -206,6 +206,17 @@
       "events": "Quels événements ont généré des conversions ?",
       "export": "Préparer un export pour la vue actuelle"
     },
+    "mcp": { "title": "Utilisez votre propre agent IA", "description": "Connectez votre agent IA aux analyses en lecture seule de HitKeep via MCP.", "action": "Configurer MCP" },
+    "quota": { "refresh": "Vérifier la disponibilité", "remaining": "Encore {{remaining}} questions sur {{limit}} pour l’équipe aujourd’hui", "exhausted": "La limite quotidienne d’Ask AI de l’équipe est atteinte.", "resets": "Réinitialisation le {{reset}}.", "proUpgrade": "Besoin de plus de réponses ? Pro offre à votre équipe 100 réponses Ask AI par jour.", "upgradeAction": "Découvrir Pro", "askAdmin": "Demandez à un administrateur de l’équipe de passer à Pro." },
+    "budget": {
+      "trigger": "Ask AI en pause",
+      "title": "Limite d’utilisation de l’IA atteinte",
+      "description": "Cette instance a atteint sa limite configurée de requêtes ou de jetons IA. Ask AI sera de nouveau disponible lorsque l’utilisation sortira de la fenêtre budgétaire glissante.",
+      "operator": "Vérifiez l’utilisation de l’IA dans l’état du système et les limites configurées.",
+      "askAdmin": "Demandez à l’administrateur de l’instance de vérifier l’utilisation et les limites de l’IA.",
+      "statusAction": "Ouvrir l’état du système",
+      "guide": "Configuration et limites de l’IA"
+    },
     "exportSuccess": "Téléchargement de l’export lancé.",
     "disabled": {
       "notConfigured": "Ask AI non configuré",

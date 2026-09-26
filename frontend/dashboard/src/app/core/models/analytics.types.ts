@@ -729,10 +729,14 @@ export interface SystemStatus {
 export interface AskAIStatus {
     enabled: boolean;
     available: boolean;
-    status: 'disabled' | 'not_configured' | 'available' | 'budget_exhausted';
+    status: 'disabled' | 'not_configured' | 'available' | 'budget_exhausted' | 'daily_limit_exhausted';
     provider?: string;
     model?: string;
     budget_exhausted: boolean;
+    daily_limit?: number;
+    daily_used?: number;
+    daily_remaining?: number;
+    daily_reset_at?: string;
 }
 
 export interface AskAIRequest {

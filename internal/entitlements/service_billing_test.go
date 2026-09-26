@@ -3,8 +3,12 @@
 package entitlements
 
 import (
+	"context"
 	"testing"
 
+	"github.com/google/uuid"
+
+	"hitkeep/config"
 	"hitkeep/internal/database"
 )
 
@@ -51,6 +55,35 @@ func TestEffectiveCloudPlanMapsSubscriptionStatuses(t *testing.T) {
 		if code, name := EffectiveCloudPlan(account); code != database.CloudPlanBusiness || name != "Business" {
 			t.Errorf("status %q: expected business plan kept, got code=%q name=%q", status, code, name)
 		}
+	}
+}
+
+func TestCloudPlanEntitlementsAskAIDailyLimits(t *testing.T) {
+	for _, tc := range []struct {
+		code  string
+		limit int
+	}{{database.CloudPlanFree, 1}, {database.CloudPlanPro, 100}, {database.CloudPlanBusiness, 500}} {
+		t.Run(tc.code, func(t *testing.T) {
+			ent := CloudPlanEntitlements(tc.code)
+			if ent == nil || ent.MaxAskAIAnswersPerDay != tc.limit {
+				t.Fatalf("expected Ask AI daily limit %d, got %+v", tc.limit, ent)
+			}
+		})
+	}
+}
+
+func TestCloudProviderAskAIFallbackLimits(t *testing.T) {
+	for _, tc := range []struct {
+		code  string
+		limit int
+	}{{"", 1}, {database.CloudPlanFree, 1}, {database.CloudPlanPro, 100}, {database.CloudPlanBusiness, 500}, {"unknown", 1}} {
+		t.Run(tc.code, func(t *testing.T) {
+			provider := NewProvider(&config.Config{CloudHosted: true, CloudPlanCode: tc.code})
+			ent, err := provider.ForTenant(context.Background(), uuid.Nil)
+			if err != nil || ent == nil || ent.MaxAskAIAnswersPerDay != tc.limit {
+				t.Fatalf("expected provider Ask AI daily limit %d, got %+v, err=%v", tc.limit, ent, err)
+			}
+		})
 	}
 }
 

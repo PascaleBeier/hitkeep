@@ -127,6 +127,20 @@ func (s *Service) TeamSiteLimit(ctx context.Context, teamID uuid.UUID) int {
 	return ent.MaxSitesPerTeam
 }
 
+// TeamAskAIDailyLimit returns the shared managed-cloud answer allowance for a
+// team. Zero is unlimited, including self-hosted and operator exemptions.
+// TeamEntitlements preserves the cloud billing account's plan precedence.
+func (s *Service) TeamAskAIDailyLimit(ctx context.Context, actorID, teamID uuid.UUID) int {
+	if !s.cloudHosted() || s.BypassesCloudLimits(ctx, actorID) || s.TeamBypassesCloudLimits(ctx, teamID) {
+		return 0
+	}
+	ent := s.TeamEntitlements(ctx, teamID)
+	if ent == nil {
+		return 0
+	}
+	return ent.MaxAskAIAnswersPerDay
+}
+
 // AllowsCustomTrackingDomains reports whether the actor may manage custom
 // tracking domains for the team. Free cloud teams must upgrade to Pro or
 // higher; self-hosted deployments are never gated.

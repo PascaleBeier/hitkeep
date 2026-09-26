@@ -206,6 +206,17 @@
       "events": "Welke events dreven conversies?",
       "export": "Maak een export voor de huidige weergave"
     },
+    "mcp": { "title": "Gebruik je eigen AI-agent", "description": "Verbind je AI-agent via MCP met de alleen-lezen analyses van HitKeep.", "action": "MCP instellen" },
+    "quota": { "refresh": "Beschikbaarheid controleren", "remaining": "Vandaag nog {{remaining}} van {{limit}} teamvragen over", "exhausted": "De dagelijkse Ask AI-limiet van het team is bereikt.", "resets": "Wordt opnieuw ingesteld op {{reset}}.", "proUpgrade": "Meer antwoorden nodig? Met Pro krijgt je team 100 Ask AI-antwoorden per dag.", "upgradeAction": "Bekijk Pro", "askAdmin": "Vraag een teambeheerder naar een upgrade." },
+    "budget": {
+      "trigger": "Ask AI gepauzeerd",
+      "title": "AI-gebruikslimiet bereikt",
+      "description": "Deze instantie heeft de ingestelde limiet voor AI-verzoeken of tokens bereikt. Ask AI wordt weer beschikbaar zodra het gebruik buiten het voortschrijdende budgetvenster valt.",
+      "operator": "Controleer het AI-gebruik in Systeemstatus en de ingestelde limieten.",
+      "askAdmin": "Vraag de instantiebeheerder om het AI-gebruik en de limieten te controleren.",
+      "statusAction": "Systeemstatus openen",
+      "guide": "AI-instelling en limieten"
+    },
     "exportSuccess": "Exportdownload gestart.",
     "disabled": {
       "notConfigured": "Ask AI niet geconfigureerd",

@@ -1,0 +1,56 @@
+<article class="ai-message ai-message--assistant" [attr.aria-label]="'askAi.answerLabel' | transloco" [attr.aria-live]="loading() ? 'polite' : null">
+    <div class="ai-avatar ai-avatar--assistant" aria-hidden="true"><img [src]="hitkeepIconUrl()" alt="" /></div>
+    <div class="ai-answer">
+        <div class="ai-answer-body">
+            <div class="ai-markdown" [innerHTML]="renderedMarkdown()"></div>
+            @if (loading()) { <span class="ai-caret" aria-hidden="true"></span> }
+        </div>
+        @if (answer(); as result) { @if (result.charts.length) {
+        <section class="ai-visuals" [attr.aria-label]="'askAi.charts' | transloco">
+            @for (chart of result.charts; track chart.title) {
+            <div class="ai-chart">
+                <h4>{{ chart.title }}</h4>
+                @if (isTable(chart)) {
+                <div class="ai-table">
+                    <table [attr.aria-label]="chart.title">
+                        <thead>
+                            <tr>
+                                @for (column of tableColumns(chart); track column) {
+                                <th scope="col">{{ formatColumnHeader(column) }}</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (row of chart.rows; track $index) {
+                            <tr>
+                                @for (column of tableColumns(chart); track column) {
+                                <td>{{ formatCell(row[column]) }}</td>
+                                }
+                            </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                } @else {
+                <div class="ai-canvas" role="img" [attr.aria-label]="chart.title"><div echarts class="ai-echarts" [options]="chartOptions(chart)" [merge]="chartMergeOptions(chart)" [initOpts]="chartInitOptions" [autoResize]="true"></div></div>
+                }
+            </div>
+            }
+        </section>
+        } @if (result.citations.length) {
+        <div class="ai-evidence" [attr.aria-label]="'askAi.citations' | transloco">
+            <i class="pi pi-link" aria-hidden="true"></i>
+            <span class="ai-evidence-label">{{ 'askAi.citations' | transloco }}</span>
+            @for (citation of result.citations; track citation.tool_call_id + citation.label) {
+            <span class="ai-citation" [title]="citation.tool_call_id">{{ citation.label }}</span>
+            }
+        </div>
+        } @if (result.actions.length) {
+        <div class="ai-actions" [attr.aria-label]="'askAi.actions' | transloco">
+            @for (action of result.actions; track action.type + action.target) {
+            <p-button [icon]="actionIcon(action)" [label]="action.label" severity="secondary" [outlined]="true" size="small" [loading]="isActionRunning(action)" [disabled]="!!runningActionKey()" (onClick)="actionRequested.emit(action)" />
+            }
+        </div>
+        } }
+    </div>
+</article>

@@ -7,7 +7,7 @@ import { DrawerModule } from '@openng/optimus-ui/drawer';
 import { Brand } from '@components/brand/brand';
 import { TeamSwitcher } from '@components/team-switcher/team-switcher';
 import { SiteSelector } from '@features/sites/components/site-selector';
-import { AskAIControl } from '@layout/ask-ai-control';
+import { AskAIControl } from '@features/ask-ai/ask-ai-control';
 import { FreePlanChip } from '@layout/free-plan-chip';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { SidebarMenuService } from '@layout/sidebar-menu.service';

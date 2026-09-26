@@ -6,7 +6,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { Observable, Subject, of } from 'rxjs';
-import { AskAIRequest, AskAIResponse, AskAIStreamEvent } from '@models/analytics.types';
+import { AskAIRequest, AskAIResponse, AskAIStatus, AskAIStreamEvent } from '@models/analytics.types';
 import { AskAIService, AskAIStreamStatusError } from '@services/ask-ai.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { NavigationNoticeService } from '@services/navigation-notice.service';
@@ -15,7 +15,7 @@ import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { SiteService } from '@features/sites/services/site.service';
-import { AskAIControl } from './ask-ai-control';
+import { AskAIControl } from '@features/ask-ai/ask-ai-control';
 import { LayoutPageBar } from './layout-page-bar';
 import { LayoutSidebar } from './layout-sidebar';
 import { MainLayoutContextService } from './main-layout-context.service';
@@ -42,6 +42,10 @@ interface AskAIStreamRequest {
 
 class FakeAskAIService {
     readonly requests: AskAIStreamRequest[] = [];
+
+    getStatus(): Observable<AskAIStatus> {
+        return of(TestBed.inject(DashboardBootstrapService).status()?.ask_ai as AskAIStatus);
+    }
 
     askStream(siteId: string, request: AskAIRequest): Observable<AskAIStreamEvent> {
         const stream = new Subject<AskAIStreamEvent>();
@@ -135,6 +139,16 @@ describe('MainLayout', () => {
                                     events: 'Which events drove conversions?',
                                     export: 'Prepare an export for the current view'
                                 },
+                                budget: {
+                                    trigger: 'Ask AI paused',
+                                    title: 'AI usage limit reached',
+                                    description: 'This instance has reached its configured AI request or token allowance.',
+                                    operator: 'Review AI usage in System Status.',
+                                    askAdmin: 'Ask your instance operator to review AI usage.',
+                                    statusAction: 'Open System Status',
+                                    guide: 'AI setup and limits'
+                                },
+                                quota: { refresh: 'Check availability' },
                                 exportSuccess: 'Export download started.',
                                 disabled: {
                                     notConfigured: 'Ask AI not configured',
@@ -395,7 +409,8 @@ describe('MainLayout', () => {
         fixture.detectChanges();
 
         expect(askAI.requests).toEqual([]);
-        expect(document.body.textContent).toContain('AI budget exhausted');
+        expect(document.body.textContent).toContain('AI usage limit reached');
+        expect(document.body.textContent).toContain('configured AI request or token allowance');
         expect(document.body.textContent).not.toContain('Run history');
         expect(document.body.textContent).not.toContain('History');
         expect(document.body.textContent).not.toContain('openai.gpt-oss-120b-1:0');
@@ -739,7 +754,7 @@ describe('MainLayout', () => {
         await waitForScheduledFocus();
         fixture.detectChanges();
 
-        const promptInput = document.body.querySelector('input[name="ask-ai-panel-query"]') as HTMLInputElement | null;
+        const promptInput = document.body.querySelector('textarea[name="ask-ai-panel-query"]') as HTMLTextAreaElement | null;
         expect(promptInput).toBeTruthy();
         expect(document.activeElement).toBe(promptInput);
     });
@@ -816,7 +831,7 @@ describe('MainLayout', () => {
             });
             fixture.detectChanges();
 
-            const promptInput = dictateButton?.closest('.ask-ai-drawer')?.querySelector('input[name="ask-ai-panel-query"]') as HTMLInputElement | null;
+            const promptInput = dictateButton?.closest('.ask-ai-drawer')?.querySelector('textarea[name="ask-ai-panel-query"]') as HTMLTextAreaElement | null;
             expect(promptInput?.value).toBe('ChatGPT hits last 14 days');
 
             dictateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -878,7 +893,7 @@ describe('MainLayout', () => {
 
         expect(userMessage?.textContent).toContain('What changed in traffic?');
         expect(assistantMessage?.textContent).toContain('Traffic increased.');
-        expect(userAvatar?.getAttribute('src') ?? '').toContain('/api/user/avatar?s=96');
+        expect(userAvatar).toBeNull();
         expect(hitkeepAvatar?.getAttribute('src') ?? '').toContain('/favicon.svg');
         expect(document.body.textContent).not.toContain('11111111');
         expect(document.body.textContent).not.toContain('openai.gpt-oss-120b');

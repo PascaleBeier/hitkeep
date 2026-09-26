@@ -74,7 +74,7 @@ test("ask ai answers with a chart, page link, and export action", async ({ page 
 
     await page.getByRole("button", { name: "Ask AI about this site" }).click();
     await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
-    const askInput = page.getByRole("searchbox", { name: "Ask AI prompt" });
+    const askInput = page.getByRole("textbox", { name: "Ask AI prompt" });
     await expect(askInput).toBeVisible();
     await askInput.fill("What changed in traffic?");
     await askInput.press("Enter");
@@ -117,11 +117,45 @@ test("ask ai opens in unavailable and mobile drawer states", async ({ page }) =>
     await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
     const drawer = page.locator(".ask-ai-drawer");
     await expect(drawer.getByText("Ask AI not configured")).toBeVisible();
-    await expect(page.getByRole("searchbox", { name: "Ask AI prompt" })).toBeDisabled();
+    await expect(page.getByRole("textbox", { name: "Ask AI prompt" })).toBeDisabled();
     await expect(page.getByRole("tab", { name: /History/ })).toHaveCount(0);
 });
 
-async function enableAskAIForBootstrap(page, askAIStatus = {}) {
+test("ask ai shows the shared daily limit and can refresh availability", async ({ page }) => {
+    await enableAskAIForBootstrap(page, { available: false, status: "daily_limit_exhausted" }, true);
+    let statusChecks = 0;
+    await page.route("**/api/sites/*/ask-ai/status", async (route) => {
+        statusChecks++;
+        const exhausted = statusChecks === 1;
+        await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+                enabled: true,
+                available: !exhausted,
+                status: exhausted ? "daily_limit_exhausted" : "available",
+                budget_exhausted: false,
+                daily_limit: 1,
+                daily_used: exhausted ? 1 : 0,
+                daily_remaining: exhausted ? 0 : 1,
+                daily_reset_at: "2026-09-27T00:00:00Z"
+            })
+        });
+    });
+    await login(page, "/dashboard");
+    await page.getByRole("button", { name: "Ask AI about this site" }).click();
+    await expect(page.getByText("0 of 1 team questions left today")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Set up MCP/ })).toHaveAttribute("href", /\/guides\/integrations\/mcp\//);
+    await expect(page.getByRole("textbox", { name: "Ask AI prompt" })).toBeDisabled();
+    await page.getByRole("button", { name: "Check availability" }).click();
+    await expect(page.getByText("1 of 1 team questions left today")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Ask AI prompt" })).toBeEnabled();
+});
+
+async function enableAskAIForBootstrap(page, askAIStatus = {}, cloudHosted = false) {
+    await page.route("**/api/sites/*/ask-ai/status", async (route) => {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enabled: true, available: true, status: "available", budget_exhausted: false, ...askAIStatus }) });
+    });
     await page.route("**/api/user/bootstrap", async (route) => {
         const response = await route.fetch();
         const bootstrap = await response.json();
@@ -129,6 +163,9 @@ async function enableAskAIForBootstrap(page, askAIStatus = {}) {
         delete headers["content-length"];
 
         bootstrap.status = bootstrap.status || {};
+        if (cloudHosted) {
+            bootstrap.status.cloud = { ...(bootstrap.status.cloud || {}), hosted: true };
+        }
         bootstrap.status.ai = {
             ...(bootstrap.status.ai || {}),
             enabled: true,

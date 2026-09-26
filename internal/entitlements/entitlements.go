@@ -13,6 +13,7 @@ type Entitlements struct {
 	MaxSitesPerTeam               int // 0 = unlimited
 	MaxRetentionDays              int // 0 = unlimited
 	MaxTeamMembers                int // 0 = unlimited
+	MaxAskAIAnswersPerDay         int // 0 = unlimited
 	AllowSSO                      bool
 	AllowCustomBranding           bool
 	AllowExternalReportRecipients bool

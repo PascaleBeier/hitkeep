@@ -46,6 +46,7 @@ func CloudPlanEntitlements(code string) *Entitlements {
 			MaxSitesPerTeam:               50,
 			MaxTeamMembers:                20,
 			MaxRetentionDays:              1095,
+			MaxAskAIAnswersPerDay:         500,
 			AllowSSO:                      true,
 			AllowCustomBranding:           true,
 			AllowExternalReportRecipients: true,
@@ -55,13 +56,15 @@ func CloudPlanEntitlements(code string) *Entitlements {
 			MaxSitesPerTeam:               10,
 			MaxTeamMembers:                5,
 			MaxRetentionDays:              365,
+			MaxAskAIAnswersPerDay:         100,
 			AllowExternalReportRecipients: true,
 		}
 	case database.CloudPlanFree:
 		return &Entitlements{
-			MaxSitesPerTeam:  3,
-			MaxTeamMembers:   3,
-			MaxRetentionDays: 60,
+			MaxSitesPerTeam:       3,
+			MaxTeamMembers:        3,
+			MaxRetentionDays:      60,
+			MaxAskAIAnswersPerDay: 1,
 		}
 	default:
 		return nil

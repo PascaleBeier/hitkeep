@@ -23,6 +23,7 @@ import (
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
+	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"
 	json "hitkeep/jsonapi"
 )
@@ -651,7 +652,7 @@ func TestAskAIAuditsInvalidRequests(t *testing.T) {
 	}
 }
 
-func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux, *database.Store, uuid.UUID, uuid.UUID, *recordingAskAIClient) {
+func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config, provider ...entitlements.Provider) (*http.ServeMux, *database.Store, uuid.UUID, uuid.UUID, *recordingAskAIClient) {
 	t.Helper()
 	cfg.AuthSessionMinutes = 15
 	store := database.NewStore(":memory:")
@@ -663,9 +664,24 @@ func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux,
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
+	if cfg.CloudHosted {
+		// The first user is an instance operator and bypasses cloud limits.
+		if _, err := store.CreateUser(context.Background(), "ask-ai-operator@example.com", "hash"); err != nil {
+			t.Fatalf("CreateUser operator: %v", err)
+		}
+	}
 	userID, err := store.CreateUser(context.Background(), "ask-ai-human@example.com", "hash")
 	if err != nil {
 		t.Fatalf("CreateUser: %v", err)
+	}
+	if cfg.CloudHosted {
+		team, err := store.CreateTenant(context.Background(), userID, "Ask AI test team", "")
+		if err != nil {
+			t.Fatalf("CreateTenant: %v", err)
+		}
+		if err := store.SetActiveTenantID(context.Background(), userID, team.ID); err != nil {
+			t.Fatalf("SetActiveTenantID: %v", err)
+		}
 	}
 	site, err := store.CreateSite(context.Background(), userID, "ask-ai.example.test")
 	if err != nil {
@@ -676,6 +692,9 @@ func setupAskAIHandlerTestEnv(t *testing.T, cfg *config.Config) (*http.ServeMux,
 	tenantStores := database.NewTenantStoreManager(store, t.TempDir(), database.WithTenantDataPlane(false))
 	t.Cleanup(func() { _ = tenantStores.Close() })
 	appCtx := &shared.Context{Store: store, TenantStores: tenantStores, Config: cfg, AI: ai}
+	if len(provider) > 0 {
+		appCtx.Entitlements = provider[0]
+	}
 	mux := http.NewServeMux()
 	Register(mux, appCtx)
 	return mux, store, site.ID, userID, ai

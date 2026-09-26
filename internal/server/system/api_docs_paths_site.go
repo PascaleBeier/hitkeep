@@ -237,6 +237,15 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"404": errResp("Site not found"),
 				}),
 		},
+		"/api/sites/{id}/ask-ai/status": map[string]any{
+			"get": op([]string{"Sites"}, "Get Ask AI status", "Returns provider availability and the selected site's team-wide managed-cloud daily answer allowance. Requires a human dashboard session with site.view.", secCookie(), []any{paramRef("#/components/parameters/siteID")}, nil,
+				map[string]any{
+					"200": jsonRefResp("Ask AI status", "#/components/schemas/AskAIStatus"),
+					"403": errResp("Dashboard session required or forbidden"),
+					"404": errResp("Site not found"),
+					"503": errResp("Service unavailable on this node"),
+				}),
+		},
 		"/api/sites/{id}/ask-ai": map[string]any{
 			"post": op([]string{"Sites"}, "Ask AI", "Runs the session-only, site-scoped dashboard assistant over read-only aggregate analytics tools. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/AskAIRequest"}),
@@ -245,7 +254,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"400": errResp("Invalid Ask AI request"),
 					"403": errResp("Dashboard session required or forbidden"),
 					"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
-					"429": jsonRefResp("Ask AI budget exhausted", "#/components/schemas/AskAIStatus"),
+					"429": jsonRefResp("Ask AI budget or daily allowance exhausted", "#/components/schemas/AskAIStatus"),
 					"502": errResp("Ask AI provider or validation failure"),
 				}),
 		},
@@ -262,7 +271,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"400": errResp("Invalid Ask AI request"),
 					"403": errResp("Dashboard session required or forbidden"),
 					"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
-					"429": jsonRefResp("Ask AI budget exhausted", "#/components/schemas/AskAIStatus"),
+					"429": jsonRefResp("Ask AI budget or daily allowance exhausted", "#/components/schemas/AskAIStatus"),
 				}),
 		},
 		"/api/sites/{id}/ask-ai/history": map[string]any{

@@ -206,6 +206,17 @@
       "events": "Welche Events haben Conversions ausgelöst?",
       "export": "Export für die aktuelle Ansicht vorbereiten"
     },
+    "mcp": { "title": "Eigenen KI-Agenten verwenden", "description": "Verbinde deinen KI-Agenten über MCP mit den schreibgeschützten Analysedaten von HitKeep.", "action": "MCP einrichten" },
+    "quota": { "refresh": "Verfügbarkeit prüfen", "remaining": "Heute noch {{remaining}} von {{limit}} Fragen für das Team übrig", "exhausted": "Das tägliche Ask-AI-Limit des Teams ist erreicht.", "resets": "Zurücksetzung: {{reset}}.", "proUpgrade": "Mehr Antworten benötigt? Mit Pro erhält dein Team 100 Ask-AI-Antworten pro Tag.", "upgradeAction": "Pro ansehen", "askAdmin": "Bitte die Team-Administration nach einem Upgrade fragen." },
+    "budget": {
+      "trigger": "Ask AI pausiert",
+      "title": "KI-Nutzungslimit erreicht",
+      "description": "Diese Instanz hat ihr konfiguriertes Limit für KI-Anfragen oder Tokens erreicht. Ask AI ist wieder verfügbar, sobald die Nutzung aus dem gleitenden Budgetzeitraum fällt.",
+      "operator": "Prüfe die KI-Nutzung im Systemstatus und die konfigurierten Limits.",
+      "askAdmin": "Bitte die Instanzverwaltung, die KI-Nutzung und die Limits zu prüfen.",
+      "statusAction": "Systemstatus öffnen",
+      "guide": "KI-Einrichtung und Limits"
+    },
     "exportSuccess": "Export-Download gestartet.",
     "disabled": {
       "notConfigured": "Ask AI nicht konfiguriert",

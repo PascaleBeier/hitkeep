@@ -80,6 +80,21 @@ func TestAskAIStatusGating(t *testing.T) {
 			enabled:    true,
 		},
 		{
+			name: "self-hosted token budget exhausted",
+			cfg: &config.Config{
+				AIEnabled:             true,
+				AskAIEnabled:          true,
+				AIProvider:            "bedrock",
+				AIModel:               "amazon.nova-lite-v1:0",
+				AIRequestLimit:        10,
+				AITokenLimit:          1000,
+				AIBudgetWindowMinutes: 60,
+			},
+			usage:      database.AIUsageSummary{Tokens: 1000},
+			wantStatus: "budget_exhausted",
+			enabled:    true,
+		},
+		{
 			name: "mantle instance role missing region",
 			cfg: &config.Config{
 				AIEnabled:    true,

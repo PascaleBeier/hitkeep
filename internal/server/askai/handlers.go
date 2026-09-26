@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,7 +36,9 @@ const (
 var errAskAIStreamWriteFailed = errors.New("ask ai stream write failed")
 
 type handler struct {
-	ctx *shared.Context
+	ctx        *shared.Context
+	quotaMu    sync.Mutex
+	quotaSlots map[uuid.UUID]*teamQuotaSlot
 }
 
 type askAIStreamingClient interface {
@@ -54,6 +57,11 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		AllowAPIKey: true,
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleAskEvents()))
+	mux.HandleFunc("GET /api/sites/{id}/ask-ai/status", ctx.Handler(shared.HandlerConfig{
+		RequireAuth: true,
+		AllowAPIKey: true,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleStatus()))
 	mux.HandleFunc("GET /api/sites/{id}/ask-ai/history", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		AllowAPIKey: true,
@@ -66,6 +74,9 @@ func (h *handler) handleAsk() http.HandlerFunc {
 		prepared, ok := h.prepareAskAI(w, r)
 		if !ok {
 			return
+		}
+		if prepared.ReleaseQuota != nil {
+			defer prepared.ReleaseQuota()
 		}
 		result, err := h.ctx.AI.GenerateAskAI(r.Context(), prepared.AIRequest)
 		if err != nil {
@@ -80,6 +91,13 @@ func (h *handler) handleAsk() http.HandlerFunc {
 				return
 			}
 			h.handleAskAIError(r.Context(), w, err, prepared.SiteID)
+			return
+		}
+		if err := r.Context().Err(); err != nil {
+			h.auditAskAIStreamResponse(r, prepared.AuditContext, askAIResponseAuditInput{
+				RequestHash: prepared.RequestHash, Result: &result, Outcome: "failure",
+				Status: "canceled", HTTPStatus: http.StatusRequestTimeout, Err: err,
+			})
 			return
 		}
 		if !h.auditAskAIResponse(w, r, prepared.AuditContext, askAIResponseAuditInput{
@@ -140,6 +158,9 @@ func (h *handler) handleAskEvents() http.HandlerFunc {
 		prepared, ok := h.prepareAskAI(w, r)
 		if !ok {
 			return
+		}
+		if prepared.ReleaseQuota != nil {
+			defer prepared.ReleaseQuota()
 		}
 		stream, ok := newAskAIEventStream(r.Context(), w)
 		if !ok {
@@ -204,6 +225,13 @@ func (h *handler) handleAskEvents() http.HandlerFunc {
 				return
 			}
 			stream.write("error", api.AskAIStreamEvent{Type: "error", Status: status, MessageKey: askAIStreamErrorMessageKey(err), Error: http.StatusText(httpStatus)})
+			return
+		}
+		if err := r.Context().Err(); err != nil {
+			h.auditAskAIStreamResponse(r, prepared.AuditContext, askAIResponseAuditInput{
+				RequestHash: prepared.RequestHash, Result: &result, Outcome: "failure",
+				Status: "canceled", HTTPStatus: http.StatusRequestTimeout, Err: err,
+			})
 			return
 		}
 		response := apiAskAIResponse(result)
@@ -286,6 +314,7 @@ type askAIPreparedRun struct {
 	RequestHash  string
 	AuditContext askAIAuditContext
 	AIRequest    hitai.AskAIRequest
+	ReleaseQuota func()
 }
 
 type askAIHistoryPrepared struct {
@@ -502,6 +531,40 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		return prepared, false
 	}
 	requestHash := askAIRequestAuditHash(request, from, to, filters)
+	var releaseQuota func()
+	if h.ctx.Config.CloudHosted {
+		release, err := h.lockTeamQuota(r.Context(), teamID)
+		if err != nil {
+			http.Error(w, "Ask AI request canceled", http.StatusRequestTimeout)
+			return prepared, false
+		}
+		quotaStatus, err := h.askAIStatusForTeam(r.Context(), teamID, userID)
+		if err != nil {
+			release()
+			shared.LoggerFromContext(r.Context()).Error("Failed to load Ask AI daily usage", "error", err, "team_id", teamID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return prepared, false
+		}
+		if !quotaStatus.Available {
+			release()
+			code := statusCodeForAskAIStatus(quotaStatus)
+			if !h.auditAskAIRequestAndResponse(w, r, auditCtx, askAIRequestAuditInput{
+				Request: &request, From: from, To: to, Filters: filters, RequestHash: requestHash,
+				Outcome: "denied", Status: quotaStatus.Status, HTTPStatus: code,
+			}, askAIResponseAuditInput{
+				RequestHash: requestHash, Outcome: "denied", Status: quotaStatus.Status, HTTPStatus: code,
+			}) {
+				return prepared, false
+			}
+			writeJSON(r.Context(), w, code, quotaStatus)
+			return prepared, false
+		}
+		if quotaStatus.DailyLimit == nil {
+			release()
+		} else {
+			releaseQuota = release
+		}
+	}
 	if !h.auditAskAIRequest(w, r, auditCtx, askAIRequestAuditInput{
 		Request:     &request,
 		From:        from,
@@ -512,10 +575,16 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		Status:      "accepted",
 		HTTPStatus:  http.StatusOK,
 	}) {
+		if releaseQuota != nil {
+			releaseQuota()
+		}
 		return prepared, false
 	}
 	analyticsStore, err := h.ctx.AnalyticsStore(r.Context(), siteID)
 	if err != nil {
+		if releaseQuota != nil {
+			releaseQuota()
+		}
 		shared.LoggerFromContext(r.Context()).Error("Failed to resolve Ask AI analytics store", "error", err, "site_id", siteID)
 		if !h.auditAskAIResponse(w, r, auditCtx, askAIResponseAuditInput{
 			RequestHash: requestHash,
@@ -535,6 +604,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		SiteID:       siteID,
 		RequestHash:  requestHash,
 		AuditContext: auditCtx,
+		ReleaseQuota: releaseQuota,
 		AIRequest: hitai.AskAIRequest{
 			TeamID: teamID, SiteID: siteID, ActorID: userID, ActorType: "user", SiteDomain: site.Domain,
 			Query: request.Query, From: from, To: to, Route: request.Route, Filters: toAIAskFilters(filters), History: toAIAskHistory(request.History),
@@ -967,7 +1037,7 @@ func parseAskAIHistoryIntQuery(r *http.Request, key string, fallback int) (int, 
 }
 
 func statusCodeForAskAIStatus(status *api.AskAIStatus) int {
-	if status != nil && status.Status == "budget_exhausted" {
+	if status != nil && (status.Status == "budget_exhausted" || status.Status == "daily_limit_exhausted") {
 		return http.StatusTooManyRequests
 	}
 	return http.StatusConflict

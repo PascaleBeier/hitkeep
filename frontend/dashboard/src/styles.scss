@@ -1,6 +1,106 @@
 @use "./tailwind.css";
 @use "@openng/icons/openng-icons.css";
 
+/* Ask AI Markdown is inserted with Angular's sanitized innerHTML, so its descendants need global, drawer-scoped typography. */
+.ask-ai-drawer .ai-markdown {
+    font-size: 0.94rem;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    overflow-x: auto;
+}
+
+.ask-ai-drawer .ai-markdown > :first-child {
+    margin-top: 0;
+}
+
+.ask-ai-drawer .ai-markdown > :last-child {
+    margin-bottom: 0;
+}
+
+.ask-ai-drawer .ai-markdown :where(p, ul, ol, pre, blockquote, table) {
+    margin: 0.55rem 0 0;
+}
+
+.ask-ai-drawer .ai-markdown :where(h1, h2, h3, h4, h5, h6) {
+    font-size: 1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0.85rem 0 0.35rem;
+}
+
+.ask-ai-drawer .ai-markdown :where(ul, ol) {
+    padding-left: 1.35rem;
+}
+
+.ask-ai-drawer .ai-markdown ul {
+    list-style-type: disc;
+}
+
+.ask-ai-drawer .ai-markdown ol {
+    list-style-type: decimal;
+}
+
+.ask-ai-drawer .ai-markdown li + li {
+    margin-top: 0.2rem;
+}
+
+.ask-ai-drawer .ai-markdown a {
+    color: var(--p-primary-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ask-ai-drawer .ai-markdown a:focus-visible {
+    outline: 2px solid var(--p-primary-color);
+    outline-offset: 2px;
+}
+
+.ask-ai-drawer .ai-markdown code {
+    background: var(--p-content-hover-background);
+    border-radius: 0.25rem;
+    font-size: 0.88em;
+    padding: 0.1rem 0.25rem;
+}
+
+.ask-ai-drawer .ai-markdown pre {
+    background: var(--p-content-hover-background);
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 0.65rem;
+    max-width: 100%;
+    overflow: auto;
+    padding: 0.7rem 0.8rem;
+}
+
+.ask-ai-drawer .ai-markdown pre code {
+    background: transparent;
+    padding: 0;
+    white-space: pre;
+}
+
+.ask-ai-drawer .ai-markdown blockquote {
+    border-left: 2px solid var(--p-content-border-color);
+    color: var(--p-text-muted-color);
+    padding-left: 0.75rem;
+}
+
+.ask-ai-drawer .ai-markdown table {
+    border-collapse: collapse;
+    min-width: 100%;
+}
+
+.ask-ai-drawer .ai-markdown :where(th, td) {
+    border-bottom: 1px solid var(--p-content-border-color);
+    font-size: 0.86rem;
+    padding: 0.45rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.ask-ai-drawer .ai-markdown th {
+    background: var(--p-content-hover-background);
+    font-weight: 650;
+}
+
 /* Make tables denser in dashboard */
 .p-datatable-sm .p-datatable-tbody > tr > td {
     padding: 0.5rem 0.75rem;

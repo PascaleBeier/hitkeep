@@ -1,4 +1,5 @@
-import { Service } from '@angular/core';
+import { Service, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, Subscriber } from 'rxjs';
 import { AskAIRequest, AskAIStatus, AskAIStreamEvent } from '@models/analytics.types';
 
@@ -14,6 +15,12 @@ export class AskAIStreamStatusError extends Error {
 
 @Service()
 export class AskAIService {
+    private readonly http = inject(HttpClient);
+
+    getStatus(siteId: string): Observable<AskAIStatus> {
+        return this.http.get<AskAIStatus>(`/api/sites/${encodeURIComponent(siteId)}/ask-ai/status`);
+    }
+
     askStream(siteId: string, request: AskAIRequest): Observable<AskAIStreamEvent> {
         return new Observable<AskAIStreamEvent>((subscriber) => {
             const controller = new AbortController();

@@ -681,12 +681,16 @@ type SystemStatus struct {
 }
 
 type AskAIStatus struct {
-	Enabled         bool   `json:"enabled"`
-	Available       bool   `json:"available"`
-	Status          string `json:"status"`
-	Provider        string `json:"provider,omitempty"`
-	Model           string `json:"model,omitempty"`
-	BudgetExhausted bool   `json:"budget_exhausted"`
+	Enabled         bool       `json:"enabled"`
+	Available       bool       `json:"available"`
+	Status          string     `json:"status"`
+	Provider        string     `json:"provider,omitempty"`
+	Model           string     `json:"model,omitempty"`
+	BudgetExhausted bool       `json:"budget_exhausted"`
+	DailyLimit      *int       `json:"daily_limit,omitempty"`
+	DailyUsed       *int       `json:"daily_used,omitempty"`
+	DailyRemaining  *int       `json:"daily_remaining,omitempty"`
+	DailyResetAt    *time.Time `json:"daily_reset_at,omitempty"`
 }
 
 type UserBootstrap struct {

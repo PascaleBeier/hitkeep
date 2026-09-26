@@ -206,6 +206,17 @@
       "events": "Which events drove conversions?",
       "export": "Prepare an export for the current view"
     },
+    "mcp": { "title": "Use your own AI agent", "description": "Connect your AI agent to HitKeep's read-only analytics through MCP.", "action": "Set up MCP" },
+    "quota": { "refresh": "Check availability", "remaining": "{{remaining}} of {{limit}} team questions left today", "exhausted": "Your team's daily Ask AI limit is reached.", "resets": "Resets {{reset}}.", "proUpgrade": "Need more answers? Pro gives your team 100 Ask AI answers a day.", "upgradeAction": "Explore Pro", "askAdmin": "Ask a team admin about upgrading." },
+    "budget": {
+      "trigger": "Ask AI paused",
+      "title": "AI usage limit reached",
+      "description": "This instance has reached its configured AI request or token allowance. Ask AI becomes available as usage leaves the rolling budget window.",
+      "operator": "Review AI usage in System Status and the configured limits.",
+      "askAdmin": "Ask your instance operator to review AI usage and limits.",
+      "statusAction": "Open System Status",
+      "guide": "AI setup and limits"
+    },
     "exportSuccess": "Export download started.",
     "disabled": {
       "notConfigured": "Ask AI not configured",

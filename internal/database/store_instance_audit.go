@@ -52,6 +52,17 @@ func (s *Store) AppendAuditEntry(ctx context.Context, params AuditEntryParams) e
 	return appendAuditEntry(ctx, s.db, params)
 }
 
+// CountSuccessfulAskAIResponses counts completed answers for one team in a UTC day.
+func (s *Store) CountSuccessfulAskAIResponses(ctx context.Context, teamID uuid.UUID, from, to time.Time) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM instance_audit_log
+		WHERE team_id = ? AND action = 'ask_ai.responded' AND outcome = 'success'
+		  AND created_at >= ? AND created_at < ?
+	`, teamID, from, to).Scan(&count)
+	return count, err
+}
+
 func appendAuditEntryTx(ctx context.Context, tx *sql.Tx, params AuditEntryParams) error {
 	return appendAuditEntry(ctx, tx, params)
 }
