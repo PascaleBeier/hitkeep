@@ -13,6 +13,17 @@ updates:
     labels:
       - "dependencies"
       - "go"
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2*"
+      golang-x:
+        patterns:
+          - "golang.org/x/*"
+        update-types: ["minor", "patch"]
+      go-patches:
+        patterns: ["*"]
+        update-types: ["patch"]
     ignore:
       - dependency-name: "github.com/duckdb/duckdb-go/v2"
         update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
@@ -34,6 +45,25 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-devkit/*"
+          - "@schematics/angular"
+      angular-eslint:
+        patterns: ["@angular-eslint/*"]
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      playwright:
+        patterns:
+          - "playwright"
+          - "@playwright/*"
+      frontend-patches:
+        patterns: ["*"]
+        update-types: ["patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -48,6 +78,9 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -62,3 +95,6 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+    groups:
+      docker:
+        patterns: ["*"]
