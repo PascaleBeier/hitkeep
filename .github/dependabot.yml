@@ -8,11 +8,11 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
-      - "go"
+      - "backend"
     groups:
       aws-sdk:
         patterns:
@@ -40,7 +40,7 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -61,6 +61,13 @@ updates:
         patterns:
           - "playwright"
           - "@playwright/*"
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
       frontend-patches:
         patterns: ["*"]
         update-types: ["patch"]
@@ -73,7 +80,7 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
@@ -90,11 +97,11 @@ updates:
       default-days: 7
     open-pull-requests-limit: 5
     commit-message:
-      prefix: "chore(deps)"
+      prefix: "chore"
       include: "scope"
     labels:
       - "dependencies"
-      - "docker"
+      - "backend"
     groups:
       docker:
         patterns: ["*"]
