@@ -11,7 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/analyticscatalog"
-	"hitkeep/internal/analyticstools"
+	"hitkeep/analyticstools"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	opportunitysvc "hitkeep/internal/opportunities"

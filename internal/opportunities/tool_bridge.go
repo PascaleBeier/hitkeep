@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	goaisdk "github.com/zendev-sh/goai"
 
-	"hitkeep/internal/analyticstools"
+	"hitkeep/analyticstools"
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 )

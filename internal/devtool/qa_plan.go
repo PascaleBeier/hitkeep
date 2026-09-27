@@ -86,7 +86,7 @@ func classifyChangedPath(path string) ([]string, bool) {
 		return []string{changeDependencies, changeDashboard}, true
 	case strings.HasPrefix(path, "internal/database/"):
 		return []string{changeDatabase}, true
-	case strings.HasPrefix(path, "internal/mcpserver/") || strings.HasPrefix(path, "internal/analyticstools/") || strings.HasPrefix(path, "skills/") || path == "server.json":
+	case strings.HasPrefix(path, "internal/mcpserver/") || strings.HasPrefix(path, "analyticstools/") || strings.HasPrefix(path, "skills/") || path == "server.json":
 		return []string{changeProductionMCP}, true
 	case strings.HasPrefix(path, "internal/devtool/") || strings.HasPrefix(path, "cmd/hk/") || path == "hk" || strings.HasPrefix(path, ".agents/"):
 		return []string{changeDeveloper}, true

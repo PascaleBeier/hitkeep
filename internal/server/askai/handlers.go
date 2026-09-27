@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/analyticstools"
 	hitai "hitkeep/internal/ai"
-	"hitkeep/internal/analyticstools"
 	"hitkeep/internal/api"
 	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
