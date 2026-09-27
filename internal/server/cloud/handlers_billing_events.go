@@ -191,17 +191,6 @@ func tenantIDFromStripeMetadata(metadata map[string]string) (uuid.UUID, error) {
 	return tenantID, nil
 }
 
-func normalizeJurisdiction(value string) string {
-	v := strings.TrimSpace(strings.ToUpper(value))
-	if strings.HasPrefix(v, "EU") {
-		return "EU"
-	}
-	if strings.HasPrefix(v, "US") {
-		return "US"
-	}
-	return v
-}
-
 func normalizePlanCode(planCode string) string {
 	switch strings.TrimSpace(strings.ToLower(planCode)) {
 	case database.CloudPlanFree:

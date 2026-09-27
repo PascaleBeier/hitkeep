@@ -525,7 +525,7 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 			writeSocialError(r.Context(), w, http.StatusBadRequest, "social_signup_invalid")
 			return
 		}
-		configuredJurisdiction := strings.ToUpper(strings.TrimSpace(h.ctx.Config.CloudJurisdiction))
+		configuredJurisdiction := shared.NormalizeCloudJurisdiction(h.ctx.Config.CloudJurisdiction)
 		if configuredJurisdiction != "" && req.Jurisdiction != "" && configuredJurisdiction != req.Jurisdiction {
 			writeSocialError(r.Context(), w, http.StatusBadRequest, "jurisdiction_mismatch")
 			return

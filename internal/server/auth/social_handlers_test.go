@@ -175,13 +175,14 @@ func TestSocialOAuthStateIsBoundToTheBrowserThatStartedAuthorization(t *testing.
 
 func TestSocialCloudSignupCreatesFreeAndPaidAccounts(t *testing.T) {
 	for _, testCase := range []struct {
-		name             string
-		plan             string
-		billing          string
-		expectedRedirect string
+		name               string
+		plan               string
+		billing            string
+		configJurisdiction string
+		expectedRedirect   string
 	}{
-		{name: "free", plan: "free", billing: "monthly", expectedRedirect: "/dashboard"},
-		{name: "paid", plan: "pro", billing: "annual", expectedRedirect: "/signup/verified?billing=annual&plan=pro"},
+		{name: "free", plan: "free", billing: "monthly", configJurisdiction: "eu-central-1", expectedRedirect: "/dashboard"},
+		{name: "paid", plan: "pro", billing: "annual", configJurisdiction: "EU", expectedRedirect: "/signup/verified?billing=annual&plan=pro"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			h, store := setupAuthTestEnv(t)
@@ -189,7 +190,7 @@ func TestSocialCloudSignupCreatesFreeAndPaidAccounts(t *testing.T) {
 			h.ctx.Config.CloudHosted = true
 			h.ctx.Config.CloudSignupEnabled = true
 			h.ctx.Config.SocialSignupEnabled = true
-			h.ctx.Config.CloudJurisdiction = "EU"
+			h.ctx.Config.CloudJurisdiction = testCase.configJurisdiction
 
 			email := testCase.name + "@example.com"
 			completionToken := h.ctx.AuthState.CreateSocialCompletion(shared.SocialCompletion{
@@ -266,7 +267,7 @@ func TestSocialCloudSignupRejectsValuesOutsideThePublicContract(t *testing.T) {
 			h.ctx.Config.CloudHosted = true
 			h.ctx.Config.CloudSignupEnabled = true
 			h.ctx.Config.SocialSignupEnabled = true
-			h.ctx.Config.CloudJurisdiction = "EU"
+			h.ctx.Config.CloudJurisdiction = "eu-central-1"
 
 			completionToken := h.ctx.AuthState.CreateSocialCompletion(shared.SocialCompletion{
 				Provider: "google", Subject: "google-" + testCase.name, ObservedEmail: strings.ReplaceAll(testCase.name, " ", "-") + "@example.com",

@@ -231,7 +231,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 			http.Error(w, "You must accept the Terms of Service and Privacy Policy", http.StatusBadRequest)
 			return
 		}
-		if configuredJurisdiction := normalizeJurisdiction(h.ctx.Config.CloudJurisdiction); configuredJurisdiction != "" && req.Jurisdiction != "" && normalizeJurisdiction(req.Jurisdiction) != configuredJurisdiction {
+		if configuredJurisdiction := shared.NormalizeCloudJurisdiction(h.ctx.Config.CloudJurisdiction); configuredJurisdiction != "" && req.Jurisdiction != "" && shared.NormalizeCloudJurisdiction(req.Jurisdiction) != configuredJurisdiction {
 			http.Error(w, "Jurisdiction mismatch", http.StatusBadRequest)
 			return
 		}
