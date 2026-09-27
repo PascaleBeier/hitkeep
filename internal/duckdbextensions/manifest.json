@@ -48,6 +48,18 @@
     "osx_arm64/httpfs.duckdb_extension.gz": {
       "archive_sha256": "758acc0b0c4fbf09506f387ff6f52826b1038b7b6849ded39928d2f992945230",
       "sha256": "10514b4ef19f80bf4ec4bf90c124f5d34625f2606263b40ae8ec7979905bb779"
+    },
+    "windows_amd64/aws.duckdb_extension.gz": {
+      "archive_sha256": "a9dc3b3d5d5e04f503f69b0b6d4be74b3c28db386ed24b560d2b474bb8305e4d",
+      "sha256": "a04d6b00e5f5ca941cd7b5875daf424d9fa0082aba4655960149c5432a554532"
+    },
+    "windows_amd64/excel.duckdb_extension.gz": {
+      "archive_sha256": "a50d8bbb8d37b036ea7366206c082dc8b90f4f902f7d5799f028bc07d41a995d",
+      "sha256": "2d05072ea6de99b27341c59b5352cf242c430440513410a1bce07bf2734b20c9"
+    },
+    "windows_amd64/httpfs.duckdb_extension.gz": {
+      "archive_sha256": "bb4a9f2721c43439006e6e776364a748d2469f92dfe5e5ebe365ed10e2be0e78",
+      "sha256": "65661c40463e74751993e8a7cb7b4c8906be9218319616a0bdfc1b4ae9ffdf9a"
     }
   }
 }

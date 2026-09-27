@@ -71,7 +71,7 @@ func Run(ctx context.Context, check bool, out io.Writer) error {
 		}
 	}
 	client := &http.Client{Timeout: 2 * time.Minute}
-	for _, platform := range []string{"linux_amd64", "linux_arm64", "osx_amd64", "osx_arm64"} {
+	for _, platform := range []string{"linux_amd64", "linux_arm64", "osx_amd64", "osx_arm64", "windows_amd64"} {
 		for _, name := range []string{"httpfs", "aws", "excel"} {
 			if err := ctx.Err(); err != nil {
 				return err
