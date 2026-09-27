@@ -13,7 +13,7 @@ import (
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/testutil/testdb"
+	"hitkeep/testutil/testdb"
 )
 
 func TestBuilderForUserBuildsDerivedAccessContext(t *testing.T) {

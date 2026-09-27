@@ -18,7 +18,7 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil/testdb"
+	"hitkeep/testutil/testdb"
 )
 
 func TestServerUsesInjectedLoggerForConfigurationWarnings(t *testing.T) {

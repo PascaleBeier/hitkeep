@@ -15,8 +15,8 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil/testdb"
 	json "hitkeep/jsonapi"
+	"hitkeep/testutil/testdb"
 )
 
 func newShareTestContext(t *testing.T, store *database.Store) *shared.Context {

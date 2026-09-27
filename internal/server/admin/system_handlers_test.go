@@ -24,8 +24,8 @@ import (
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil/testdb"
 	json "hitkeep/jsonapi"
+	"hitkeep/testutil/testdb"
 )
 
 func setupSystemTestEnv(t *testing.T) (*handler, *database.Store, *database.TenantStoreManager, uuid.UUID, uuid.UUID, uuid.UUID) {

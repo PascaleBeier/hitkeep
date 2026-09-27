@@ -20,9 +20,9 @@ import (
 	"hitkeep/internal/security"
 	serverauth "hitkeep/internal/server/auth"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil/testdb"
 	json "hitkeep/jsonapi"
 	"hitkeep/testutil"
+	"hitkeep/testutil/testdb"
 )
 
 func setupUserSecurityTestEnv(t *testing.T) (*handler, *database.Store, uuid.UUID) {

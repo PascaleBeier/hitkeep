@@ -22,9 +22,9 @@ import (
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
-	"hitkeep/internal/testutil/testdb"
 	json "hitkeep/jsonapi"
 	"hitkeep/testutil"
+	"hitkeep/testutil/testdb"
 )
 
 type authTestMailDriver struct {

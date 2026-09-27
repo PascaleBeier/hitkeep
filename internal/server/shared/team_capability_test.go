@@ -10,7 +10,7 @@ import (
 
 	"hitkeep/internal/auth"
 	"hitkeep/internal/database"
-	"hitkeep/internal/testutil/testdb"
+	"hitkeep/testutil/testdb"
 )
 
 func TestHandlerConfigAuthHelpers(t *testing.T) {

@@ -10,7 +10,7 @@ import (
 
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/testutil/testdb"
+	"hitkeep/testutil/testdb"
 )
 
 func setupShareAIActivityTestEnv(t *testing.T) (*handler, *database.Store, string, uuid.UUID) {

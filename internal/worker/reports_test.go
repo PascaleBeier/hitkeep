@@ -17,8 +17,8 @@ import (
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/testutil/testdb"
 	"hitkeep/reporting"
+	"hitkeep/testutil/testdb"
 )
 
 func TestReportMailFailureFieldsAreGrouped(t *testing.T) {

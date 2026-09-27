@@ -16,7 +16,7 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/mailer"
-	"hitkeep/internal/testutil/testdb"
+	"hitkeep/testutil/testdb"
 )
 
 type cloudLifecycleWorkerMailDriver struct {

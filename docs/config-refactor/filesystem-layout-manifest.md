@@ -12,7 +12,7 @@ This manifest is the Phase 0C evidence gate for Phases 9 and 10. It records curr
 
 ## Current top-level package state
 
-Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`, `realtime`, `reporting`, the passkey fixture `testutil`, and the developer CLI leaf `devtool/cli`.
+Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`, `realtime`, `reporting`, the test fixture family `testutil`, and the developer CLI leaf `devtool/cli`.
 
 Remaining indexed families:
 
@@ -21,7 +21,7 @@ Remaining indexed families:
 - `importables`, `ingest`, `ipmeta`, `mailables`, `mailer`
 - `mcpserver`, `opportunities`, `searchconsole`
 - `security`, `server`, `socialauth`, `sso`, `takeout`
-- `testutil`, `webhookdispatcher`, `webhooks`, `worker`
+- `webhookdispatcher`, `webhooks`, `worker`
 
 No remaining Go package-import cycle is currently proven. Reported Go cycles are call recursion or test-mock cycles, not import cycles; that does not make a package leaf-safe.
 
@@ -50,6 +50,15 @@ Disposition: **stay explicit / validate projections**. Do not consolidate these 
 - **Imports and cycle:** stdlib crypto, encoding, formatting, and math packages; the existing WebAuthn protocol/CBOR/COSE and credential packages; and `hitkeep/jsonapi`. It imports no server package, so moving the fixture does not introduce a server import cycle.
 - **Build and filesystem:** the single file has no build tag, OS/CGO split, generated source, embed, filesystem, process, or network operation. Its randomness is part of test credential construction, not persistent state.
 - **Proof and rollback:** `go test -race ./testutil ./internal/server/auth ./internal/server/user` passes after the move. Reverse the one-file move and restore the two test imports to roll back; no data migration or compatibility shim is needed because external modules could not import the former `internal/` path. **Phase 10 move-only wave completed.**
+
+### `testutil/testdb` database fixture
+
+- **Old → new path:** `internal/testutil/testdb/testdb.go` → `testutil/testdb/testdb.go`. The package name and exported fixture functions remain unchanged; no forwarding package is added.
+- **Owner and purpose:** test-only, isolated, already-migrated DuckDB control and tenant fixtures for packages outside `database`. Tests of migration behavior still construct their own fresh store.
+- **Dependents:** the 13 direct importers are `internal/server/access/context_test.go`, `internal/server/admin/handlers_test.go`, `internal/server/admin/system_handlers_test.go`, `internal/server/auth/handlers_test.go`, `internal/server/server_test.go`, `internal/server/share/ai_activity_handlers_test.go`, `internal/server/share/handlers_test.go`, `internal/server/shared/team_capability_test.go`, `internal/server/user/security_handlers_test.go`, `internal/server/user/team_handlers_billing_test.go`, `internal/worker/cloud_lifecycle_billing_test.go`, `internal/worker/reports_test.go`, and `internal/worker/retention_test.go`. The affected transitive test package boundary is server/access/admin/auth/share/shared/user and worker; no production source imports this fixture.
+- **Imports and cycle:** direct imports are `context`, `os`, `path/filepath`, `sync`, `testing`, and `hitkeep/internal/database`. The fixture depends inward on `database`; no database source imports the fixture, so the move adds no import cycle.
+- **Build and filesystem:** the one-file package has no build tags, OS/CGO split, generated source, or embed. Its native `os`/`filepath` operations remain part of temporary DuckDB fixture creation and clone setup; this path-only wave does not substitute Afero, fileflow, or pathologize for database files.
+- **Proof and rollback:** focused race tests pass for `testutil/testdb` and all affected default-build server and worker packages. Reverse the file move and restore the 13 test imports to roll back; no persistent data or external import contract changes. **Phase 10 move-only wave completed.**
 
 ### `internal/api`
 
