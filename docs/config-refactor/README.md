@@ -38,10 +38,18 @@ This folder is the durable progress ledger for the migration. Update it in the s
 | 8 | In progress | GoReleaser release ownership while preserving future package-manager compatibility | `a3f71980` adds the release digest manifest; tagged Linux amd64/arm64 archives, checksums, raw cloud assets, version metadata, exact-SHA snapshot publication, Darwin/arm64 CGO compilation, and the public Homebrew install/upgrade/uninstall lifecycle are proven; a stabilization release plus Windows CGO feasibility and Scoop lifecycle proof remain pending |
 | 8A | In progress | Review and simplify the release process with Ponytail and spf13 Go guidance | Interim review removed three duplicated upgrade job definitions and exact-SHA snapshot `33017615814` passed on `c09d2c6d`; the requested whole-release review must be repeated after docs attestation, Helm lifecycle proof, final graph assembly, and stabilization evidence |
 | 9 | In progress | Afero/fileflow/pathologize migration by operation risk | Runtime config uses injected Afero and one cross-filesystem release relocation uses fileflow; the complete operation inventory and remaining justified waves are pending, while database/WAL/fsync/lock operations stay native |
-| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, `internal/mcptest` → `mcptest`, stabilized `internal/config` → `config`, `internal/assetstore` → `assetstore`, `internal/cluster` → `cluster`, `internal/realtime` → `realtime`, `internal/reporting` → `reporting`, and `internal/devtool/cli` → `devtool/cli`; no compatibility shims because Go already prohibited external imports |
+| 10 | In progress | Flatten `internal/` in dependency-order move-only slices | Pure foundations moved: `internal/appurl` → `appurl`, `internal/exportfmt` → `exportfmt`, `internal/hklog` → `hklog`, `internal/analyticscatalog` → `analyticscatalog`, `internal/jsonapi` → `jsonapi`, `internal/localization` → `localization`, `internal/mcptest` → `mcptest`, stabilized `internal/config` → `config`, `internal/assetstore` → `assetstore`, `internal/cluster` → `cluster`, `internal/realtime` → `realtime`, `internal/reporting` → `reporting`, the passkey fixture `internal/testutil/passkeys.go` → `testutil/passkeys.go`, and `internal/devtool/cli` → `devtool/cli`; no compatibility shims because Go already prohibited external imports |
 | 11 | Pending | Stabilize, full QA, CI, docs validation, completion audit | — |
 
 ## Current delivery status
+
+### 2.14.0 preparation (2026-09-27)
+
+- `codex/2-14-config-final` at `9704dec4` bundles the official DuckDB v1.5.5 `aws`, `excel`, and `httpfs` Windows amd64 archives with checked SHA-256 manifest entries and licenses. The bundle checker, extension package tests, and a CGO-enabled Windows amd64 cross-build using macOS MinGW passed. Windows execution and Scoop lifecycle are still unproven.
+- Source-bound changed QA `20260927T092318-d71c2486` passed all five selected gates. Full QA `20260927T094713-ef9b0cd8` passed 26 of 27 gates; its self-hosted image built successfully, but the upgrade smoke lacked the required pinned previous-image input in the developer MCP environment. The user-approved focused fallback `20260927T101558-2e101fcb` passed that gate, including the upgrade/recreation smoke. These are two runs, not one all-pass full run.
+- The adjacent docs draft at `codex/2-14-blog` commit `8624e08` updates homepage icons, Reports and Ask AI screenshots, the Ask AI guide, and the unpublished 2.14.0 post. Its docs build passed; its Ask AI answer uses an explicitly labeled seeded demo response.
+- Phase 10 moved the test-only passkey fixture from `internal/testutil/passkeys.go` to `testutil/passkeys.go` without changing its package API. Both direct test importers now use the root path, and focused race tests pass; the separate database fixture package remains under `internal/testutil/testdb`.
+- The remaining migration gates below remain open. Root-level package moves require current dependency/owner/build proof for each candidate; the current plan's definition of done still calls for removing every `internal/` source and reference.
 
 ### Combined release candidate (2026-09-25)
 
@@ -94,7 +102,7 @@ This folder is the durable progress ledger for the migration. Update it in the s
 - Real cross-repository draft docs-attestation rehearsal and deployed token-scope proof.
 - Real tagged-release execution of the authenticated disposable Kind/Helm lifecycle, including deployed GHCR token scope and private prepublication artifact availability.
 - Stabilization release.
-- Windows CGO artifacts and Scoop install, upgrade, and uninstall lifecycle proof. Local mingw-w64 11 linkage against the DuckDB Windows static libraries currently fails on unresolved C++/MSVCRT symbols; no signing path is planned.
+- Windows release artifact assembly and real Windows/Scoop install, upgrade, and uninstall lifecycle proof. A local CGO-enabled Windows amd64 cross-build now passes with macOS MinGW and bundled DuckDB extensions; the tagged release workflow and Windows runtime remain unproven. No signing path is planned.
 - Remaining dependency-ordered `internal/` layout and filesystem migration waves.
 - Final Ponytail and spf13 Go review after the remaining gates close.
 

@@ -12,7 +12,7 @@ This manifest is the Phase 0C evidence gate for Phases 9 and 10. It records curr
 
 ## Current top-level package state
 
-Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`, `realtime`, `reporting`, and the developer CLI leaf `devtool/cli`.
+Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`, `realtime`, `reporting`, the passkey fixture `testutil`, and the developer CLI leaf `devtool/cli`.
 
 Remaining indexed families:
 
@@ -41,6 +41,15 @@ These surfaces form one build-time chain. The developer catalog owns supported b
 Disposition: **stay explicit / validate projections**. Do not consolidate these surfaces into production runtime configuration or move developer-only cloud defaults into the application binary.
 
 ## Move records: completed and rejected candidates
+
+### `testutil` passkey fixture
+
+- **Old → new path:** `internal/testutil/passkeys.go` → `testutil/passkeys.go`; the separate `internal/testutil/testdb` package stays in place for its own wave. Package name and exported fixture API are unchanged.
+- **Owner and purpose:** one test-only WebAuthn/passkey fixture that constructs registration and assertion responses. Production code does not import it.
+- **Dependents:** the exact direct importers are `internal/server/auth/handlers_test.go` and `internal/server/user/security_handlers_test.go`. Their test packages are the affected transitive boundary; no other direct importer was returned by the exact import search.
+- **Imports and cycle:** stdlib crypto, encoding, formatting, and math packages; the existing WebAuthn protocol/CBOR/COSE and credential packages; and `hitkeep/jsonapi`. It imports no server package, so moving the fixture does not introduce a server import cycle.
+- **Build and filesystem:** the single file has no build tag, OS/CGO split, generated source, embed, filesystem, process, or network operation. Its randomness is part of test credential construction, not persistent state.
+- **Proof and rollback:** `go test -race ./testutil ./internal/server/auth ./internal/server/user` passes after the move. Reverse the one-file move and restore the two test imports to roll back; no data migration or compatibility shim is needed because external modules could not import the former `internal/` path. **Phase 10 move-only wave completed.**
 
 ### `internal/api`
 
