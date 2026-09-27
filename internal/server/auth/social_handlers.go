@@ -15,7 +15,6 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/security"
 	"hitkeep/internal/server/shared"
@@ -23,6 +22,7 @@ import (
 	"hitkeep/internal/sso"
 	json "hitkeep/jsonapi"
 	"hitkeep/localization"
+	"hitkeep/mailables"
 )
 
 const socialFlowTTL = 10 * time.Minute

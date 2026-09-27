@@ -14,9 +14,9 @@ import (
 	"hitkeep/hklog"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	opportunitysvc "hitkeep/internal/opportunities"
+	"hitkeep/mailables"
 	"hitkeep/reporting"
 )
 

@@ -15,8 +15,8 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
+	"hitkeep/mailables"
 	"hitkeep/reporting"
 	"hitkeep/testutil/testdb"
 )

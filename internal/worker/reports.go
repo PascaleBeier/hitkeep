@@ -9,8 +9,8 @@ import (
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
-	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
+	"hitkeep/mailables"
 )
 
 // ReportWorker sends scheduled analytics emails (daily / weekly / monthly).

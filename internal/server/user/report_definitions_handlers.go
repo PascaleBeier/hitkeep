@@ -17,11 +17,11 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
 	"hitkeep/internal/database"
-	"hitkeep/internal/mailables"
 	"hitkeep/internal/mailer"
 	"hitkeep/internal/server/shared"
 	"hitkeep/internal/worker"
 	json "hitkeep/jsonapi"
+	"hitkeep/mailables"
 	"hitkeep/reporting"
 )
 
