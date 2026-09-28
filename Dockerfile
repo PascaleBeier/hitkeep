@@ -57,6 +57,7 @@ COPY exportfmt ./exportfmt
 COPY hklog ./hklog
 COPY internal ./internal
 COPY jsonapi ./jsonapi
+COPY listrefresh ./listrefresh
 COPY localization ./localization
 COPY mailables ./mailables
 COPY realtime ./realtime

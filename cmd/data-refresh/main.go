@@ -13,7 +13,7 @@ import (
 
 	duckdbrefresh "hitkeep/internal/duckdbextensions/refresh"
 	iprefresh "hitkeep/internal/ipmeta/refresh"
-	"hitkeep/internal/listrefresh"
+	"hitkeep/listrefresh"
 )
 
 func main() {

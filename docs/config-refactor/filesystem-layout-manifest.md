@@ -12,7 +12,7 @@ This manifest is the Phase 0C evidence gate for Phases 9 and 10. It records curr
 
 ## Current top-level package state
 
-Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `analyticstools`, `jsonapi`, `localization`, `config`, `mailables`, `mcptest`, `realtime`, `reporting`, the test fixture family `testutil`, and the developer CLI leaf `devtool/cli`.
+Already moved from `internal/`: `appurl`, `assetstore`, `cluster`, `exportfmt`, `hklog`, `analyticscatalog`, `analyticstools`, `jsonapi`, `listrefresh`, `localization`, `config`, `mailables`, `mcptest`, `realtime`, `reporting`, the test fixture family `testutil`, and the developer CLI leaf `devtool/cli`.
 
 Remaining indexed families:
 
@@ -59,6 +59,15 @@ Disposition: **stay explicit / validate projections**. Do not consolidate these 
 - **Imports and cycle:** direct imports are `context`, `os`, `path/filepath`, `sync`, `testing`, and `hitkeep/internal/database`. The fixture depends inward on `database`; no database source imports the fixture, so the move adds no import cycle.
 - **Build and filesystem:** the one-file package has no build tags, OS/CGO split, generated source, or embed. Its native `os`/`filepath` operations remain part of temporary DuckDB fixture creation and clone setup; this path-only wave does not substitute Afero, fileflow, or pathologize for database files.
 - **Proof and rollback:** focused race tests pass for `testutil/testdb` and all affected default-build server and worker packages. Reverse the file move and restore the 13 test imports to roll back; no persistent data or external import contract changes. **Phase 10 move-only wave completed.**
+
+### `internal/listrefresh` move-only candidate
+
+- **Old → new path:** `internal/listrefresh` → `listrefresh`, with package name and exported signatures unchanged. This is a path-only move of `refresh.go` and `refresh_test.go`; there is no forwarding package.
+- **Owner and purpose:** `listrefresh` coordinates the developer/maintenance refresh of the AI-agent and spam-feed lists. It owns the two-minute fetch/validate/compare/save sequence; the `aianalytics` and `blocking/spamfeed` packages retain fetching, validation, and persistence.
+- **Dependents:** the exact three direct importers of `hitkeep/internal/listrefresh` are `cmd/data-refresh/main.go`, `cmd/update_ai_agent_lists.go`, and `cmd/update_spam_lists.go`. Their transitive boundary is the data-refresh command and the root CLI command graph; no production server package directly imports this helper.
+- **Imports and cycle:** direct imports are stdlib `context`, `errors`, `fmt`, `log/slog`, `os`, `reflect`, and `time`, plus `hitkeep/internal/aianalytics` and `hitkeep/internal/blocking/spamfeed`. The move changes no dependency edge or package name; `go list` and focused tests must verify no cycle after updating the three imports.
+- **Build and filesystem:** both files are ordinary Go source without build tags, OS/CGO split, generated source, or embeds. The coordinator uses `os.Lstat` to distinguish a missing list from an unreadable existing path. `Load`/`Save` remain owned by the two data packages; this move does not change network, filesystem, permissions, or replacement semantics. The Docker source-builder must copy the new top-level directory.
+- **Tests and rollback:** `go test -race ./listrefresh` passes after adjusting the test-only embedded spam fixture path for the new directory; every `cmd/...` race-test package passes. The default and cloud command builds and changed QA remain required. Rollback moves the two files back, restores the three command imports, fixture path, and Docker copy line, and removes this record. The former path was internal, so no external compatibility shim is justified. **Phase 10 move-only wave completed.**
 
 ### `internal/api`
 

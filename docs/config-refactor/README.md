@@ -41,6 +41,8 @@ This folder is the durable progress ledger for the migration. Update it in the s
 
 ## Current delivery status
 
+- 2026-09-28 Phase 10: moved the two-file `internal/listrefresh` command refresh coordinator to `listrefresh`, updated its three direct command imports and Docker source copy, and corrected the test fixture's relative path. `go list ./listrefresh ./cmd/...`, `go test -race ./listrefresh`, and all `cmd/...` race-test packages passed. The remaining `internal/` families and release gates are still open.
+
 ### 2.14.0 preparation (2026-09-28)
 
 - `codex/2-14-config-final` at `efad9a66` includes the official DuckDB v1.5.5 `aws`, `excel`, and `httpfs` Windows amd64 bundles, completed `testutil`, `mailables`, and `analyticstools` move-only waves, and the image source-builder fix for the new root packages. It merges HitKeep `origin/main` at `177bd2a2`; a fresh fetch confirms that commit remains current. Windows execution and Scoop lifecycle remain unproven.
