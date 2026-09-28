@@ -48,6 +48,14 @@ export interface BillingCheckoutSessionRequest {
     locale?: string;
 }
 
+export interface CloudBillingState {
+    team_id: string;
+    plan_code: string;
+    subscription_status: string;
+    pending_plan_code?: 'pro' | 'business';
+    billing?: BillingInterval;
+}
+
 @Service()
 export class CloudService {
     private readonly http = inject(HttpClient);
@@ -70,5 +78,9 @@ export class CloudService {
 
     getPlans(): Observable<CloudPlanTier[]> {
         return this.http.get<CloudPlanTier[]>('/api/cloud/plans');
+    }
+
+    getBillingState(): Observable<CloudBillingState> {
+        return this.http.get<CloudBillingState>('/api/cloud/billing/state');
     }
 }

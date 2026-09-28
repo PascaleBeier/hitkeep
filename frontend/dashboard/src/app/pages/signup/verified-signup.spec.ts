@@ -2,68 +2,29 @@ import { DOCUMENT } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { Observable, of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
 
 import { VerifiedSignup } from '@pages/signup/verified-signup';
+import { AnalyticsService } from '@services/analytics.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
-import { BillingPortalSessionResponse, CloudService } from '@services/cloud.service';
 
 describe('VerifiedSignup', () => {
     let queryParams: Record<string, string>;
-    let locationAssign: ReturnType<typeof vi.fn>;
-
-    const cloud = {
-        createBillingCheckoutSession: vi.fn<(request: unknown) => Observable<BillingPortalSessionResponse>>()
-    };
-    const tracking = {
-        install: vi.fn(),
-        trackEvent: vi.fn()
-    };
-    const router = {
-        navigateByUrl: vi.fn<(url: string) => Promise<boolean>>(() => Promise.resolve(true))
-    };
+    const analytics = { getSystemStatus: vi.fn(() => of({ cloud: { hosted: true } })) };
+    const tracking = { install: vi.fn(), trackEvent: vi.fn() };
+    const router = { navigateByUrl: vi.fn<(url: string) => Promise<boolean>>(() => Promise.resolve(true)) };
 
     beforeEach(async () => {
         vi.clearAllMocks();
         queryParams = {};
-        locationAssign = vi.fn();
-        const location = {
-            hostname: 'cloud.hitkeep.eu',
-            assign: locationAssign
-        } as unknown as Location;
-        const defaultView = new Proxy(window, {
-            get(target, property) {
-                if (property === 'location') return location;
-                const value = Reflect.get(target, property, target);
-                return typeof value === 'function' ? value.bind(target) : value;
-            }
-        }) as Window;
-        const documentMock = new Proxy(document, {
-            get(target, property) {
-                if (property === 'defaultView') return defaultView;
-                const value = Reflect.get(target, property, target);
-                return typeof value === 'function' ? value.bind(target) : value;
-            }
-        }) as Document;
-
         await TestBed.configureTestingModule({
-            imports: [
-                VerifiedSignup,
-                TranslocoTestingModule.forRoot({
-                    langs: { en: {} },
-                    translocoConfig: {
-                        availableLangs: ['en'],
-                        defaultLang: 'en'
-                    },
-                    preloadLangs: true
-                })
-            ],
+            imports: [VerifiedSignup, TranslocoTestingModule.forRoot({ langs: { en: {} }, translocoConfig: { availableLangs: ['en'], defaultLang: 'en' }, preloadLangs: true })],
             providers: [
-                { provide: CloudService, useValue: cloud },
+                { provide: AnalyticsService, useValue: analytics },
                 { provide: CloudSignupTrackingService, useValue: tracking },
                 { provide: Router, useValue: router },
-                { provide: DOCUMENT, useValue: documentMock },
+                { provide: DOCUMENT, useValue: document },
                 {
                     provide: ActivatedRoute,
                     useValue: {
@@ -76,9 +37,7 @@ describe('VerifiedSignup', () => {
                 }
             ]
         })
-            .overrideComponent(VerifiedSignup, {
-                set: { imports: [], template: '<div></div>' }
-            })
+            .overrideComponent(VerifiedSignup, { set: { imports: [], template: '<div></div>' } })
             .compileComponents();
     });
 
@@ -88,48 +47,26 @@ describe('VerifiedSignup', () => {
         return fixture;
     }
 
-    it('takes verified Business annual intent directly to checkout', () => {
+    it('keeps verified Business annual intent for explicit payment review', () => {
         queryParams = { plan: 'business', billing: 'annual' };
-        cloud.createBillingCheckoutSession.mockReturnValue(of({ url: 'https://checkout.stripe.com/c/pay/test' }));
-
-        create();
-
-        expect(cloud.createBillingCheckoutSession).toHaveBeenCalledWith({
-            plan_code: 'business',
-            billing: 'annual',
-            locale: 'en'
-        });
-        expect(tracking.trackEvent).toHaveBeenCalledWith('signup_verified', {
-            plan: 'business',
-            interval: 'annual',
-            jurisdiction: 'EU',
-            source_path: '/signup/verified'
-        });
-        expect(tracking.trackEvent).toHaveBeenCalledWith('checkout_started', {
-            plan: 'business',
-            interval: 'annual',
-            jurisdiction: 'EU',
-            source_path: '/signup/verified'
-        });
-        expect(locationAssign).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/test');
+        const component = create().componentInstance;
+        expect(router.navigateByUrl).not.toHaveBeenCalled();
+        component['reviewPayment']();
+        expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/team?purchase=review&plan=business&billing=annual');
+        expect(tracking.trackEvent).toHaveBeenCalledWith('signup_verified', expect.objectContaining({ plan: 'business', interval: 'annual' }));
     });
 
-    it('keeps a continue-on-Free escape hatch when checkout fails', () => {
+    it('does not offer Cloud payment on a self-hosted instance', () => {
+        analytics.getSystemStatus.mockReturnValueOnce(of({ cloud: { hosted: false } }));
+        const component = create().componentInstance;
+        component['reviewPayment']();
+        expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+        expect(tracking.install).not.toHaveBeenCalled();
+    });
+
+    it('lets a verified user continue on Free', () => {
         queryParams = { plan: 'pro', billing: 'monthly' };
-        cloud.createBillingCheckoutSession.mockReturnValue(throwError(() => new Error('checkout unavailable')));
-
-        const fixture = create();
-        const component = fixture.componentInstance;
-        expect(component['checkoutFailed']()).toBe(true);
-
-        component['continueFree']();
-
-        expect(tracking.trackEvent).toHaveBeenCalledWith('continue_on_free', {
-            plan: 'pro',
-            interval: 'monthly',
-            jurisdiction: 'EU',
-            source_path: '/signup/verified'
-        });
+        create().componentInstance['continueFree']();
         expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     });
 });

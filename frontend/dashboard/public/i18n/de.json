@@ -763,6 +763,8 @@
     "openInNewTabAria": "In neuem Tab öffnen",
     "openUserMenuAria": "Benutzermenü öffnen",
     "password": "Passwort",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen",
     "passwordPlaceholder": "••••••••",
     "preparing": "Wird vorbereitet...",
     "refreshDataTooltip": "Daten aktualisieren",
@@ -2806,23 +2808,51 @@
     }
   },
   "signup": {
+    "pageTitle": "Erstelle dein HitKeep-Konto",
+    "paidTitle": "Starte mit HitKeep {{plan}}",
+    "paidSubtitle": "Erstelle dein Konto, bestätige deine E-Mail-Adresse und prüfe dann die Zahlung.",
+    "paidNextSteps": "Konto erstellen → E-Mail bestätigen → Zahlung prüfen",
+    "annualCharge": "Jährliche Abrechnung.",
+    "priceUnavailable": "Preis im Checkout verfügbar",
+    "freePrice": "Kostenlos",
+    "reviewPayment": "Zahlung prüfen",
+    "checkingCloud": "Dein Cloud-Konto wird geprüft…",
+    "recovery": {
+      "loading": "Zahlungsstatus wird geprüft…",
+      "switchTeamTitle": "Zum Team dieses Checkouts wechseln",
+      "switchTeamDescription": "Wähle oben das Team aus, das du beim Checkout verwendet hast.",
+      "unavailableTitle": "Dieser Checkout konnte nicht bestätigt werden",
+      "unavailableDescription": "Prüfe deinen Abrechnungsstatus, bevor du eine weitere Zahlung startest.",
+      "retryState": "Erneut prüfen",
+      "paidTitle": "Dein kostenpflichtiger Tarif ist aktiv",
+      "paidDescription": "Die Zahlung ist abgeschlossen. Dein Team hat seinen kostenpflichtigen Tarif.",
+      "dashboard": "Dashboard öffnen",
+      "canceledTitle": "Die Zahlung wurde nicht abgeschlossen",
+      "canceledDescription": "Dein Konto ist bereit. Fahre mit deinem gewählten Tarif fort oder nutze Free.",
+      "reviewTitle": "Prüfe deinen Tarif",
+      "reviewDescription": "Dein Konto ist bereit. Prüfe Tarif und Preis, bevor du zur Zahlung gehst.",
+      "confirmTeam": "Bestätige, dass {{team}} das Team ist, das du upgraden möchtest.",
+      "confirmTeamAction": "Dieses Team verwenden",
+      "continuePaid": "Weiter mit {{plan}} — {{price}}",
+      "continueFree": "Mit Free fortfahren",
+      "checkoutError": "Die Abrechnung konnte nicht geöffnet werden. Versuche es erneut."
+    },
     "title": "Starte kostenloses Tracking für deine Websites",
     "subtitle": "Erstelle deinen Workspace und tracke in unter einer Minute. Keine Kreditkarte erforderlich.",
-    "paidIntentNote": "Nach der E-Mail-Bestätigung öffnen wir den sicheren Checkout. Du kannst stattdessen kostenlos fortfahren.",
     "billing": {
       "monthly": "Monatliche Abrechnung",
       "annual": "Jährliche Abrechnung"
     },
     "verified": {
       "title": "Dein Workspace ist bestätigt",
-      "subtitle": "{{plan}} mit {{billing}} ist bereit. Wir öffnen den sicheren Checkout.",
+      "subtitle": "{{plan}} ist bereit ({{billing}}). Prüfe Tarif und Preis, bevor du zur Zahlung gehst.",
       "openingCheckout": "Stripe Checkout wird geöffnet…",
       "checkoutFailed": "Der Checkout konnte nicht geöffnet werden. Dein Workspace ist im Free-Tarif aktiv und du kannst es erneut versuchen.",
       "retryCheckout": "Checkout erneut öffnen",
       "continueFree": "Mit Free fortfahren",
       "freeNote": "Eine Belastung erfolgt nur, wenn du den Checkout abschließt."
     },
-    "jurisdictionLabel": "Jurisdiktion",
+    "jurisdictionLabel": "Datenregion",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

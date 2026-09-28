@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -23,7 +24,9 @@ import (
 
 func (h *handler) handleForgotPassword() http.HandlerFunc {
 	type request struct {
-		Email string `json:"email"`
+		Email   string `json:"email"`
+		Plan    string `json:"plan"`
+		Billing string `json:"billing"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +59,16 @@ func (h *handler) handleForgotPassword() http.HandlerFunc {
 		}
 
 		resetLink := appurl.Path(h.ctx.Config.PublicURL, "/reset-password?token="+token)
+		if h.ctx.Config.CloudHosted && h.ctx.Config.CloudSignupEnabled {
+			plan := normalizeSocialPlan(req.Plan)
+			if plan == "pro" || plan == "business" {
+				billing := normalizeSocialBilling(req.Billing)
+				if billing == "" {
+					billing = "monthly"
+				}
+				resetLink += "&plan=" + url.QueryEscape(plan) + "&billing=" + url.QueryEscape(billing)
+			}
+		}
 		locale := h.preferredMailLocale(r, user.ID)
 
 		if h.ctx.Mailer == nil {

@@ -24,7 +24,7 @@ describe('SocialSignup', () => {
                 flow: 'signup' as const
             })
         ),
-        completeSocialSignup: vi.fn<AuthService['completeSocialSignup']>(() => of({ status: 'ok' as const, plan_code: 'pro', billing: 'annual', redirect_url: '/signup/verified?plan=pro&billing=annual' }))
+        completeSocialSignup: vi.fn<AuthService['completeSocialSignup']>(() => of({ status: 'ok' as const, plan_code: 'pro', billing: 'monthly', redirect_url: '/signup/verified?plan=pro&billing=monthly' }))
     };
     const trackingMock = { install: vi.fn(), trackEvent: vi.fn() };
     const routerMock = { navigateByUrl: vi.fn<(url: string) => Promise<boolean>>(() => Promise.resolve(true)) };
@@ -63,7 +63,7 @@ describe('SocialSignup', () => {
                     provide: ActivatedRoute,
                     useValue: {
                         snapshot: {
-                            queryParamMap: convertToParamMap({ plan: 'pro', billing: 'annual', region: 'EU' })
+                            queryParamMap: convertToParamMap({ plan: 'pro', billing: 'monthly', region: 'EU' })
                         }
                     }
                 }
@@ -91,7 +91,7 @@ describe('SocialSignup', () => {
             email: undefined,
             team_name: 'Social Team',
             plan_code: 'pro',
-            billing: 'annual',
+            billing: 'monthly',
             jurisdiction: 'EU',
             locale: 'en',
             accepted_tos: true
@@ -100,6 +100,6 @@ describe('SocialSignup', () => {
         const signupProperties = signupStarted?.[1] as Record<string, unknown> | undefined;
         expect(signupProperties?.['auth_method']).toBe('social');
         expect(signupProperties?.['provider']).toBe('google');
-        expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/signup/verified?plan=pro&billing=annual');
+        expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/signup/verified?plan=pro&billing=monthly');
     });
 });

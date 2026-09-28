@@ -768,6 +768,8 @@
     "openInNewTabAria": "Openen in nieuw tabblad",
     "openUserMenuAria": "Gebruikersmenu openen",
     "password": "Wachtwoord",
+    "showPassword": "Wachtwoord tonen",
+    "hidePassword": "Wachtwoord verbergen",
     "passwordPlaceholder": "••••••••",
     "preparing": "Voorbereiden...",
     "refreshDataTooltip": "Gegevens vernieuwen",
@@ -2750,23 +2752,51 @@
     }
   },
   "signup": {
+    "pageTitle": "Maak je HitKeep-account aan",
+    "paidTitle": "Aan de slag met HitKeep {{plan}}",
+    "paidSubtitle": "Maak je account aan, bevestig je e-mail en bekijk daarna de betaling.",
+    "paidNextSteps": "Account maken → E-mail bevestigen → Betaling bekijken",
+    "annualCharge": "Jaarlijks gefactureerd.",
+    "priceUnavailable": "Prijs zichtbaar bij afrekenen",
+    "freePrice": "Gratis",
+    "reviewPayment": "Betaling bekijken",
+    "checkingCloud": "Je Cloud-account wordt gecontroleerd…",
+    "recovery": {
+      "loading": "Betaalstatus wordt gecontroleerd…",
+      "switchTeamTitle": "Schakel naar het team van deze betaling",
+      "switchTeamDescription": "Gebruik de teamkiezer om het team te openen dat je bij het afrekenen koos.",
+      "unavailableTitle": "Deze betaling kon niet worden bevestigd",
+      "unavailableDescription": "Controleer je factuurstatus voordat je een nieuwe betaling start.",
+      "retryState": "Opnieuw controleren",
+      "paidTitle": "Je betaalde abonnement is actief",
+      "paidDescription": "De betaling is voltooid. Je team heeft het betaalde abonnement.",
+      "dashboard": "Dashboard openen",
+      "canceledTitle": "De betaling is niet voltooid",
+      "canceledDescription": "Je account is klaar. Ga verder met je gekozen abonnement of gebruik Gratis.",
+      "reviewTitle": "Bekijk je abonnement",
+      "reviewDescription": "Je account is klaar. Bekijk het abonnement en de prijs voordat je betaalt.",
+      "confirmTeam": "Bevestig dat {{team}} het team is dat je wilt upgraden.",
+      "confirmTeamAction": "Dit team gebruiken",
+      "continuePaid": "Verder met {{plan}} — {{price}}",
+      "continueFree": "Verder met Gratis",
+      "checkoutError": "Facturatie kon niet worden geopend. Probeer het opnieuw."
+    },
     "title": "Begin gratis met het volgen van je sites",
     "subtitle": "Creëer je werkruimte en begin binnen een minuut met volgen. Geen creditcard vereist.",
-    "paidIntentNote": "Na e-mailverificatie openen we de beveiligde checkout. Je kunt ook doorgaan met Free.",
     "billing": {
       "monthly": "Maandelijkse facturering",
       "annual": "Jaarlijkse facturering"
     },
     "verified": {
       "title": "Je werkruimte is geverifieerd",
-      "subtitle": "{{plan}} met {{billing}} staat klaar. We openen de beveiligde checkout.",
+      "subtitle": "{{plan}} is klaar ({{billing}}). Controleer het abonnement en de prijs voordat je verdergaat naar de betaling.",
       "openingCheckout": "Stripe Checkout wordt geopend…",
       "checkoutFailed": "De checkout kon niet worden geopend. Je werkruimte is actief op Free en je kunt het opnieuw proberen.",
       "retryCheckout": "Checkout opnieuw proberen",
       "continueFree": "Doorgaan met Free",
       "freeNote": "Je kaart wordt pas belast als je de checkout afrondt."
     },
-    "jurisdictionLabel": "Jurisdictie",
+    "jurisdictionLabel": "Gegevensregio",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

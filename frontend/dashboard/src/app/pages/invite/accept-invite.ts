@@ -6,11 +6,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { MessageModule } from '@openng/optimus-ui/message';
-import { PasswordModule } from '@openng/optimus-ui/password';
 import { finalize } from 'rxjs';
 
 import { Brand } from '@components/brand/brand';
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { AuthService, SocialProvider, SocialProviderID } from '@services/auth.service';
@@ -18,7 +18,7 @@ import { AuthService, SocialProvider, SocialProviderID } from '@services/auth.se
 @Component({
     selector: 'app-accept-invite',
     standalone: true,
-    imports: [ReactiveFormsModule, AuthCard, AuthDivider, AuthMethods, Brand, ButtonModule, MessageModule, PasswordModule, TranslocoPipe],
+    imports: [ReactiveFormsModule, AuthCard, PasswordInput, AuthDivider, AuthMethods, Brand, ButtonModule, MessageModule, TranslocoPipe],
     templateUrl: './accept-invite.html',
     styleUrl: './accept-invite.css',
     changeDetection: ChangeDetectionStrategy.OnPush

@@ -7,19 +7,19 @@ import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 // OptimusUI Imports
-import { PasswordModule } from '@openng/optimus-ui/password';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 
 // Corrected path to Core
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { Brand } from '@components/brand/brand';
 
 @Component({
     selector: 'app-setup',
     standalone: true,
-    imports: [AuthCard, Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, MessageModule, TranslocoPipe],
+    imports: [AuthCard, PasswordInput, Brand, ReactiveFormsModule, ButtonModule, InputTextModule, MessageModule, TranslocoPipe],
     templateUrl: './setup.html',
     styleUrl: './setup.css',
     changeDetection: ChangeDetectionStrategy.OnPush

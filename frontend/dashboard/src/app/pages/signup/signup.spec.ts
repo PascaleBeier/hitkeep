@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { Router } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
+import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { NEVER, of, Subject, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
@@ -19,9 +20,16 @@ describe('Signup', () => {
     let locationAssignMock: ReturnType<typeof vi.fn>;
     let documentMock: Document;
 
-    const cloudServiceMock: { signup: ReturnType<typeof vi.fn>; resendSignupVerification: ReturnType<typeof vi.fn> } = {
+    const cloudServiceMock: { signup: ReturnType<typeof vi.fn>; resendSignupVerification: ReturnType<typeof vi.fn>; getPlans: ReturnType<typeof vi.fn> } = {
         signup: vi.fn(() => NEVER),
-        resendSignupVerification: vi.fn(() => NEVER)
+        resendSignupVerification: vi.fn(() => NEVER),
+        getPlans: vi.fn(() =>
+            of([
+                { code: 'free', name: 'Free', entitlements: { max_sites_per_team: 3, max_team_members: 3 } },
+                { code: 'pro', name: 'Pro', prices: { monthly: { amount_minor: 1500, currency: 'EUR' }, annual: { amount_minor: 15000, currency: 'EUR' } }, entitlements: { max_sites_per_team: 10, max_team_members: 5 } },
+                { code: 'business', name: 'Business', prices: { monthly: { amount_minor: 3900, currency: 'EUR' }, annual: { amount_minor: 39000, currency: 'EUR' } }, entitlements: { max_sites_per_team: 50, max_team_members: 20 } }
+            ])
+        )
     };
 
     const analyticsServiceMock = {
@@ -98,6 +106,7 @@ describe('Signup', () => {
                 })
             ],
             providers: [
+                provideTranslocoLocale({ langToLocaleMapping: { en: 'en-US' } }),
                 { provide: Router, useValue: routerMock },
                 { provide: AuthService, useValue: authServiceMock },
                 { provide: CloudService, useValue: cloudServiceMock },
@@ -148,6 +157,21 @@ describe('Signup', () => {
             interval: 'monthly',
             source_path: '/signup'
         });
+    });
+
+    it('keeps Pro monthly intent on the login link', () => {
+        queryParams = { plan: 'pro', billing: 'monthly' };
+        fixture.destroy();
+        fixture = TestBed.createComponent(Signup);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+
+        const next = component['loginQueryParams']();
+        expect(next.plan).toBe('pro');
+        expect(next.billing).toBe('monthly');
+        expect(next.returnUrl).toContain('purchase=review');
+        expect(new URLSearchParams(next.returnUrl.split('?')[1]).get('billing')).toBe('monthly');
+        expect(Object.keys(next).sort()).toEqual(['billing', 'plan', 'returnUrl']);
     });
 
     it('submits a cloud signup request with free plan', () => {

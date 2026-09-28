@@ -6,6 +6,10 @@
                 <i class="pi pi-envelope text-4xl text-primary-500" aria-hidden="true"></i>
                 <h1 id="social-signup-title" class="hk-auth-title">{{ "social.confirmationTitle" | transloco }}</h1>
                 <p class="hk-auth-subtitle">{{ "social.confirmationSent" | transloco }}</p>
+                @if (selectedPlan() !== 'free') {
+                <p class="m-0 text-sm font-semibold">{{ ('signup.plans.' + selectedPlan() + '.name') | transloco }} · {{ ('signup.billing.' + selectedBilling()) | transloco }}</p>
+                <p class="m-0 text-sm text-[var(--p-text-muted-color)]">{{ 'signup.paidNextSteps' | transloco }}</p>
+                }
             </header>
             } @else {
             <header class="hk-auth-header">
@@ -20,6 +24,10 @@
             <p-message severity="secondary" icon="pi pi-spin pi-spinner">{{ "common.loading" | transloco }}</p-message>
             } @if (preview()) {
             <form (submit)="onSubmit($event)" class="hk-auth-form" novalidate>
+                @if (selectedPlan() !== 'free') {
+                <p class="m-0 text-sm font-semibold">{{ ('signup.plans.' + selectedPlan() + '.name') | transloco }} · {{ ('signup.billing.' + selectedBilling()) | transloco }}</p>
+                <p class="m-0 text-sm text-[var(--p-text-muted-color)]">{{ 'signup.paidNextSteps' | transloco }}</p>
+                }
                 <div class="rounded-lg border border-surface px-4 py-3 text-sm">
                     <div class="font-semibold">{{ preview()!.display_name }}</div>
                     <div class="text-[var(--p-text-muted-color)]">{{ ("signup.jurisdictions." + jurisdiction().toLowerCase()) | transloco }}</div>

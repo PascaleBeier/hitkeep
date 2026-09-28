@@ -763,6 +763,8 @@
     "openInNewTabAria": "Abrir en una nueva pestaña",
     "openUserMenuAria": "Abrir menú de usuario",
     "password": "Contraseña",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
     "passwordPlaceholder": "••••••••",
     "preparing": "Preparando...",
     "refreshDataTooltip": "Actualizar datos",
@@ -3002,23 +3004,51 @@
     }
   },
   "signup": {
+    "pageTitle": "Crea tu cuenta de HitKeep",
+    "paidTitle": "Empieza con HitKeep {{plan}}",
+    "paidSubtitle": "Crea tu cuenta, verifica tu correo y después revisa el pago.",
+    "paidNextSteps": "Crear cuenta → Verificar correo → Revisar pago",
+    "annualCharge": "Cobro anual.",
+    "priceUnavailable": "Precio disponible al pagar",
+    "freePrice": "Gratis",
+    "reviewPayment": "Revisar pago",
+    "checkingCloud": "Comprobando tu cuenta de Cloud…",
+    "recovery": {
+      "loading": "Comprobando el estado del pago…",
+      "switchTeamTitle": "Cambia al equipo de este pago",
+      "switchTeamDescription": "Usa el selector de equipos para abrir el equipo elegido al pagar.",
+      "unavailableTitle": "No pudimos confirmar este pago",
+      "unavailableDescription": "Comprueba el estado de facturación antes de iniciar otro pago.",
+      "retryState": "Comprobar de nuevo",
+      "paidTitle": "Tu plan de pago está activo",
+      "paidDescription": "El pago se completó. Tu equipo ya tiene su plan de pago.",
+      "dashboard": "Abrir panel",
+      "canceledTitle": "El pago no se completó",
+      "canceledDescription": "Tu cuenta está lista. Continúa con el plan elegido o usa Gratis.",
+      "reviewTitle": "Revisa tu plan",
+      "reviewDescription": "Tu cuenta está lista. Revisa el plan y el precio antes de pagar.",
+      "confirmTeam": "Confirma que {{team}} es el equipo que quieres mejorar.",
+      "confirmTeamAction": "Usar este equipo",
+      "continuePaid": "Continuar con {{plan}} — {{price}}",
+      "continueFree": "Continuar con Gratis",
+      "checkoutError": "No se pudo abrir la facturación. Inténtalo de nuevo."
+    },
     "title": "Empieza a rastrear tus sitios gratis",
     "subtitle": "Crea tu espacio de trabajo y empieza a rastrear en menos de un minuto. Sin tarjeta de crédito.",
-    "paidIntentNote": "Tras verificar el correo, abriremos el pago seguro. También puedes continuar con Free.",
     "billing": {
       "monthly": "Facturación mensual",
       "annual": "Facturación anual"
     },
     "verified": {
       "title": "Tu espacio de trabajo está verificado",
-      "subtitle": "{{plan}} con {{billing}} está listo. Estamos abriendo el pago seguro.",
+      "subtitle": "{{plan}} está listo ({{billing}}). Revisa el plan y el precio antes de continuar al pago.",
       "openingCheckout": "Abriendo Stripe Checkout…",
       "checkoutFailed": "No se pudo abrir el pago. Tu espacio está activo en Free y puedes volver a intentarlo.",
       "retryCheckout": "Reintentar el pago",
       "continueFree": "Continuar con Free",
       "freeNote": "No se cobra ninguna tarjeta hasta que completes el pago."
     },
-    "jurisdictionLabel": "Jurisdicción",
+    "jurisdictionLabel": "Región de datos",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

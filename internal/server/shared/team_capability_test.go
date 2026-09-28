@@ -25,6 +25,7 @@ func TestHandlerConfigAuthHelpers(t *testing.T) {
 		{"site permission", HandlerConfig{SitePerm: auth.PermSiteView}, true, true},
 		{"human-only permission", HandlerConfig{SitePerm: auth.PermSiteManageWebhooks, HumanOnly: true}, true, false},
 		{"team capability", HandlerConfig{TeamCap: auth.CapTeamManageSettings}, true, false},
+		{"active team capability", HandlerConfig{ActiveTeamCap: auth.CapTeamManageSettings}, true, false},
 		{"api client only", HandlerConfig{APIClientOnly: true}, false, false},
 		{"open route", HandlerConfig{}, false, false},
 	}
@@ -117,6 +118,53 @@ func TestRequireTeamCapability(t *testing.T) {
 			t.Fatalf("expected forbidden without next handler, got status %d called=%v", w.Code, nextCalled)
 		}
 	})
+}
+
+func TestRequireActiveTeamCapability(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestStore(t)
+	defer store.Close()
+
+	ownerID, err := store.CreateUser(ctx, "active-cap-owner@example.test", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberID, err := store.CreateUser(ctx, "active-cap-member@example.test", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	teamID, err := store.GetActiveTenantID(ctx, ownerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddTeamMember(ctx, teamID, memberID, database.TenantRoleMember, ownerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetActiveTenantID(ctx, memberID, teamID); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &Context{Store: store}
+	next := func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }
+	for _, tc := range []struct {
+		name   string
+		userID uuid.UUID
+		want   int
+	}{
+		{"owner", ownerID, http.StatusNoContent},
+		{"member", memberID, http.StatusForbidden},
+		{"unauthenticated", uuid.Nil, http.StatusUnauthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/cloud/billing/state", nil)
+			req = req.WithContext(context.WithValue(req.Context(), UserIDKey, tc.userID))
+			w := httptest.NewRecorder()
+			app.RequireActiveTeamCapability(auth.CapTeamManageSettings)(next).ServeHTTP(w, req)
+			if w.Code != tc.want {
+				t.Fatalf("status = %d, want %d: %s", w.Code, tc.want, w.Body.String())
+			}
+		})
+	}
 }
 
 func TestRequirePermissionRequiresAPIClientSiteGrantBeforeInstanceBypass(t *testing.T) {

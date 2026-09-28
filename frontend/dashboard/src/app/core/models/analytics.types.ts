@@ -103,6 +103,7 @@ export interface CloudPlanTier {
     code: string;
     name: string;
     entitlements: TeamEntitlements;
+    prices?: Partial<Record<'monthly' | 'annual', { amount_minor: number; currency: string }>>;
 }
 
 export interface UserTeamsResponse {

@@ -7,7 +7,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 // OptimusUI
 import { ButtonModule } from '@openng/optimus-ui/button';
-import { PasswordModule } from '@openng/optimus-ui/password';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { InputOtpModule } from '@openng/optimus-ui/inputotp';
 import { SettingsCard } from '@features/settings/components/settings-card';
@@ -15,6 +14,7 @@ import { RelativeDateTime } from '@components/relative-date-time/relative-date-t
 
 // Core
 import { AuthService } from '@services/auth.service';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { SocialProvider, SocialProviderID } from '@services/auth.service';
 import { PasskeyRegistrationFinishRequest, PasskeyRegistrationStartResponse, UserRecoveryCodesResponse, UserSecurityService, UserSecurityStatus, UserTotpSetup } from '@services/user-security.service';
 import { UserProfileService } from '@services/user-profile.service';
@@ -23,7 +23,7 @@ import { ActivatedRoute } from '@angular/router';
 
 @Component({
     selector: 'app-settings-security',
-    imports: [ReactiveFormsModule, ButtonModule, PasswordModule, MessageModule, InputOtpModule, SettingsCard, RelativeDateTime, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, PasswordInput, MessageModule, InputOtpModule, SettingsCard, RelativeDateTime, TranslocoPipe],
     templateUrl: './settings-security.html',
     styleUrl: './settings-security.css',
     changeDetection: ChangeDetectionStrategy.OnPush

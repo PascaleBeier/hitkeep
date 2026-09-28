@@ -36,6 +36,7 @@ type HandlerConfig struct {
 	InstancePerm  auth.Permission
 	SitePerm      auth.Permission
 	TeamCap       auth.Capability
+	ActiveTeamCap auth.Capability
 	AllowAPIKey   bool
 	APIClientOnly bool
 	HumanOnly     bool
@@ -163,6 +164,9 @@ func (c *Context) applyAccessChecks(config HandlerConfig, handler http.HandlerFu
 	if config.TeamCap != "" {
 		handler = c.RequireTeamCapability(config.TeamCap)(handler)
 	}
+	if config.ActiveTeamCap != "" {
+		handler = c.RequireActiveTeamCapability(config.ActiveTeamCap)(handler)
+	}
 
 	// Apply instance permission check if needed.
 	if config.InstancePerm != "" {
@@ -183,7 +187,7 @@ func (c *Context) applyAuthentication(config HandlerConfig, handler http.Handler
 }
 
 func (config HandlerConfig) requiresUserAuth() bool {
-	return config.RequireAuth || config.InstancePerm != "" || config.SitePerm != "" || config.TeamCap != ""
+	return config.RequireAuth || config.InstancePerm != "" || config.SitePerm != "" || config.TeamCap != "" || config.ActiveTeamCap != ""
 }
 
 func (config HandlerConfig) allowsAPIKey() bool {

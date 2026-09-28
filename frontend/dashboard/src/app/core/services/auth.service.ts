@@ -220,8 +220,8 @@ export class AuthService {
         );
     }
 
-    requestPasswordReset(email: string): Observable<void> {
-        return this.http.post<void>('/api/auth/forgot-password', { email });
+    requestPasswordReset(email: string, intent?: { plan: string; billing: string }): Observable<void> {
+        return this.http.post<void>('/api/auth/forgot-password', { email, ...(intent ? { plan: intent.plan, billing: intent.billing } : {}) });
     }
 
     resetPassword(token: string, password: string): Observable<void> {
