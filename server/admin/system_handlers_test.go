@@ -17,14 +17,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	"hitkeep/auth"
 	"hitkeep/blocking"
+	"hitkeep/config"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/mailer"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
 	"hitkeep/testutil/testdb"
 )
 

@@ -18,14 +18,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
-	"hitkeep/exportfmt"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/entitlements"
-	"hitkeep/server/shared"
+	"hitkeep/exportfmt"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 // setupTestEnv initializes an in-memory database and a handler instance.

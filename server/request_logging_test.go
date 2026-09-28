@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func TestRequestLoggingMiddlewareAddsRequestFields(t *testing.T) {

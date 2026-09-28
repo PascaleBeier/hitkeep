@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
+	"hitkeep/config"
 	"hitkeep/mailer"
 	opportunitysvc "hitkeep/opportunities"
 )

@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func setupTestEnv(t *testing.T) (*shared.Context, *database.Store, uuid.UUID) {

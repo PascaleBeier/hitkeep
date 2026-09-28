@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/exportfmt"
 	"hitkeep/api"
-	"hitkeep/server/shared"
+	"hitkeep/exportfmt"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func (h *handler) handleGetSiteHits() http.HandlerFunc {

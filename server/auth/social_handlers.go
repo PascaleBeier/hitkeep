@@ -12,17 +12,17 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/appurl"
 	"hitkeep/api"
+	"hitkeep/appurl"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
+	"hitkeep/localization"
+	"hitkeep/mailables"
 	"hitkeep/mailer"
 	"hitkeep/security"
 	"hitkeep/server/shared"
 	"hitkeep/socialauth"
 	"hitkeep/sso"
-	json "hitkeep/jsonapi"
-	"hitkeep/localization"
-	"hitkeep/mailables"
 )
 
 const socialFlowTTL = 10 * time.Minute

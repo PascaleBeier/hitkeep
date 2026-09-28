@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"hitkeep/hklog"
 	tenant "hitkeep/database/migrations/tenant"
+	"hitkeep/hklog"
 )
 
 // MigrateTenant applies tenant-scoped analytics migrations to an already

@@ -171,9 +171,9 @@ func TestFilesystemLayoutManifestPinsBuildOwnershipSurfaces(t *testing.T) {
 	}
 
 	for path, anchors := range map[string][]string{
-		"devtool/catalog.go":    {"var variants = []Variant{"},
-		"devtool/app.go":        {"func (a *App) ComposeEnvironment(variant Variant) []string"},
-		"devtool/runs.go":       {"func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Writer) error"},
+		"devtool/catalog.go":             {"var variants = []Variant{"},
+		"devtool/app.go":                 {"func (a *App) ComposeEnvironment(variant Variant) []string"},
+		"devtool/runs.go":                {"func (a *App) executeBuild(ctx context.Context, request RunRequest, writer io.Writer) error"},
 		"Dockerfile":                     nil,
 		".goreleaser.yaml":               {"id: self-hosted", "id: cloud", "CGO_ENABLED=1"},
 		".github/workflows/pipeline.yml": {"build-release-archives:", "build-and-push-image:"},

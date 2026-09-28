@@ -22,8 +22,8 @@ import (
 
 	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/worker"
 	json "hitkeep/jsonapi"
+	"hitkeep/worker"
 )
 
 // RecoveryError signals a recovery command that has already written its

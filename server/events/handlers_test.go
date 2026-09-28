@@ -12,13 +12,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
-	"hitkeep/exportfmt"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/shared"
+	"hitkeep/exportfmt"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func setupEventHandlerTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {

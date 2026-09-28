@@ -12,9 +12,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/api"
 	"hitkeep/database"
+	"hitkeep/hklog"
 )
 
 const importStageCleanupInterval = 24 * time.Hour

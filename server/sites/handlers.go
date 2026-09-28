@@ -11,13 +11,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/assetstore"
 	"hitkeep/api"
+	"hitkeep/assetstore"
 	authcore "hitkeep/auth"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	"hitkeep/webhooks"
-	json "hitkeep/jsonapi"
 )
 
 type handler struct {

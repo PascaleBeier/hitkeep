@@ -16,14 +16,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	hitai "hitkeep/ai"
 	"hitkeep/api"
+	"hitkeep/config"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	"hitkeep/socialauth"
 	"hitkeep/worker"
-	json "hitkeep/jsonapi"
 )
 
 type nsqPinger interface {

@@ -15,8 +15,8 @@ import (
 	"hitkeep/appurl"
 	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func (h *handler) handleStripeWebhook() http.HandlerFunc {

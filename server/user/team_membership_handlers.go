@@ -14,9 +14,9 @@ import (
 	"hitkeep/api"
 	"hitkeep/database"
 	"hitkeep/entitlements"
+	json "hitkeep/jsonapi"
 	serverauth "hitkeep/server/auth"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
 )
 
 type addTeamMemberRequest struct {

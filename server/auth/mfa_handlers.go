@@ -9,11 +9,11 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
+	"hitkeep/mailables"
 	"hitkeep/mailer"
 	"hitkeep/security"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
-	"hitkeep/mailables"
 )
 
 type mfaTotpVerifyRequest struct {

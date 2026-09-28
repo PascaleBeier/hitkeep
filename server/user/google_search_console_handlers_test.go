@@ -16,8 +16,8 @@ import (
 	"hitkeep/api"
 	authcore "hitkeep/auth"
 	"hitkeep/database"
-	"hitkeep/searchconsole"
 	json "hitkeep/jsonapi"
+	"hitkeep/searchconsole"
 )
 
 func TestGoogleSearchConsoleStatusReportsMissingSelfHostedCredentials(t *testing.T) {

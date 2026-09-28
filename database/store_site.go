@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/hklog"
 )
 
 // FindSiteByDomain resolves a site by its tracked domain. It runs once per

@@ -11,12 +11,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/entitlements"
-	"hitkeep/mailer"
 	"hitkeep/mailables"
+	"hitkeep/mailer"
 	"hitkeep/reporting"
 	"hitkeep/testutil/testdb"
 )

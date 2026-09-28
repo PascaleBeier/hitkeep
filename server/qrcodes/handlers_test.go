@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	"hitkeep/blocking"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/server/shared"
 )

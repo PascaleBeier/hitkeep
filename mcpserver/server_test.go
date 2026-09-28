@@ -22,13 +22,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	authcore "hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/filterparams"
 	json "hitkeep/jsonapi"
 	"hitkeep/mcptest"
+	"hitkeep/server/filterparams"
 )
 
 func TestMCPLogMiddlewareDoesNotLogRawErrors(t *testing.T) {

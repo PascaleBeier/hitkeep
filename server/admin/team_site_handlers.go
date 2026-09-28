@@ -11,16 +11,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/appurl"
 	"hitkeep/api"
+	"hitkeep/appurl"
 	authcore "hitkeep/auth"
 	"hitkeep/database"
 	"hitkeep/entitlements"
+	json "hitkeep/jsonapi"
+	"hitkeep/mailables"
 	"hitkeep/mailer"
 	serverauth "hitkeep/server/auth"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
-	"hitkeep/mailables"
 )
 
 type resolvedSiteMemberUser struct {

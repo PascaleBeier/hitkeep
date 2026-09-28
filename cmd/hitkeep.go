@@ -18,18 +18,18 @@ import (
 
 	"hitkeep/cluster"
 	"hitkeep/config"
-	"hitkeep/hklog"
 	"hitkeep/database"
 	"hitkeep/duckdbextensions"
 	"hitkeep/entitlements"
+	"hitkeep/hklog"
 	"hitkeep/ingest"
 	"hitkeep/mailer"
+	"hitkeep/public"
+	"hitkeep/realtime"
 	"hitkeep/searchconsole"
 	"hitkeep/server"
 	"hitkeep/webhookdispatcher"
 	"hitkeep/worker"
-	"hitkeep/public"
-	"hitkeep/realtime"
 )
 
 var Version = "snapshot"

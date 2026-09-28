@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/database"
-	"hitkeep/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/webhooks"
 )
 
 const Topic = "webhook_deliveries"

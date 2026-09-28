@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/access"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
 )
 
 func (h *handler) handleGetUserBootstrap() http.HandlerFunc {

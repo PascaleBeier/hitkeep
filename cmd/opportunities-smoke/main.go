@@ -17,9 +17,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"hitkeep/config"
 	hitai "hitkeep/ai"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/opportunities"
 	"hitkeep/opportunities/smokegate"

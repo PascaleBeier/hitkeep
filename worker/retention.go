@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/assetstore"
-	"hitkeep/hklog"
 	"hitkeep/database"
+	"hitkeep/hklog"
 )
 
 type S3Config = database.S3SecretConfig

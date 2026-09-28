@@ -10,10 +10,10 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/config"
-	"hitkeep/hklog"
 	"hitkeep/database"
-	"hitkeep/mailer"
+	"hitkeep/hklog"
 	"hitkeep/mailables"
+	"hitkeep/mailer"
 )
 
 const cloudLifecycleFreeRetentionDays = database.CloudFreePlanRetentionDays

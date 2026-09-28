@@ -19,8 +19,8 @@ import (
 	"hitkeep/api"
 	authcore "hitkeep/auth"
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 type handler struct {

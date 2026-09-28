@@ -4,9 +4,9 @@ import (
 	"net/http"
 
 	"hitkeep/api"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
-	json "hitkeep/jsonapi"
 )
 
 // handleGetShareAIActivity serves the unified AI activity report for a shared

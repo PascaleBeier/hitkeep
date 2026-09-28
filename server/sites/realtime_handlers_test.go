@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/config"
-	"hitkeep/server/shared"
 	"hitkeep/realtime"
+	"hitkeep/server/shared"
 )
 
 func TestHandleGetSiteRealtimeStreamsSiteEvents(t *testing.T) {

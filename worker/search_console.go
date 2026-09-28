@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/database"
+	"hitkeep/hklog"
 	"hitkeep/searchconsole"
 )
 

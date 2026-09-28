@@ -13,13 +13,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	"hitkeep/auth"
 	"hitkeep/blocking"
+	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func setupAIFetchTestEnv(t *testing.T) (*database.Store, *shared.Context, uuid.UUID, uuid.UUID, string) {

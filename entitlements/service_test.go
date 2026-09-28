@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/entitlements"
 )

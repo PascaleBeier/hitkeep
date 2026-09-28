@@ -14,9 +14,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/api"
 	"hitkeep/database"
+	"hitkeep/hklog"
 )
 
 func TestBackupErrorKindUsesStableCategories(t *testing.T) {

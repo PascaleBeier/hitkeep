@@ -10,12 +10,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func TestSearchConsoleOverviewReturnsMappedSiteMetrics(t *testing.T) {

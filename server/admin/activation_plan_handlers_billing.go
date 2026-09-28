@@ -11,8 +11,8 @@ import (
 
 	"hitkeep/database"
 	"hitkeep/entitlements"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 // handleSetActivationTeamPlan lets an instance owner or admin manually grant

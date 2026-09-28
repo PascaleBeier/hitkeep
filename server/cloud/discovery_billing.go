@@ -9,9 +9,9 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/config"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	"hitkeep/server/system"
-	json "hitkeep/jsonapi"
 )
 
 const discoveryCacheControl = "public, max-age=3600"

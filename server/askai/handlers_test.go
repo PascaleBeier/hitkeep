@@ -18,14 +18,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	hitai "hitkeep/ai"
 	"hitkeep/api"
 	authcore "hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/entitlements"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func TestHandleAskAIErrorDoesNotLogRawProviderError(t *testing.T) {

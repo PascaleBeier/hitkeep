@@ -11,8 +11,8 @@ import (
 	"github.com/nsqio/go-nsq"
 
 	"hitkeep/config"
-	"hitkeep/hklog"
 	"hitkeep/database"
+	"hitkeep/hklog"
 	json "hitkeep/jsonapi"
 )
 

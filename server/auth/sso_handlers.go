@@ -12,14 +12,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/appurl"
 	"hitkeep/api"
+	"hitkeep/appurl"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/security"
 	"hitkeep/server/shared"
 	"hitkeep/sso"
 	"hitkeep/webhooks"
-	json "hitkeep/jsonapi"
 )
 
 const ssoFlowTTL = 10 * time.Minute

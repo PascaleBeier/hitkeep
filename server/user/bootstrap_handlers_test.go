@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func TestHandleGetUserBootstrap(t *testing.T) {

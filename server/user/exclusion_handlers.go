@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/database"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func (h *handler) handleListTeamExclusions() http.HandlerFunc {

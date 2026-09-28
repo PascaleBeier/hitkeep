@@ -12,13 +12,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
+	"hitkeep/config"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	"hitkeep/webhookdispatcher"
 	webhookcore "hitkeep/webhooks"
-	json "hitkeep/jsonapi"
 )
 
 func TestSiteWebhookHandlerLifecycleAndAudit(t *testing.T) {

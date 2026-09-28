@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/database/migrations"
+	"hitkeep/hklog"
 )
 
 const (

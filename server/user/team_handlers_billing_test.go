@@ -8,13 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	authcore "hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/entitlements"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 	"hitkeep/testutil/testdb"
 )
 

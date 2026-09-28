@@ -17,14 +17,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
-	"hitkeep/exportfmt"
 	"hitkeep/api"
 	"hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
+	"hitkeep/exportfmt"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	takeoutsvc "hitkeep/takeout"
-	json "hitkeep/jsonapi"
 )
 
 type takeoutSentinel struct {

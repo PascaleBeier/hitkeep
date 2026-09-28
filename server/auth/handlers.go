@@ -18,13 +18,13 @@ import (
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/text/language"
 
-	"hitkeep/appurl"
 	"hitkeep/api"
+	"hitkeep/appurl"
 	authcore "hitkeep/auth"
-	"hitkeep/mailer"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
 	"hitkeep/localization"
+	"hitkeep/mailer"
+	"hitkeep/server/shared"
 )
 
 type handler struct {

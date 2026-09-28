@@ -15,8 +15,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/assetstore"
 	"hitkeep/api"
+	"hitkeep/assetstore"
 )
 
 // defaultTenantSplitFixtureTables is the explicit migration acceptance

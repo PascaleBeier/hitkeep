@@ -14,13 +14,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/config"
 	"hitkeep/api"
 	authcore "hitkeep/auth"
+	"hitkeep/config"
 	"hitkeep/database"
 	"hitkeep/importables"
-	"hitkeep/server/shared"
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func setupImportHandlerTest(t *testing.T) (*handler, *database.Store, *api.Site) {

@@ -12,8 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
-	"hitkeep/webhooks"
 	json "hitkeep/jsonapi"
+	"hitkeep/webhooks"
 )
 
 const (

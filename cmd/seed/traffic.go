@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/aianalytics"
 	"hitkeep/api"
 	"hitkeep/database"
+	"hitkeep/hklog"
 )
 
 // seedDemoHostname is the hostname every seeded hit and fetch record carries.

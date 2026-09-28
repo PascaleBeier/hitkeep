@@ -11,9 +11,9 @@ import (
 
 	"hitkeep/api"
 	"hitkeep/database"
+	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 	"hitkeep/sso"
-	json "hitkeep/jsonapi"
 )
 
 func TestTeamSSOConfigurationIsValidatedEncryptedAndRedacted(t *testing.T) {

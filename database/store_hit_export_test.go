@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/exportfmt"
 	"hitkeep/api"
+	"hitkeep/exportfmt"
 )
 
 func TestExportHitsCSVIncludesUTMFields(t *testing.T) {

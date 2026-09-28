@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
-	"hitkeep/server/shared"
 	"hitkeep/realtime"
+	"hitkeep/server/shared"
 )
 
 func TestShutdownClosesActiveRealtimeStreamBeforeDeadline(t *testing.T) {

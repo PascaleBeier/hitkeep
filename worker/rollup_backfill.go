@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/hklog"
 	"hitkeep/database"
+	"hitkeep/hklog"
 )
 
 type RollupBackfillWorker struct {

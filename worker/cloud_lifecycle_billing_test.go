@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"hitkeep/config"
-	"hitkeep/hklog"
 	"hitkeep/api"
+	"hitkeep/config"
 	"hitkeep/database"
+	"hitkeep/hklog"
 	"hitkeep/mailer"
 	"hitkeep/testutil/testdb"
 )
