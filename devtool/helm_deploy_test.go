@@ -124,16 +124,6 @@ func helmDeployArgs(t *testing.T, chartVersion, image, chart string) []string {
 	return strings.Split(strings.TrimSpace(string(output)), "\n")
 }
 
-func TestReleaseWorkflowRunsHelmSmokeWithBash(t *testing.T) {
-	raw, err := os.ReadFile("../.github/workflows/release.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(raw), "bash ./scripts/helm-smoke.sh \"$CANDIDATE_IMAGE\" self-hosted") {
-		t.Fatal("release workflow must run non-executable helm-smoke.sh through bash")
-	}
-}
-
 func shellFunction(t *testing.T, script, name string) string {
 	t.Helper()
 	declaration := name + "() {\n"

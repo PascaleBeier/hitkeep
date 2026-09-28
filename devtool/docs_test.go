@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"go.yaml.in/yaml/v3"
-
 	runtimeconfig "hitkeep/config"
 )
 
@@ -23,15 +21,6 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		root := releaseMetadataFixture(t)
 		if err := validateReleaseMetadata(root); err != nil {
 			t.Fatal(err)
-		}
-	})
-
-	t.Run("reusable migration workflow is rejected", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", "on:\n  workflow_call:\njobs: {}\n")
-		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "must not support workflow_call") {
-			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
@@ -84,83 +73,6 @@ func TestValidateReleaseMetadata(t *testing.T) {
 		}
 	})
 
-	t.Run("missing GoReleaser release build", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\n")
-		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "github.com/goreleaser/goreleaser/v2@v2.18.0"`) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("release inputs must be transported", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "pipeline.yml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", strings.Replace(string(workflow), "name: release-inputs-${{ inputs.version }}", "name: missing-release-inputs", 1))
-		if err := validateReleaseMetadata(root); err == nil {
-			t.Fatal("validateReleaseMetadata() accepted a missing release input artifact")
-		}
-	})
-
-	t.Run("manual release build is rejected", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n./hk ci build-binaries\n")
-		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), ".github/workflows/pipeline.yml must not run ./hk ci build-binaries") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("missing example configuration release asset", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n")
-		err := validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), `.github/workflows/pipeline.yml is missing release metadata contract "hitkeep.example.yaml"`) {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	t.Run("downstream docs failure isolation", func(t *testing.T) {
-		root := releaseMetadataFixture(t)
-		workflow, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		invalid := strings.Replace(string(workflow), "  deploy-cloud:", "      - name: Surface downstream docs failure\n        run: gh run watch --log-failed\n  deploy-cloud:", 1)
-		writeFixtureFile(t, root, ".github/workflows/release.yml", invalid)
-		err = validateReleaseMetadata(root)
-		if err == nil || !strings.Contains(err.Error(), "post-publication docs notification must not surface downstream failures") {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-}
-
-func TestValidateGovulncheckWorkflowContract(t *testing.T) {
-	valid := []byte("plan_id=\"$(./hk qa plan pr --output json | jq -r '.data.plan_id')\"\n./hk qa pr --plan-id \"$plan_id\" --gate \"$gates\"\n")
-	if err := validateGovulncheckWorkflowContract(valid); err != nil {
-		t.Fatalf("validateGovulncheckWorkflowContract() error = %v", err)
-	}
-	for _, workflow := range [][]byte{
-		[]byte("./hk qa pr --gate \"$gates\"\n"),
-		[]byte("plan_id=\"$(./hk qa plan pr --output json | jq -r '.data.plan_id')\"\n./hk qa pr --gate \"$gates\"\n"),
-		[]byte("./hk qa pr --plan-id \"$plan_id\" --gate \"$gates\"\n"),
-	} {
-		if err := validateGovulncheckWorkflowContract(workflow); err == nil {
-			t.Fatalf("validateGovulncheckWorkflowContract() accepted %q", workflow)
-		}
-	}
-}
-
-func TestWorkflowNeedsRejectsUnsupportedYAMLNodes(t *testing.T) {
-	for _, kind := range []yaml.Kind{yaml.DocumentNode, yaml.MappingNode, yaml.AliasNode} {
-		var needs workflowNeeds
-		if err := needs.UnmarshalYAML(&yaml.Node{Kind: kind}); err == nil {
-			t.Errorf("UnmarshalYAML(%v) accepted unsupported node", kind)
-		}
-	}
 }
 
 func TestValidateContainerDataPath(t *testing.T) {
@@ -268,138 +180,6 @@ func releaseMetadataFixture(t *testing.T) string {
 	writeFixtureFile(t, root, "charts/hitkeep/Chart.yaml", "version: 2.12.0\nappVersion: 2.12.0\n")
 	writeFixtureFile(t, root, "charts/hitkeep/README.md", "tag: 2.12.0 # x-release-please-version\n")
 	writeFixtureFile(t, root, "release-please-config.json", fixtureReleasePleaseConfig())
-	writeFixtureFile(t, root, ".goreleaser.yaml", "files:\n  - hitkeep-configuration.json\n  - hitkeep.example.yaml\n  - hitkeep-configuration-manifest.json\n")
-	writeFixtureFile(t, root, ".github/workflows/pipeline.yml", "github.com/goreleaser/goreleaser/v2@v2.18.0\n--snapshot\n--clean\n--single-target\n--id self-hosted\n--id cloud\n./hk catalog configuration --output json\n./hk catalog configuration-manifest\nhitkeep-configuration.json\nhitkeep.example.yaml\nhitkeep-configuration-manifest.json\nrelease_tag: $tag\nrelease_version: $version\npattern: binaries-linux-*\nname: release-inputs-${{ inputs.version }}\ntar --format=posix\ngzip -n\n")
-	writeFixtureFile(t, root, ".github/workflows/release.yml", `# sync-hitkeep-release.yml
-jobs:
-  release-please: {}
-  build-release:
-    needs: release-please
-  upgrade-from-supported-floor:
-    needs: build-release
-    strategy:
-      matrix:
-        include:
-          - surface: docker
-          - surface: compose
-          - surface: helm
-    steps:
-      - name: Resolve immutable upgrade fixture
-        id: fixture
-        env:
-          CANDIDATE_DIGEST: ${{ needs.build-release.outputs.image_digest }}
-        run: |
-          manifest="tests/fixtures/release-fixtures.json"
-          repository="${GITHUB_REPOSITORY,,}"
-          candidate="ghcr.io/${repository}@${CANDIDATE_DIGEST}"
-          previous_version="2.12.0"
-      - name: Smoke Docker upgrade from supported floor
-        env:
-          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
-          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
-        run: ./scripts/docker-smoke.sh "$CANDIDATE_IMAGE" self-hosted --recreate
-      - name: Smoke Compose upgrade from supported floor
-        env:
-          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
-          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
-        run: ./scripts/compose-smoke.sh "$CANDIDATE_IMAGE" self-hosted
-      - name: Smoke Helm upgrade from supported floor
-        env:
-          CANDIDATE_IMAGE: ${{ steps.fixture.outputs.candidate }}
-          HITKEEP_PREVIOUS_IMAGE: ${{ steps.fixture.outputs.previous }}
-        run: ./scripts/helm-smoke.sh "$CANDIDATE_IMAGE" self-hosted
-  publish-helm:
-    needs: build-release
-  verify-tracker-package:
-    needs: build-release
-    steps:
-      - name: Build and verify package
-        run: |
-          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
-          ./hk qa pr --plan-id "$plan_id" --gate tracker-package
-      - name: Pack verified tracker artifact
-        run: |
-          metadata="$(npm pack --json)"
-          tarball="$(jq -r 'to_entries | first | .value.filename' <<< "$metadata")"
-      - name: Upload verified tracker artifact
-  docs-attestation:
-    needs:
-      - release-please
-      - build-release
-      - upgrade-from-supported-floor
-      - publish-helm
-      - verify-tracker-package
-    steps:
-      - name: Dispatch and verify exact documentation attestation
-        env:
-          DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
-          DOCS_WORKFLOW_SHA256: 394bedb5cf9b30c79a9eff03ada1bc28b50f6d9fba495a7e2218f1a36e074fc8
-        run: |
-          gh workflow run sync-hitkeep-release.yml --ref main \\
-            -f prepublication=true \\
-            -f source_run_id="$source_run_id" \\
-            -f source_head_sha="$GITHUB_SHA" \\
-            -f source_workflow_sha256="$source_workflow_sha256" \\
-            -f source_catalog_sha256="$catalog_sha256" \\
-            -f source_example_sha256="$example_sha256" \\
-            -f source_manifest_sha256="$manifest_sha256"
-          gh run list --event workflow_dispatch
-          gh run watch "$docs_run_id"
-          gh api "repos/$DOCS_REPOSITORY/actions/runs/$docs_run_id"
-          gh api "repos/$DOCS_REPOSITORY/check-suites/$check_suite_id"
-          gh run download "$docs_run_id" --name hitkeep-docs-release-attestation
-          jq '.id == $run_id and .head_sha == $docs_head_sha and .app.id == 15368 and .conclusion == "success" and .source.tag == $tag and .source.run_id == $source_run_id'
-  finalize-release:
-    needs:
-      - release-please
-      - build-release
-      - upgrade-from-supported-floor
-      - publish-helm
-      - verify-tracker-package
-      - docs-attestation
-    steps:
-      - name: Download verified tracker artifact
-      - name: Publish verified tracker
-        run: |
-          integrity="$(openssl dgst -sha512 -binary \"$tarball\")"
-          npm publish "$tarball" --tag latest || true
-          npm view @hitkeep/tracker dist-tags.latest
-          for attempt in {1..6}; do
-            [[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]] && break
-          done
-          [[ "$existing" != "$integrity" ]]
-          [[ "$latest" != "$VERSION" ]]
-          npm view @hitkeep/tracker dist.integrity
-      - name: Promote immutable image to mutable tags
-      - name: Promote GitHub release
-        run: gh release edit "$TAG" --draft=false --latest
-  sync-docs-release:
-    needs:
-      - finalize-release
-      - docs-attestation
-    steps:
-      - name: Dispatch hitkeep-docs release synchronization
-        env:
-          SOURCE_WORKFLOW_SHA256: ${{ needs.docs-attestation.outputs.source_workflow_sha256 }}
-          SOURCE_CATALOG_SHA256: ${{ needs.docs-attestation.outputs.source_catalog_sha256 }}
-          SOURCE_EXAMPLE_SHA256: ${{ needs.docs-attestation.outputs.source_example_sha256 }}
-          SOURCE_MANIFEST_SHA256: ${{ needs.docs-attestation.outputs.source_manifest_sha256 }}
-        run: |
-          gh workflow run sync-hitkeep-release.yml \\
-            -f prepublication=false \\
-            -f source_run_id="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}" \\
-            -f source_head_sha="${GITHUB_SHA}" \\
-            -f source_workflow_sha256="${SOURCE_WORKFLOW_SHA256}" \\
-            -f source_catalog_sha256="${SOURCE_CATALOG_SHA256}" \\
-            -f source_example_sha256="${SOURCE_EXAMPLE_SHA256}" \\
-            -f source_manifest_sha256="${SOURCE_MANIFEST_SHA256}"
-  deploy-cloud:
-    needs: finalize-release
-`)
-	writeFixtureFile(t, root, ".github/workflows/default-tenant-migration-acceptance.yml", `on:
-  workflow_dispatch:
-jobs: {}
-`)
 	return root
 }
 

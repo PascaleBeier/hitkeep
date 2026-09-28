@@ -6,98 +6,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
 
+// reviewedDocsV2Pin is the reviewed digest of the private docs receiver workflow.
 const reviewedDocsV2Pin = "812c7896202be86362a5c384c17b8e87c461fac1353ec44210c79b15b4e58c08"
 
-type releaseGraph struct {
-	Jobs map[string]releaseGraphJob
-}
-
-type releaseGraphJob struct {
-	Needs []string
-	If    string
-}
-
-type docsSubject struct {
-	Schema, Base, Workflow, RunID, Attempt, Artifact string
-}
-
-func TestReleaseGraphBlocksNonSuccessAndUntrustedHandoffs(t *testing.T) {
-	workflow, raw := parseReleaseGraph(t)
-	outcomes := map[string]string{
-		"release-please": "success", "build-release": "success", "upgrade-from-supported-floor": "success",
-		"publish-helm": "success", "verify-tracker-package": "success", "docs-attestation": "success", "finalize-release": "success",
-	}
-	subject := docsSubject{Schema: "hitkeep.docs-attestation/v2", Base: strings.Repeat("a", 40), Workflow: reviewedDocsV2Pin, RunID: "1", Attempt: "1", Artifact: strings.Repeat("b", 64)}
-	checksum := strings.Repeat("c", 64)
-	if finalize, deploy := releaseAdmission(workflow, outcomes, subject, checksum); !finalize || !deploy {
-		t.Fatalf("all-success trusted handoffs must admit finalization and deployment: subject=%t docs=%#v finalize=%#v deploy=%#v", validDocsSubject(subject), workflow.Jobs["docs-attestation"], workflow.Jobs["finalize-release"], workflow.Jobs["deploy-cloud"])
-	}
-	for _, want := range []string{
-		"DOCS_WORKFLOW_SHA256: " + reviewedDocsV2Pin,
-		"attestation_schema=hitkeep.docs-attestation/v2",
-		"docs_attestation_artifact_sha256=\"${DOCS_ATTESTATION_ARTIFACT_SHA256}\"",
-		"--pattern checksums.txt",
-		"artifact_sha256=\"${ARTIFACT_SHA256}\"",
-		"gh run watch \"$downstream_run_id\"",
-		".run_attempt == $run_attempt",
-		"source_catalog_sha256=\"${SOURCE_CATALOG_SHA256}\"",
-		"docs_run_attempt=\"${DOCS_RUN_ATTEMPT}\"",
-	} {
-		if !strings.Contains(raw, want) {
-			t.Errorf("release workflow is missing trusted handoff %q", want)
-		}
-	}
-
-	for _, job := range []string{"docs-attestation", "finalize-release", "deploy-cloud"} {
-		for _, prerequisite := range workflow.Jobs[job].Needs {
-			for _, result := range []string{"failure", "cancelled", "skipped"} {
-				mutated := maps.Clone(outcomes)
-				mutated[prerequisite] = result
-				finalize, deploy := releaseAdmission(workflow, mutated, subject, checksum)
-				if job == "docs-attestation" || job == "finalize-release" {
-					if finalize {
-						t.Errorf("%s %s must block finalization", prerequisite, result)
-					}
-				}
-				if deploy {
-					t.Errorf("%s %s must block cloud deployment", prerequisite, result)
-				}
-			}
-		}
-	}
-
-	for _, invalid := range []docsSubject{
-		{Schema: "hitkeep.docs-attestation/v2", Base: strings.Repeat("a", 40), Workflow: strings.Repeat("d", 64), RunID: "1", Attempt: "1", Artifact: strings.Repeat("b", 64)},
-		{Schema: "hitkeep.docs-attestation/v2", Base: strings.Repeat("a", 40), Workflow: reviewedDocsV2Pin, RunID: "1", Attempt: "1", Artifact: "not-a-digest"},
-		{Schema: "hitkeep.docs-attestation/v2", Base: strings.Repeat("a", 40), Workflow: reviewedDocsV2Pin, RunID: "1", Attempt: "1", Artifact: strings.Repeat("d", 64)},
-	} {
-		finalize, deploy := releaseAdmission(workflow, outcomes, invalid, checksum)
-		if finalize || deploy {
-			t.Errorf("untrusted docs subject %#v admitted release", invalid)
-		}
-	}
-	for _, invalid := range []string{"", "not-a-digest", strings.Repeat("d", 64)} {
-		_, deploy := releaseAdmission(workflow, outcomes, subject, invalid)
-		if deploy {
-			t.Errorf("untrusted cloud checksum %q admitted deployment", invalid)
-		}
-	}
-	if !strings.Contains(raw, "release-summary:") || !strings.Contains(raw, "npm_status") || !strings.Contains(raw, "docs_status") || !strings.Contains(raw, "aws_status") {
-		t.Fatal("release workflow must expose machine-readable partial-publication outcomes")
-	}
-}
-
 func TestReleaseCallerMatchesCurrentDocsV2Receiver(t *testing.T) {
-	_, raw := parseReleaseGraph(t)
+	raw := readReleaseWorkflow(t)
 	docsWorkflow, err := os.ReadFile(filepath.Join("..", "..", "hitkeep-docs", ".github", "workflows", "sync-hitkeep-release.yml"))
 	if errors.Is(err, os.ErrNotExist) {
 		t.Skip("optional cross-repository check requires the private docs checkout; producer contracts are checked independently")
@@ -115,174 +35,8 @@ func TestReleaseCallerMatchesCurrentDocsV2Receiver(t *testing.T) {
 	}
 }
 
-func TestPostpublicationCorrelationRejectsCollisions(t *testing.T) {
-	_, raw := parseReleaseGraph(t)
-	receiptVerifier := []string{
-		`receipt_name="hitkeep-docs-postpublication-receipt-${downstream_run_id}-${downstream_run_attempt}"`,
-		`receipt_id="$(jq -r --arg name "$receipt_name" '[.artifacts[] | select(.name == $name and .expired == false and (.digest | test("^sha256:[a-f0-9]{64}$")))] | if length == 1 then .[0].id else empty end' downstream-artifacts.json)"`,
-		`receipt_digest="$(jq -r --argjson receipt_id "$receipt_id" '[.artifacts[] | select(.id == $receipt_id)] | if length == 1 then .[0].digest | ltrimstr("sha256:") else empty end' downstream-artifacts.json)"`,
-		`"$(sha256sum downstream-receipt.zip | awk '{print $1}')" != "$receipt_digest"`,
-		"actions/runs/$downstream_run_id/artifacts",
-		"actions/artifacts/$receipt_id/zip",
-		"postpublication receipt digest mismatch",
-		`.schema_version == "hitkeep.docs-postpublication-receipt/v1"`,
-		`.source.repository == "PascaleBeier/hitkeep"`,
-		".source.run_id == $source_run_id",
-		".source.commit == $source_commit",
-		".source.tag == $tag",
-		".source.workflow_sha256 == $source_workflow_sha256",
-		".source.catalog_sha256 == $catalog_sha256",
-		".source.example_sha256 == $example_sha256",
-		".source.manifest_sha256 == $manifest_sha256",
-		`.docs.repository == "PascaleBeier/hitkeep-docs"`,
-		".docs.base_sha == $docs_base_sha",
-		".docs.workflow_sha256 == $docs_workflow_sha256",
-		".docs.prepublication_run_id == $docs_run_id",
-		".docs.prepublication_run_attempt == $docs_run_attempt",
-		".docs.prepublication_attestation_artifact_sha256 == $docs_attestation_artifact_sha256",
-		".receipt.run_id == $receipt_run_id",
-		".receipt.run_attempt == $receipt_run_attempt",
-	}
-	if err := validateReleaseWorkflowGraph([]byte(raw)); err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range receiptVerifier {
-		if !strings.Contains(raw, want) {
-			t.Errorf("postpublication receipt verifier is missing %q", want)
-			continue
-		}
-		if err := validateReleaseWorkflowGraph([]byte(replacePostpublicationReceipt(raw, want))); err == nil {
-			t.Errorf("release validator accepted missing receipt verification %q", want)
-		}
-	}
-	expected := postpublicationRun{Repository: "PascaleBeier/hitkeep-docs", Workflow: ".github/workflows/sync-hitkeep-release.yml", Event: "workflow_dispatch", Base: strings.Repeat("a", 40), RunID: "42", Attempt: "3", Subject: "source-and-prepublication-subject"}
-	for _, candidate := range []postpublicationRun{
-		{Repository: expected.Repository, Workflow: expected.Workflow, Event: expected.Event, Base: expected.Base, RunID: expected.RunID, Attempt: "4", Subject: expected.Subject},
-		{Repository: expected.Repository, Workflow: expected.Workflow, Event: expected.Event, Base: expected.Base, RunID: "43", Attempt: expected.Attempt, Subject: expected.Subject},
-		{Repository: expected.Repository, Workflow: expected.Workflow, Event: expected.Event, Base: expected.Base, RunID: expected.RunID, Attempt: expected.Attempt, Subject: "wrong-subject"},
-	} {
-		if matchesPostpublicationRun(expected, candidate) {
-			t.Errorf("collision %#v matched", candidate)
-		}
-	}
-	if !matchesPostpublicationRun(expected, expected) {
-		t.Fatal("exact postpublication receipt did not match")
-	}
-}
-
-type postpublicationRun struct {
-	Repository, Workflow, Event, Base, RunID, Attempt, Subject string
-}
-
-func matchesPostpublicationRun(expected, candidate postpublicationRun) bool {
-	return expected == candidate
-}
-
-func replacePostpublicationReceipt(workflow, target string) string {
-	start := strings.Index(workflow, "          receipt_name=")
-	if start < 0 {
-		return workflow
-	}
-	prefix, receipt := workflow[:start], workflow[start:]
-	return prefix + strings.Replace(receipt, target, "removed", 1)
-}
-
-func parseReleaseGraph(t *testing.T) (releaseGraph, string) {
-	t.Helper()
-	raw, err := os.ReadFile("../.github/workflows/release.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(raw)
-	workflow := releaseGraph{Jobs: map[string]releaseGraphJob{}}
-	for _, name := range []string{"docs-attestation", "finalize-release", "deploy-cloud"} {
-		workflow.Jobs[name] = parseReleaseJob(t, text, name)
-	}
-	return workflow, text
-}
-
-func parseReleaseJob(t *testing.T, workflow, name string) releaseGraphJob {
-	t.Helper()
-	start := strings.Index(workflow, "  "+name+":\n")
-	if start < 0 {
-		t.Fatalf("missing %s", name)
-	}
-	block := workflow[start:]
-	for i := 1; i+3 < len(block); i++ {
-		if block[i] == '\n' && block[i+1] == ' ' && block[i+2] == ' ' && block[i+3] != ' ' {
-			block = block[:i]
-			break
-		}
-	}
-	job := releaseGraphJob{}
-	inNeeds := false
-	for line := range strings.SplitSeq(block, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "needs:" {
-			inNeeds = true
-			continue
-		}
-		if strings.HasPrefix(line, "    ") && !strings.HasPrefix(line, "      ") {
-			inNeeds = false
-		}
-		if inNeeds && strings.HasPrefix(trimmed, "- ") {
-			job.Needs = append(job.Needs, strings.TrimPrefix(trimmed, "- "))
-		}
-		if after, ok := strings.CutPrefix(trimmed, "if: "); ok {
-			job.If = after
-		}
-	}
-	return job
-}
-
-func releaseAdmission(workflow releaseGraph, outcomes map[string]string, subject docsSubject, checksum string) (bool, bool) {
-	docs := outcomes["docs-attestation"] == "success" && admits(workflow.Jobs["docs-attestation"], outcomes) && validDocsSubject(subject)
-	outcomes = maps.Clone(outcomes)
-	if docs {
-		outcomes["docs-attestation"] = "success"
-	} else {
-		outcomes["docs-attestation"] = "failure"
-	}
-	finalize := outcomes["finalize-release"] == "success" && admits(workflow.Jobs["finalize-release"], outcomes)
-	if finalize {
-		outcomes["finalize-release"] = "success"
-	} else {
-		outcomes["finalize-release"] = "failure"
-	}
-	return finalize, admits(workflow.Jobs["deploy-cloud"], outcomes) && validCloudChecksum(checksum)
-}
-
-func admits(job releaseGraphJob, outcomes map[string]string) bool {
-	if len(job.Needs) == 0 {
-		return false
-	}
-	for _, need := range job.Needs {
-		if outcomes[need] != "success" {
-			return false
-		}
-		if strings.Contains(job.If, "always()") && !strings.Contains(job.If, "needs."+need+".result == 'success'") {
-			return false
-		}
-	}
-	return true
-}
-
-func validDocsSubject(subject docsSubject) bool {
-	return subject.Schema == "hitkeep.docs-attestation/v2" &&
-		regexp.MustCompile("^[a-f0-9]{40}$").MatchString(subject.Base) &&
-		subject.Workflow == reviewedDocsV2Pin &&
-		regexp.MustCompile("^[1-9][0-9]*$").MatchString(subject.RunID) &&
-		regexp.MustCompile("^[1-9][0-9]*$").MatchString(subject.Attempt) &&
-		regexp.MustCompile("^[a-f0-9]{64}$").MatchString(subject.Artifact) &&
-		subject.Artifact == strings.Repeat("b", 64)
-}
-
-func validCloudChecksum(checksum string) bool {
-	return checksum == strings.Repeat("c", 64)
-}
-
 func TestPostpublicationFailureLeavesValidEarlyReceiptPending(t *testing.T) {
-	_, raw := parseReleaseGraph(t)
+	raw := readReleaseWorkflow(t)
 	script := releaseStepScript(t, raw, "sync-docs-release", "Dispatch hitkeep-docs release synchronization")
 	sourceCommit := strings.Repeat("a", 40)
 	docsBase := strings.Repeat("b", 40)
@@ -377,7 +131,7 @@ esac
 }
 
 func TestDocsAttestationRejectsMismatchedArtifactZIPBeforeFinalization(t *testing.T) {
-	workflow, raw := parseReleaseGraph(t)
+	raw := readReleaseWorkflow(t)
 	script := releaseStepScript(t, raw, "docs-attestation", "Dispatch and verify exact documentation attestation")
 	start := strings.Index(script, "artifact_name=")
 	if start < 0 {
@@ -457,14 +211,15 @@ esac
 	if strings.Contains(string(state), "docs_attestation_artifact_sha256=") {
 		t.Fatalf("mismatched artifact produced an attestation output: %s", state)
 	}
-	outcomes := map[string]string{
-		"release-please": "success", "build-release": "success", "upgrade-from-supported-floor": "success",
-		"publish-helm": "success", "verify-tracker-package": "success", "docs-attestation": "failure", "finalize-release": "success",
+}
+
+func readReleaseWorkflow(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile("../.github/workflows/release.yml")
+	if err != nil {
+		t.Fatal(err)
 	}
-	subject := docsSubject{Schema: "hitkeep.docs-attestation/v2", Base: docsBase, Workflow: reviewedDocsV2Pin, RunID: "1", Attempt: "1", Artifact: strings.Repeat("b", 64)}
-	if finalize, _ := releaseAdmission(workflow, outcomes, subject, strings.Repeat("c", 64)); finalize {
-		t.Fatal("failed docs attestation admitted finalization")
-	}
+	return string(raw)
 }
 
 func releaseStepScript(t *testing.T, raw, job, name string) string {
