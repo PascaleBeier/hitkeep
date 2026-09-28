@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -248,7 +249,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			CustomerID:      customerID,
 			PriceID:         priceID,
 			SuccessURL:      checkoutSuccessURL(h.ctx.Config),
-			CancelURL:       checkoutCancelURL(h.ctx.Config),
+			CancelURL:       checkoutCancelURLForIntent(h.ctx.Config, req.PlanCode, req.BillingInterval, activeTenantID),
 			Locale:          req.Locale,
 			UserID:          user.ID,
 			TenantID:        activeTenantID,
@@ -292,6 +293,65 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing checkout session response", "error", err)
 		}
 	}
+}
+
+type billingStateResponse struct {
+	TeamID             uuid.UUID `json:"team_id"`
+	PlanCode           string    `json:"plan_code"`
+	SubscriptionStatus string    `json:"subscription_status"`
+	PendingPlanCode    string    `json:"pending_plan_code,omitempty"`
+	BillingInterval    string    `json:"billing,omitempty"`
+}
+
+func (h *handler) handleGetBillingState() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.ctx.Config.CloudHosted {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+		userID := shared.GetUserIDFromContext(r)
+		if userID == uuid.Nil || h.ctx.Store == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		teamID, err := h.ctx.Store.GetActiveTenantID(r.Context(), userID)
+		if err != nil {
+			http.Error(w, "Unable to resolve active team", http.StatusBadRequest)
+			return
+		}
+		state := billingStateResponse{TeamID: teamID, PlanCode: database.CloudPlanFree, SubscriptionStatus: database.CloudSubscriptionStatusFree}
+		account, err := h.ctx.Store.GetCloudBillingAccount(r.Context(), teamID)
+		if err != nil && !errors.Is(err, database.ErrCloudBillingAccountNotFound) {
+			http.Error(w, "Unable to load billing state", http.StatusInternalServerError)
+			return
+		}
+		if account != nil {
+			state.PlanCode, _ = effectivePlanCode(account)
+			state.SubscriptionStatus = account.SubscriptionStatus
+			if account.SubscriptionStatus == subscriptionStatusPending {
+				state.PendingPlanCode = planCodeForPrice(h.ctx.Config, account.StripePriceID)
+				state.BillingInterval = account.BillingInterval
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.MarshalWrite(w, state); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud billing state", "error", err)
+		}
+	}
+}
+
+func checkoutCancelURLForIntent(conf *config.Config, plan, billing string, teamID uuid.UUID) string {
+	parsed, err := url.Parse(checkoutCancelURL(conf))
+	if err != nil {
+		return checkoutCancelURL(conf)
+	}
+	query := parsed.Query()
+	query.Set("checkout", "canceled")
+	query.Set("plan", plan)
+	query.Set("billing", billing)
+	query.Set("team", teamID.String())
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func billingPortalReturnURL(conf *config.Config) string {

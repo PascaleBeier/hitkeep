@@ -1,5 +1,42 @@
 @if (team(); as t) {
 <div class="grid gap-4">
+    @if (recoveryKind(); as kind) {
+    <section class="grid gap-3 rounded-xl border border-[var(--p-content-border-color)] bg-[var(--p-content-background)] p-4 sm:p-6" aria-labelledby="purchase-recovery-title">
+        @if (kind === 'loading') {
+        <h2 id="purchase-recovery-title" class="m-0 text-lg font-semibold">{{ 'signup.recovery.loading' | transloco }}</h2>
+        } @else if (kind === 'switchTeam') {
+        <h2 id="purchase-recovery-title" class="m-0 text-lg font-semibold">{{ 'signup.recovery.switchTeamTitle' | transloco }}</h2>
+        <p class="mb-0 text-sm">{{ 'signup.recovery.switchTeamDescription' | transloco }}</p>
+        } @else if (kind === 'unavailable') {
+        <h2 id="purchase-recovery-title" class="m-0 text-lg font-semibold">{{ 'signup.recovery.unavailableTitle' | transloco }}</h2>
+        <p class="text-sm">{{ 'signup.recovery.unavailableDescription' | transloco }}</p>
+        <p-button [label]="'signup.recovery.retryState' | transloco" severity="secondary" (onClick)="billingStateResource.reload()" />
+        } @else if (kind === 'paid') {
+        <h2 id="purchase-recovery-title" class="m-0 text-lg font-semibold">{{ 'signup.recovery.paidTitle' | transloco }}</h2>
+        <p class="text-sm">{{ 'signup.recovery.paidDescription' | transloco }}</p>
+        <a pButton routerLink="/dashboard" severity="secondary"><span pButtonLabel>{{ 'signup.recovery.dashboard' | transloco }}</span></a>
+        } @else {
+        <h2 id="purchase-recovery-title" class="m-0 text-lg font-semibold">{{ (kind === 'canceled' ? 'signup.recovery.canceledTitle' : 'signup.recovery.reviewTitle') | transloco }}</h2>
+        <p class="text-sm">{{ (kind === 'canceled' ? 'signup.recovery.canceledDescription' : 'signup.recovery.reviewDescription') | transloco }}</p>
+        <p class="text-sm font-medium">{{ ('signup.plans.' + recoveryIntent().plan + '.name') | transloco }} · {{ ('signup.billing.' + recoveryIntent().billing) | transloco }} · {{ recoveryPrice() }}</p>
+        @if (teamService.hasMultipleTeams() && !teamConfirmed()) {
+        <p class="text-sm">{{ 'signup.recovery.confirmTeam' | transloco: { team: t.name } }}</p>
+        <p-button [label]="'signup.recovery.confirmTeamAction' | transloco" severity="secondary" (onClick)="confirmRecoveryTeam()" />
+        } @else {
+        <div class="flex flex-wrap gap-2">
+            <p-button
+                [label]="'signup.recovery.continuePaid' | transloco: { plan: ('signup.plans.' + recoveryIntent().plan + '.name') | transloco, price: recoveryPrice() }"
+                [loading]="checkoutPending()"
+                [disabled]="checkoutPending()"
+                (onClick)="startRecoveryCheckout()"
+            />
+            <p-button [label]="'signup.recovery.continueFree' | transloco" severity="secondary" [outlined]="true" [disabled]="checkoutPending()" (onClick)="continueOnFree()" />
+        </div>
+        } @if (recoveryError()) {
+        <p role="alert" class="mb-0 text-sm text-[var(--p-red-600)]">{{ 'signup.recovery.checkoutError' | transloco }}</p>
+        } }
+    </section>
+    }
     <app-settings-card [title]="t.name" icon="pi pi-users">
         <div settings-card-body>
             <app-admin-item-list [items]="teamDetailItems()" [ariaLabel]="'admin.team.overview.title' | transloco" [emptyMessage]="'common.empty.noDataDescription' | transloco" />

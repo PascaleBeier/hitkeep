@@ -6,8 +6,8 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 
-import { PasswordModule } from '@openng/optimus-ui/password';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { CheckboxModule } from '@openng/optimus-ui/checkbox';
@@ -16,14 +16,16 @@ import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectButtonModule } from '@openng/optimus-ui/selectbutton';
 
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
 import { Brand } from '@components/brand/brand';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { CloudStatus } from '@models/analytics.types';
+import { CloudPlanTier, CloudStatus } from '@models/analytics.types';
 import { AnalyticsService } from '@services/analytics.service';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 import { BillingInterval, CloudPlanCode, CloudService, CloudSignupRequest } from '@services/cloud.service';
+import { cloudBillingReviewUrl, cloudPurchaseIntent, cloudPurchaseQuery } from '@core/utils/cloud-purchase-intent';
 import { AUTH_FIELDSET_DESIGN_TOKENS, AUTH_SELECT_BUTTON_DESIGN_TOKENS } from '@core/theme/hitkeep-preset';
 import { AuthService, SocialProvider, SocialProviderID } from '@services/auth.service';
 
@@ -31,7 +33,7 @@ type Jurisdiction = 'EU' | 'US';
 
 @Component({
     selector: 'app-signup',
-    imports: [AuthCard, AuthDivider, AuthMethods, Brand, FormsModule, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, FieldsetModule, MessageModule, SelectButtonModule, RouterLink, TranslocoPipe],
+    imports: [AuthCard, PasswordInput, AuthDivider, AuthMethods, Brand, FormsModule, ReactiveFormsModule, ButtonModule, InputTextModule, CheckboxModule, FieldsetModule, MessageModule, SelectButtonModule, RouterLink, TranslocoPipe],
     templateUrl: './signup.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -50,6 +52,7 @@ export class Signup {
     private readonly analytics = inject(AnalyticsService);
     private readonly auth = inject(AuthService);
     private readonly cloud = inject(CloudService);
+    private readonly localeService = inject(TranslocoLocaleService);
     private readonly signupTracking = inject(CloudSignupTrackingService);
 
     protected readonly isLoading = signal(false);
@@ -57,6 +60,7 @@ export class Signup {
     protected readonly socialProviders = signal<readonly SocialProvider[]>([]);
     protected readonly errorMessage = signal<string | null>(null);
     protected readonly cloudStatus = signal<CloudStatus | null>(null);
+    protected readonly planTiers = signal<CloudPlanTier[]>([]);
     protected readonly verificationSent = signal(false);
     protected readonly submittedEmail = signal('');
     protected readonly verificationResendPending = signal(false);
@@ -65,12 +69,22 @@ export class Signup {
     protected readonly verificationResendFeedbackSeverity = signal<'success' | 'error'>('success');
     protected readonly selectedPlan = signal<CloudPlanCode>('free');
     protected readonly selectedBilling = signal<BillingInterval>('monthly');
+    protected readonly loginQueryParams = computed(() => {
+        const intent = { plan: this.selectedPlan(), billing: this.selectedBilling() };
+        return { ...cloudPurchaseQuery(intent), returnUrl: intent.plan === 'free' ? '/dashboard' : cloudBillingReviewUrl(intent) };
+    });
     private readonly activeLanguage = injectActiveLang();
     protected readonly currentYear = new Date().getFullYear();
     protected readonly jurisdictionOptions: Jurisdiction[] = ['EU', 'US'];
     protected readonly jurisdictionFieldsetDesignTokens = AUTH_FIELDSET_DESIGN_TOKENS;
     protected readonly jurisdictionDesignTokens = AUTH_SELECT_BUTTON_DESIGN_TOKENS;
     protected readonly currentJurisdiction = computed<Jurisdiction>(() => this.normalizeJurisdiction(this.cloudStatus()?.jurisdiction) ?? this.inferJurisdictionFromHost());
+    protected readonly selectedTier = computed(() => this.planTiers().find((tier) => tier.code === this.selectedPlan()) ?? null);
+    protected readonly priceLabel = computed(() => {
+        this.activeLanguage();
+        const price = this.selectedTier()?.prices?.[this.selectedBilling()];
+        return price ? this.localeService.localizeNumber(price.amount_minor / 100, 'currency', undefined, { currency: price.currency }) : null;
+    });
     protected readonly socialMethods = computed<readonly AuthMethodOption[]>(() =>
         this.socialProviders().map((provider) => ({
             id: provider.id,
@@ -116,6 +130,13 @@ export class Signup {
                 next: (status) => {
                     this.cloudStatus.set(status.cloud ?? null);
                     if (status.cloud?.hosted && status.cloud.signup_enabled) {
+                        this.cloud
+                            .getPlans()
+                            .pipe(takeUntilDestroyed(this.destroyRef))
+                            .subscribe({
+                                next: (plans) => this.planTiers.set(plans),
+                                error: () => this.planTiers.set([])
+                            });
                         this.signupTracking.install();
                         this.trackSignupPageView();
                         this.trackInitialSignupError();
@@ -150,6 +171,8 @@ export class Signup {
             this.signupForm.password().markAsTouched();
             this.signupForm.teamName().markAsTouched();
             this.signupForm.acceptedTos().markAsTouched();
+            const firstInvalid = this.signupForm.email().invalid() ? 'email' : this.signupForm.password().invalid() ? 'password' : this.signupForm.teamName().invalid() ? 'teamName' : 'acceptedTos';
+            this.document.getElementById(firstInvalid)?.focus();
             return;
         }
 
@@ -297,8 +320,9 @@ export class Signup {
     private hydrateFromQuery(): void {
         const params = this.route.snapshot.queryParamMap;
 
-        this.selectedPlan.set(this.normalizePlan(params.get('plan')));
-        this.selectedBilling.set(this.selectedPlan() === 'free' ? 'monthly' : this.normalizeBilling(params.get('billing')));
+        const intent = cloudPurchaseIntent(params.get('plan'), params.get('billing'));
+        this.selectedPlan.set(intent.plan);
+        this.selectedBilling.set(intent.billing);
 
         const teamName = params.get('team_name')?.trim();
         if (teamName) {
@@ -422,15 +446,6 @@ export class Signup {
             return normalized;
         }
         return null;
-    }
-
-    private normalizePlan(value: string | null | undefined): CloudPlanCode {
-        const normalized = value?.trim().toLowerCase();
-        return normalized === 'pro' || normalized === 'business' ? normalized : 'free';
-    }
-
-    private normalizeBilling(value: string | null | undefined): BillingInterval {
-        return value?.trim().toLowerCase() === 'annual' ? 'annual' : 'monthly';
     }
 
     private socialErrorKey(code?: string): string {

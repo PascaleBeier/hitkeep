@@ -53,18 +53,17 @@
                         {{ "common.password" | transloco }}
                         <span class="api-client-required-asterisk" aria-hidden="true">*</span>
                     </label>
-                    <p-password
-                        id="password"
-                        [formControl]="setupForm.password().control()"
-                        [toggleMask]="true"
-                        [fluid]="true"
-                        [feedback]="false"
-                        [attr.aria-invalid]="setupForm.password().touched() && setupForm.password().invalid() ? true : null"
-                        [attr.aria-describedby]="'setup-password-help'"
+                    <app-password-input
+                        inputId="password"
+                        [control]="setupForm.password().control()"
+                        autocomplete="new-password"
+                        [invalid]="setupForm.password().touched() && setupForm.password().invalid()"
+                        [describedBy]="setupForm.password().touched() && setupForm.password().invalid() ? 'setup-password-error' : 'setup-password-help'"
                     />
-                    <small id="setup-password-help" class="hk-auth-field-help">{{ "password.reset.minimumLength" | transloco }}</small>
                     @if (setupForm.password().touched() && setupForm.password().invalid()) {
-                    <p-message severity="error" variant="simple" size="small" role="status">{{ "password.reset.minimumLength" | transloco }}</p-message>
+                    <p-message id="setup-password-error" severity="error" variant="simple" size="small" role="status">{{ "password.reset.minimumLength" | transloco }}</p-message>
+                    } @else {
+                    <small id="setup-password-help" class="hk-auth-field-help">{{ "password.reset.minimumLength" | transloco }}</small>
                     }
                 </div>
 

@@ -143,8 +143,12 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"200": jsonRefResp("Auth session", "#/components/schemas/AuthSession")}),
 		},
 		"/api/auth/forgot-password": map[string]any{
-			"post": op([]string{"Auth"}, "Request password reset", "Sends password reset email if account exists.", nil, nil,
-				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"email": map[string]any{"type": "string", "format": "email"}}, "required": []string{"email"}}),
+			"post": op([]string{"Auth"}, "Request password reset", "Sends password reset email if account exists. Hosted Cloud may include a validated plan and billing interval in the reset link.", nil, nil,
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{
+					"email":   map[string]any{"type": "string", "format": "email"},
+					"plan":    map[string]any{"type": "string", "enum": []string{"free", "pro", "business"}},
+					"billing": map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
+				}, "required": []string{"email"}}),
 				map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},
 		"/api/auth/reset-password": map[string]any{
@@ -195,7 +199,7 @@ func openAPIV1CorePaths() map[string]any {
 				map[string]any{"200": jsonRefResp("Status", "#/components/schemas/Status")}),
 		},
 		"/api/cloud/signup": map[string]any{
-			"post": cloudOp("Create managed cloud account", "Creates a hosted cloud user and team, then optionally returns a Stripe Checkout URL for paid plans.", nil, nil,
+			"post": cloudOp("Create managed cloud account", "Requests a hosted Cloud account. Password signup requires email verification before the user reviews payment for a paid plan.", nil, nil,
 				jsonBody(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -205,10 +209,12 @@ func openAPIV1CorePaths() map[string]any {
 						"last_name":    map[string]any{"type": "string"},
 						"team_name":    map[string]any{"type": "string"},
 						"plan_code":    map[string]any{"type": "string", "enum": []string{"free", "pro", "business"}},
+						"billing":      map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
+						"accepted_tos": map[string]any{"type": "boolean"},
 						"jurisdiction": map[string]any{"type": "string"},
 						"locale":       map[string]any{"type": "string"},
 					},
-					"required": []string{"email", "password", "team_name", "plan_code"},
+					"required": []string{"email", "password", "plan_code", "accepted_tos"},
 				}),
 				map[string]any{
 					"201": jsonSchemaResp("Cloud signup response", map[string]any{
@@ -252,8 +258,22 @@ func openAPIV1CorePaths() map[string]any {
 					"429": errResp("Too many requests"),
 				}),
 		},
+		"/api/cloud/plans": map[string]any{
+			"get": cloudOp("List Cloud plans", "Public managed Cloud plan catalog. Configured paid prices are resolved from Stripe; a missing price is omitted rather than estimated.", nil, nil, nil,
+				map[string]any{"200": jsonSchemaResp("Cloud plan catalog", map[string]any{
+					"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{
+						"code":         map[string]any{"type": "string", "enum": []string{"free", "pro", "business"}},
+						"name":         map[string]any{"type": "string"},
+						"entitlements": map[string]any{"type": "object", "additionalProperties": true},
+						"prices": map[string]any{"type": "object", "properties": map[string]any{
+							"monthly": map[string]any{"type": "object", "properties": map[string]any{"amount_minor": map[string]any{"type": "integer", "minimum": 1}, "currency": map[string]any{"type": "string"}}, "required": []string{"amount_minor", "currency"}},
+							"annual":  map[string]any{"type": "object", "properties": map[string]any{"amount_minor": map[string]any{"type": "integer", "minimum": 1}, "currency": map[string]any{"type": "string"}}, "required": []string{"amount_minor", "currency"}},
+						}},
+					}, "required": []string{"code", "name", "entitlements"}},
+				})}),
+		},
 		"/api/cloud/billing/portal": map[string]any{
-			"post": cloudOp("Create billing portal session", "Creates a Stripe Customer Portal session for the authenticated hosted cloud team.", secCookie(), nil,
+			"post": cloudOp("Create billing portal session", "Creates a Stripe Customer Portal session for the authenticated hosted Cloud team. Requires team.manage_settings on the active team.", secCookie(), nil,
 				jsonBody(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -275,11 +295,12 @@ func openAPIV1CorePaths() map[string]any {
 				}),
 		},
 		"/api/cloud/billing/checkout": map[string]any{
-			"post": cloudOp("Create billing checkout session", "Creates a Stripe Checkout session to upgrade the authenticated hosted cloud team to a paid plan.", secCookie(), nil,
+			"post": cloudOp("Create billing checkout session", "Creates a Stripe Checkout session to upgrade the authenticated hosted Cloud team to a paid plan. Requires team.manage_settings on the active team. The cancellation URL retains the requested plan, interval, and team for recovery.", secCookie(), nil,
 				jsonBody(map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"plan_code": map[string]any{"type": "string", "enum": []string{"pro", "business"}},
+						"billing":   map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
 						"locale":    map[string]any{"type": "string"},
 					},
 					"required": []string{"plan_code"},
@@ -294,9 +315,23 @@ func openAPIV1CorePaths() map[string]any {
 					}),
 					"400": errResp("Invalid request"),
 					"401": errResp("Unauthorized"),
+					"403": errResp("Team billing access denied"),
 					"404": errResp("Cloud billing account not found"),
 					"409": errResp("Use billing portal to manage an existing paid plan"),
 					"502": errResp("Unable to start checkout"),
+				}),
+		},
+		"/api/cloud/billing/state": map[string]any{
+			"get": cloudOp("Get Cloud billing state", "Returns authoritative billing state for the authenticated active Cloud team. Requires team.manage_settings. A pending plan is reported only while checkout is pending; a paid plan is never described as Free.", secCookie(), nil, nil,
+				map[string]any{
+					"200": jsonSchemaResp("Cloud billing state", map[string]any{"type": "object", "properties": map[string]any{
+						"team_id":             map[string]any{"type": "string", "format": "uuid"},
+						"plan_code":           map[string]any{"type": "string"},
+						"subscription_status": map[string]any{"type": "string"},
+						"pending_plan_code":   map[string]any{"type": "string", "enum": []string{"pro", "business"}},
+						"billing":             map[string]any{"type": "string", "enum": []string{"monthly", "annual"}},
+					}, "required": []string{"team_id", "plan_code", "subscription_status"}}),
+					"401": errResp("Unauthorized"), "403": errResp("Team billing access denied"), "404": errResp("Cloud not hosted"),
 				}),
 		},
 		"/api/cloud/webhooks/stripe": map[string]any{

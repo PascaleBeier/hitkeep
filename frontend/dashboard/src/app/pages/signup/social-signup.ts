@@ -16,6 +16,7 @@ import { AuthCard } from '@core/components/auth-card/auth-card';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { AuthService, SocialPreviewResponse } from '@services/auth.service';
 import { BillingInterval, CloudPlanCode } from '@services/cloud.service';
+import { cloudPurchaseIntent } from '@core/utils/cloud-purchase-intent';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 
 type Jurisdiction = 'EU' | 'US';
@@ -39,8 +40,8 @@ export class SocialSignup {
     protected readonly verificationSent = signal(false);
     protected readonly preview = signal<SocialPreviewResponse | null>(null);
     protected readonly currentYear = new Date().getFullYear();
-    protected readonly selectedPlan = signal<CloudPlanCode>(this.normalizePlan(this.route.snapshot.queryParamMap.get('plan')));
-    protected readonly selectedBilling = signal<BillingInterval>(this.normalizeBilling(this.route.snapshot.queryParamMap.get('billing')));
+    protected readonly selectedPlan = signal<CloudPlanCode>(cloudPurchaseIntent(this.route.snapshot.queryParamMap.get('plan'), this.route.snapshot.queryParamMap.get('billing')).plan);
+    protected readonly selectedBilling = signal<BillingInterval>(cloudPurchaseIntent(this.route.snapshot.queryParamMap.get('plan'), this.route.snapshot.queryParamMap.get('billing')).billing);
     protected readonly jurisdiction = signal<Jurisdiction>(this.normalizeJurisdiction(this.route.snapshot.queryParamMap.get('region')) ?? this.inferJurisdiction());
     private readonly completionToken = this.readCompletionToken();
 
@@ -136,14 +137,5 @@ export class SocialSignup {
     private normalizeJurisdiction(value: string | null): Jurisdiction | null {
         const normalized = value?.trim().toUpperCase();
         return normalized === 'EU' || normalized === 'US' ? normalized : null;
-    }
-
-    private normalizePlan(value: string | null): CloudPlanCode {
-        const normalized = value?.trim().toLowerCase();
-        return normalized === 'pro' || normalized === 'business' ? normalized : 'free';
-    }
-
-    private normalizeBilling(value: string | null): BillingInterval {
-        return value?.trim().toLowerCase() === 'annual' ? 'annual' : 'monthly';
     }
 }

@@ -46,20 +46,17 @@
                 <div class="hk-auth-field">
                     <div class="flex items-center justify-between gap-3">
                         <label for="password" class="hk-auth-field-label">{{ "login.passwordLabel" | transloco }}</label>
-                        <a routerLink="/forgot-password" class="hk-auth-link">{{ "login.forgotPassword" | transloco }}</a>
+                        <a routerLink="/forgot-password" [queryParams]="recoveryQueryParams" class="hk-auth-link">{{ "login.forgotPassword" | transloco }}</a>
                     </div>
-                    <p-password
-                        id="password"
-                        [formControl]="loginForm.password().control()"
+                    <app-password-input
+                        inputId="password"
+                        [control]="loginForm.password().control()"
                         autocomplete="current-password"
-                        [toggleMask]="true"
-                        [feedback]="false"
-                        [fluid]="true"
-                        [class.ng-invalid]="loginForm.password().touched() && loginForm.password().invalid()"
-                        [class.ng-dirty]="loginForm.password().dirty()"
+                        [invalid]="loginForm.password().touched() && loginForm.password().invalid()"
+                        [describedBy]="loginForm.password().touched() && loginForm.password().invalid() ? 'login-password-error' : null"
                     />
                     @if (loginForm.password().touched() && loginForm.password().invalid()) {
-                    <p-message severity="error" variant="simple" size="small" role="status">{{ "login.passwordRequired" | transloco }}</p-message>
+                    <p-message id="login-password-error" severity="error" variant="simple" size="small" role="status">{{ "login.passwordRequired" | transloco }}</p-message>
                     }
                 </div>
 
@@ -86,7 +83,7 @@
                     type="submit"
                     [loading]="authMode() === 'sso' ? isSSOLoading() : isLoading()"
                     [fluid]="true"
-                    [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading() || socialLoading() !== null || loginForm.email().invalid() || (authMode() === 'password' && loginForm.password().invalid())"
+                    [disabled]="isLoading() || isPasskeyLoading() || isSSOLoading() || socialLoading() !== null"
                 />
                 } @else {
                 <div class="hk-auth-field">
@@ -160,7 +157,7 @@
             @if (showSignupLink()) {
             <p class="hk-auth-footer-text">
                 <span>{{ "login.cloudSignupPrompt" | transloco }}</span>
-                <a routerLink="/signup" class="hk-auth-link">{{ "login.cloudSignupAction" | transloco }}</a>
+                <a routerLink="/signup" [queryParams]="signupQueryParams" class="hk-auth-link">{{ "login.cloudSignupAction" | transloco }}</a>
             </p>
             }
             <p class="hk-auth-footer-text">

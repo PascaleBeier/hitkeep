@@ -16,10 +16,6 @@
     --settings-field-placeholder: var(--p-text-muted-color);
 }
 
-:host ::ng-deep .p-password input {
-    width: 100%;
-}
-
 :host ::ng-deep .settings-action-btn {
     min-width: 10rem;
     justify-content: center;

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/internal/api"
+	authcore "hitkeep/internal/auth"
 	"hitkeep/internal/database"
 	"hitkeep/internal/entitlements"
 	"hitkeep/internal/mailables"
@@ -38,6 +40,7 @@ type stripeClient interface {
 	CreateCheckoutSession(context.Context, createCheckoutSessionInput) (*checkoutSessionOutput, error)
 	CreatePortalSession(context.Context, createPortalSessionInput) (*portalSessionOutput, error)
 	GetCharge(context.Context, string) (*stripeChargeOutput, error)
+	GetPrice(context.Context, string) (*stripePriceOutput, error)
 }
 
 type stripeWebhookVerifier interface {
@@ -97,6 +100,13 @@ type stripeChargeOutput struct {
 	CustomerID string
 }
 
+type stripePriceOutput struct {
+	AmountMinor int64
+	Currency    string
+	Interval    string
+	Active      bool
+}
+
 type stripeSDKClient struct {
 	client *stripe.Client
 }
@@ -122,13 +132,20 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 		RateLimiter: ctx.AuthLimiter,
 	}, h.handleVerifySignup()))
 	mux.HandleFunc("POST /api/cloud/billing/portal", ctx.Handler(shared.HandlerConfig{
-		RequireAuth: true,
-		RateLimiter: ctx.ApiLimiter,
+		RequireAuth:   true,
+		ActiveTeamCap: authcore.CapTeamManageSettings,
+		RateLimiter:   ctx.ApiLimiter,
 	}, h.handleCreateBillingPortalSession()))
 	mux.HandleFunc("POST /api/cloud/billing/checkout", ctx.Handler(shared.HandlerConfig{
-		RequireAuth: true,
-		RateLimiter: ctx.ApiLimiter,
+		RequireAuth:   true,
+		ActiveTeamCap: authcore.CapTeamManageSettings,
+		RateLimiter:   ctx.ApiLimiter,
 	}, h.handleCreateBillingCheckoutSession()))
+	mux.HandleFunc("GET /api/cloud/billing/state", ctx.Handler(shared.HandlerConfig{
+		RequireAuth:   true,
+		ActiveTeamCap: authcore.CapTeamManageSettings,
+		RateLimiter:   ctx.ApiLimiter,
+	}, h.handleGetBillingState()))
 	mux.HandleFunc("GET /api/cloud/plans", ctx.Handler(shared.HandlerConfig{
 		RateLimiter: ctx.ApiLimiter,
 	}, h.handleListCloudPlans()))
@@ -454,14 +471,52 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 		})
 	}
 
+	var mu sync.Mutex
+	var cachedPrices map[string]map[string]api.CloudPlanPrice
+	var cacheUntil time.Time
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.ctx.Config.CloudHosted {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
 
+		// ponytail: one lock covers four Stripe reads on cache expiry; split per price if catalog traffic needs it.
+		mu.Lock()
+		if time.Now().After(cacheUntil) {
+			cachedPrices = make(map[string]map[string]api.CloudPlanPrice)
+			if strings.TrimSpace(h.ctx.Config.StripeSecretKey) != "" && h.stripe != nil {
+				currency := "EUR"
+				if strings.EqualFold(h.ctx.Config.CloudJurisdiction, "US") {
+					currency = "USD"
+				}
+				for _, code := range planCodes[1:] {
+					for _, interval := range []string{database.CloudBillingIntervalMonthly, database.CloudBillingIntervalAnnual} {
+						priceID := priceIDForPlan(h.ctx.Config, code, interval)
+						if priceID == "" {
+							continue
+						}
+						price, err := h.stripe.GetPrice(r.Context(), priceID)
+						if err != nil || price == nil || !price.Active || price.AmountMinor <= 0 || !strings.EqualFold(price.Currency, currency) || price.Interval != map[string]string{database.CloudBillingIntervalMonthly: "month", database.CloudBillingIntervalAnnual: "year"}[interval] {
+							continue
+						}
+						if cachedPrices[code] == nil {
+							cachedPrices[code] = make(map[string]api.CloudPlanPrice)
+						}
+						cachedPrices[code][interval] = api.CloudPlanPrice{AmountMinor: price.AmountMinor, Currency: currency}
+					}
+				}
+			}
+			cacheUntil = time.Now().Add(5 * time.Minute)
+		}
+		response := make([]api.CloudPlanTier, len(plans))
+		copy(response, plans)
+		for i := range response {
+			response[i].Prices = cachedPrices[response[i].Code]
+		}
+		mu.Unlock()
+
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, plans); err != nil {
+		if err := json.MarshalWrite(w, response); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud plans response", "error", err)
 		}
 	}

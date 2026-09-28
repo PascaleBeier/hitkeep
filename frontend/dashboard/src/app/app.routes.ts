@@ -33,7 +33,7 @@ export const routes: Routes = [
         path: 'signup',
         loadComponent: () => import('@pages/signup/signup').then((m) => m.Signup),
         canActivate: [cloudSignupGuard],
-        data: titleData('signup.title')
+        data: titleData('signup.pageTitle')
     },
     {
         path: 'signup/verified',

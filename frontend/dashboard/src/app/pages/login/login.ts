@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -8,7 +9,6 @@ import { firstValueFrom } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PasswordModule } from '@openng/optimus-ui/password';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { CheckboxModule } from '@openng/optimus-ui/checkbox';
@@ -17,6 +17,7 @@ import { MessageModule } from '@openng/optimus-ui/message';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { AuthDivider } from '@core/components/auth-divider/auth-divider';
 import { Brand } from '@components/brand/brand';
 import { AuthMethodOption, AuthMethods } from '@core/components/auth-methods/auth-methods';
@@ -26,6 +27,7 @@ import { AnalyticsService } from '@services/analytics.service';
 import { UserPreferencesService } from '@services/user-preferences.service';
 import { readSessionEndState, SessionEndReason } from '@services/session-end-navigation.service';
 import { toAssertionResponseJson, toPublicKeyRequestOptions } from '@core/utils/webauthn';
+import { cloudBillingReviewUrl, cloudPurchaseIntent, cloudPurchaseQuery } from '@core/utils/cloud-purchase-intent';
 
 type MfaFactor = 'totp' | 'passkey' | 'recovery_code' | 'email_link';
 type AuthMode = 'password' | 'sso' | 'social';
@@ -38,13 +40,14 @@ const SESSION_END_NOTICES = {
 @Component({
     selector: 'app-login',
     standalone: true,
-    imports: [AuthCard, AuthDivider, AuthMethods, Brand, ReactiveFormsModule, PasswordModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, MessageModule, TooltipModule, RouterLink, TranslocoPipe],
+    imports: [AuthCard, PasswordInput, AuthDivider, AuthMethods, Brand, ReactiveFormsModule, ButtonModule, InputTextModule, CheckboxModule, InputOtpModule, MessageModule, TooltipModule, RouterLink, TranslocoPipe],
     templateUrl: './login.html',
     styleUrl: './login.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Login {
     private static readonly PASSKEY_DEVICE_HISTORY_KEY = 'hitkeep.passkey.used_on_device';
+    private readonly document = inject(DOCUMENT);
     private destroyRef = inject(DestroyRef);
     private router = inject(Router);
     private route = inject(ActivatedRoute);
@@ -87,6 +90,15 @@ export class Login {
     protected readonly mfaHasFallback = computed(() => this.mfaHasRecoveryCode() || this.mfaHasActionFallback());
     protected readonly mfaShowsFallbackDivider = computed(() => this.mfaHasFallback() && (this.mfaHasTotp() || (this.mfaHasRecoveryCode() && this.mfaHasActionFallback())));
     protected readonly showSignupLink = computed(() => Boolean(this.cloudStatus()?.hosted && this.cloudStatus()?.signup_enabled));
+    protected readonly signupQueryParams =
+        this.route.snapshot.queryParamMap.has('plan') || this.route.snapshot.queryParamMap.has('billing')
+            ? cloudPurchaseQuery(cloudPurchaseIntent(this.route.snapshot.queryParamMap.get('plan'), this.route.snapshot.queryParamMap.get('billing')))
+            : null;
+    protected readonly recoveryQueryParams = (() => {
+        if (!this.signupQueryParams || this.signupQueryParams.plan === 'free') return this.signupQueryParams;
+        const reviewUrl = cloudBillingReviewUrl(this.signupQueryParams);
+        return this.route.snapshot.queryParamMap.get('returnUrl') === reviewUrl ? { ...this.signupQueryParams, returnUrl: reviewUrl } : this.signupQueryParams;
+    })();
     protected readonly authMethods = computed<readonly AuthMethodOption[]>(() => {
         const disabled = this.isLoading() || this.isPasskeyLoading() || this.isSSOLoading() || this.socialLoading() !== null;
         if (this.authMode() === 'sso') {
@@ -432,6 +444,7 @@ export class Login {
         if (this.loginForm.email().invalid() || this.loginForm.password().invalid()) {
             this.loginForm.email().markAsTouched();
             this.loginForm.password().markAsTouched();
+            this.document.getElementById(this.loginForm.email().invalid() ? 'email' : 'password')?.focus();
             return;
         }
         this.startPasswordLogin();

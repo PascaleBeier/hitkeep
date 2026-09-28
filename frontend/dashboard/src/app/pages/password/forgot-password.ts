@@ -1,8 +1,9 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -15,6 +16,7 @@ import { MessageModule } from '@openng/optimus-ui/message';
 import { AuthCard } from '@core/components/auth-card/auth-card';
 import { Brand } from '@components/brand/brand';
 import { AuthService } from '@services/auth.service';
+import { cloudBillingReviewUrl, cloudPurchaseIntent, cloudPurchaseQuery } from '@core/utils/cloud-purchase-intent';
 
 @Component({
     selector: 'app-forgot-password',
@@ -26,6 +28,15 @@ import { AuthService } from '@services/auth.service';
 })
 export class ForgotPassword {
     private authService = inject(AuthService);
+    private readonly document = inject(DOCUMENT);
+    private readonly route = inject(ActivatedRoute);
+    protected readonly purchaseIntent = cloudPurchaseIntent(this.route.snapshot.queryParamMap.get('plan'), this.route.snapshot.queryParamMap.get('billing'));
+    protected readonly loginQueryParams = (() => {
+        if (this.purchaseIntent.plan === 'free') return {};
+        const query = cloudPurchaseQuery(this.purchaseIntent);
+        const reviewUrl = cloudBillingReviewUrl(this.purchaseIntent);
+        return this.route.snapshot.queryParamMap.get('returnUrl') === reviewUrl ? { ...query, returnUrl: reviewUrl } : query;
+    })();
 
     protected isLoading = signal(false);
     protected errorMessage = signal<string | null>(null);
@@ -40,6 +51,7 @@ export class ForgotPassword {
         event?.preventDefault();
         if (this.form().invalid()) {
             this.form.email().markAsTouched();
+            this.document.getElementById('email')?.focus();
             return;
         }
 
@@ -47,7 +59,7 @@ export class ForgotPassword {
         this.errorMessage.set(null);
 
         this.authService
-            .requestPasswordReset(this.form.email().value())
+            .requestPasswordReset(this.form.email().value(), this.purchaseIntent.plan === 'free' ? undefined : this.purchaseIntent)
             .pipe(finalize(() => this.isLoading.set(false)))
             .subscribe({
                 next: () => this.successMessage.set(true),

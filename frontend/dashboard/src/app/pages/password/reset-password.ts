@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -9,25 +10,28 @@ import { TranslocoPipe } from '@jsverse/transloco';
 // OptimusUI
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { MessageModule } from '@openng/optimus-ui/message';
-import { PasswordModule } from '@openng/optimus-ui/password';
 
 // Core
 import { AuthCard } from '@core/components/auth-card/auth-card';
+import { PasswordInput } from '@core/components/password-input/password-input';
 import { Brand } from '@components/brand/brand';
 import { AuthService } from '@services/auth.service';
+import { cloudBillingReviewUrl, cloudPurchaseIntent, cloudPurchaseQuery } from '@core/utils/cloud-purchase-intent';
 
 @Component({
     selector: 'app-reset-password',
     standalone: true,
-    imports: [AuthCard, ReactiveFormsModule, Brand, ButtonModule, MessageModule, PasswordModule, TranslocoPipe],
+    imports: [AuthCard, PasswordInput, ReactiveFormsModule, Brand, ButtonModule, MessageModule, TranslocoPipe],
     templateUrl: './reset-password.html',
     styleUrl: './reset-password.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ResetPassword implements OnInit {
+    private readonly document = inject(DOCUMENT);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
     private authService = inject(AuthService);
+    private readonly purchaseIntent = cloudPurchaseIntent(this.route.snapshot.queryParamMap.get('plan'), this.route.snapshot.queryParamMap.get('billing'));
 
     protected token: string | null = null;
     protected isLoading = signal(false);
@@ -51,6 +55,7 @@ export class ResetPassword implements OnInit {
         if (!this.token) return;
         if (this.form().invalid()) {
             this.form.password().markAsTouched();
+            this.document.getElementById('password')?.focus();
             return;
         }
 
@@ -73,6 +78,9 @@ export class ResetPassword implements OnInit {
     }
 
     goToLogin() {
-        this.router.navigate(['/login']);
+        const intent = this.purchaseIntent;
+        void this.router.navigate(['/login'], {
+            queryParams: intent.plan === 'free' ? {} : { ...cloudPurchaseQuery(intent), returnUrl: cloudBillingReviewUrl(intent) }
+        });
     }
 }

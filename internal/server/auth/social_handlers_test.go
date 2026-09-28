@@ -183,6 +183,7 @@ func TestSocialCloudSignupCreatesFreeAndPaidAccounts(t *testing.T) {
 	}{
 		{name: "free", plan: "free", billing: "monthly", configJurisdiction: "eu-central-1", expectedRedirect: "/dashboard"},
 		{name: "paid", plan: "pro", billing: "annual", configJurisdiction: "EU", expectedRedirect: "/signup/verified?billing=annual&plan=pro"},
+		{name: "paid_monthly", plan: "pro", billing: "monthly", configJurisdiction: "EU", expectedRedirect: "/signup/verified?billing=monthly&plan=pro"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			h, store := setupAuthTestEnv(t)

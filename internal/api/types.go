@@ -1644,10 +1644,16 @@ type SocialProvidersResponse struct {
 	SignupEnabled bool             `json:"signup_enabled"`
 }
 
+type CloudPlanPrice struct {
+	AmountMinor int64  `json:"amount_minor"`
+	Currency    string `json:"currency"`
+}
+
 type CloudPlanTier struct {
-	Code         string           `json:"code"`
-	Name         string           `json:"name"`
-	Entitlements TeamEntitlements `json:"entitlements"`
+	Code         string                    `json:"code"`
+	Name         string                    `json:"name"`
+	Entitlements TeamEntitlements          `json:"entitlements"`
+	Prices       map[string]CloudPlanPrice `json:"prices,omitempty"`
 }
 
 type CloudStatus struct {

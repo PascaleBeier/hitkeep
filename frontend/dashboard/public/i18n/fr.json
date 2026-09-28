@@ -763,6 +763,8 @@
     "openInNewTabAria": "Ouvrir dans un nouvel onglet",
     "openUserMenuAria": "Ouvrir le menu utilisateur",
     "password": "Mot de passe",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
     "passwordPlaceholder": "••••••••",
     "preparing": "Préparation...",
     "refreshDataTooltip": "Rafraîchir les données",
@@ -2767,23 +2769,51 @@
     }
   },
   "signup": {
+    "pageTitle": "Créez votre compte HitKeep",
+    "paidTitle": "Commencer avec HitKeep {{plan}}",
+    "paidSubtitle": "Créez votre compte, vérifiez votre adresse e-mail, puis examinez le paiement.",
+    "paidNextSteps": "Créer un compte → Vérifier l’e-mail → Examiner le paiement",
+    "annualCharge": "Facturation annuelle.",
+    "priceUnavailable": "Prix disponible lors du paiement",
+    "freePrice": "Gratuit",
+    "reviewPayment": "Examiner le paiement",
+    "checkingCloud": "Vérification de votre compte Cloud…",
+    "recovery": {
+      "loading": "Vérification du statut du paiement…",
+      "switchTeamTitle": "Passer à l’équipe de ce paiement",
+      "switchTeamDescription": "Utilisez le sélecteur d’équipe pour ouvrir l’équipe choisie lors du paiement.",
+      "unavailableTitle": "Impossible de confirmer ce paiement",
+      "unavailableDescription": "Vérifiez votre statut de facturation avant de lancer un autre paiement.",
+      "retryState": "Vérifier à nouveau",
+      "paidTitle": "Votre offre payante est active",
+      "paidDescription": "Le paiement est terminé. Votre équipe dispose de son offre payante.",
+      "dashboard": "Ouvrir le tableau de bord",
+      "canceledTitle": "Le paiement n’a pas été effectué",
+      "canceledDescription": "Votre compte est prêt. Continuez avec l’offre choisie ou utilisez Gratuit.",
+      "reviewTitle": "Examiner votre offre",
+      "reviewDescription": "Votre compte est prêt. Vérifiez l’offre et le prix avant de payer.",
+      "confirmTeam": "Confirmez que {{team}} est l’équipe à faire évoluer.",
+      "confirmTeamAction": "Utiliser cette équipe",
+      "continuePaid": "Continuer avec {{plan}} — {{price}}",
+      "continueFree": "Continuer avec Gratuit",
+      "checkoutError": "Impossible d’ouvrir la facturation. Réessayez."
+    },
     "title": "Commencez à suivre vos sites gratuitement",
     "subtitle": "Créez votre espace de travail et commencez le suivi en moins d'une minute. Aucune carte bancaire requise.",
-    "paidIntentNote": "Après vérification de l'e-mail, nous ouvrirons le paiement sécurisé. Vous pouvez aussi continuer avec Free.",
     "billing": {
       "monthly": "Facturation mensuelle",
       "annual": "Facturation annuelle"
     },
     "verified": {
       "title": "Votre espace de travail est vérifié",
-      "subtitle": "{{plan}} avec {{billing}} est prêt. Nous ouvrons le paiement sécurisé.",
+      "subtitle": "{{plan}} est prêt ({{billing}}). Vérifiez le forfait et le prix avant de passer au paiement.",
       "openingCheckout": "Ouverture de Stripe Checkout…",
       "checkoutFailed": "Le paiement ne s'est pas ouvert. Votre espace est actif sur Free et vous pouvez réessayer.",
       "retryCheckout": "Réessayer le paiement",
       "continueFree": "Continuer avec Free",
       "freeNote": "Aucune carte n'est débitée tant que vous ne terminez pas le paiement."
     },
-    "jurisdictionLabel": "Juridiction",
+    "jurisdictionLabel": "Région des données",
     "jurisdictions": {
       "eu": "EU",
       "us": "US"

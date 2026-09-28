@@ -38,6 +38,7 @@ type fakeStripeClient struct {
 	createCustomerErr error
 	createCheckoutErr error
 	createPortalErr   error
+	prices            map[string]*stripePriceOutput
 }
 
 func (f *fakeStripeClient) CreateCustomer(_ context.Context, input createCustomerInput) (string, error) {
@@ -68,6 +69,10 @@ func (f *fakeStripeClient) CreatePortalSession(_ context.Context, input createPo
 		ID:  "bps_test",
 		URL: "https://billing.stripe.test/session",
 	}, nil
+}
+
+func (f *fakeStripeClient) GetPrice(_ context.Context, priceID string) (*stripePriceOutput, error) {
+	return f.prices[priceID], nil
 }
 
 func (f *fakeStripeClient) GetCharge(_ context.Context, chargeID string) (*stripeChargeOutput, error) {
@@ -1711,8 +1716,9 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	if stripeClient.lastCheckoutInput.SuccessURL != "https://cloud.hitkeep.eu/hitkeep/admin/team?checkout=success" {
 		t.Fatalf("expected prefixed checkout success URL, got %q", stripeClient.lastCheckoutInput.SuccessURL)
 	}
-	if stripeClient.lastCheckoutInput.CancelURL != "https://cloud.hitkeep.eu/hitkeep/admin/team?checkout=canceled" {
-		t.Fatalf("expected prefixed checkout cancel URL, got %q", stripeClient.lastCheckoutInput.CancelURL)
+	wantCancelURL := fmt.Sprintf("https://cloud.hitkeep.eu/hitkeep/admin/team?billing=annual&checkout=canceled&plan=pro&team=%s", account.TenantID)
+	if stripeClient.lastCheckoutInput.CancelURL != wantCancelURL {
+		t.Fatalf("expected checkout cancel URL %q, got %q", wantCancelURL, stripeClient.lastCheckoutInput.CancelURL)
 	}
 
 	storedAccount, err := store.GetCloudBillingAccount(context.Background(), account.TenantID)
@@ -1733,6 +1739,53 @@ func TestHandleCreateBillingCheckoutSession(t *testing.T) {
 	}
 	if storedAccount.BillingInterval != database.CloudBillingIntervalAnnual {
 		t.Fatalf("expected persisted annual interval, got %q", storedAccount.BillingInterval)
+	}
+}
+
+func TestHandleGetBillingStateUsesStoredCheckoutAndPaidState(t *testing.T) {
+	h, store := setupCloudTestHandler(t)
+	defer store.Close()
+	h.ctx.Config.StripePriceBusinessMonthly = "price_business_monthly"
+	account, err := store.CreateManagedCloudAccount(context.Background(), database.CreateManagedCloudAccountInput{
+		Email: "billing-state@example.com", HashedPassword: "hashed", TeamName: "Billing Team",
+	})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), database.CloudBillingAccount{
+		TenantID: account.TenantID, PlanCode: database.CloudPlanFree, PlanName: "Free",
+		SubscriptionStatus: subscriptionStatusPending, BillingInterval: database.CloudBillingIntervalMonthly,
+		StripePriceID: "price_business_monthly",
+	}); err != nil {
+		t.Fatalf("store pending account: %v", err)
+	}
+
+	getState := func() billingStateResponse {
+		req := httptest.NewRequest(http.MethodGet, "/api/cloud/billing/state", nil)
+		req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, account.UserID))
+		w := httptest.NewRecorder()
+		h.handleGetBillingState().ServeHTTP(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("billing state: %d %s", w.Code, w.Body.String())
+		}
+		var state billingStateResponse
+		if err := json.UnmarshalRead(w.Body, &state); err != nil {
+			t.Fatalf("decode billing state: %v", err)
+		}
+		return state
+	}
+	pending := getState()
+	if pending.TeamID != account.TenantID || pending.PlanCode != database.CloudPlanFree || pending.SubscriptionStatus != subscriptionStatusPending || pending.PendingPlanCode != database.CloudPlanBusiness || pending.BillingInterval != database.CloudBillingIntervalMonthly {
+		t.Fatalf("unexpected pending billing state: %+v", pending)
+	}
+	if err := store.UpsertCloudBillingAccount(context.Background(), database.CloudBillingAccount{
+		TenantID: account.TenantID, PlanCode: database.CloudPlanBusiness, PlanName: "Business", SubscriptionStatus: subscriptionStatusActive,
+	}); err != nil {
+		t.Fatalf("store active account: %v", err)
+	}
+	paid := getState()
+	if paid.PlanCode != database.CloudPlanBusiness || paid.PendingPlanCode != "" || paid.SubscriptionStatus != subscriptionStatusActive {
+		t.Fatalf("unexpected paid billing state: %+v", paid)
 	}
 }
 

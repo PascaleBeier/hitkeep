@@ -25,6 +25,8 @@ describe('Login', () => {
     let authError: string | null;
     let authMethod: string | null;
     let email: string | null;
+    let plan: string | null;
+    let billing: string | null;
     const authMock: {
         status: () => string;
         login: ReturnType<typeof vi.fn>;
@@ -81,6 +83,8 @@ describe('Login', () => {
         authError = null;
         authMethod = null;
         email = null;
+        plan = null;
+        billing = null;
         vi.clearAllMocks();
         authMock.getSocialProviders.mockReturnValue(of({ providers: [], signup_enabled: false }));
         authMock.startSocial.mockReturnValue(of({ auth_url: 'https://accounts.example.com/authorize' }));
@@ -131,7 +135,9 @@ describe('Login', () => {
                                     ...(returnUrl ? { returnUrl } : {}),
                                     ...(authError ? { error: authError } : {}),
                                     ...(authMethod ? { method: authMethod } : {}),
-                                    ...(email ? { email } : {})
+                                    ...(email ? { email } : {}),
+                                    ...(plan ? { plan } : {}),
+                                    ...(billing ? { billing } : {})
                                 });
                             }
                         }
@@ -574,6 +580,29 @@ describe('Login', () => {
         expect(signupLinks.length).toBe(1);
         expect(signupLinks[0]?.getAttribute('href')).toBe('/signup');
         expect(footer?.querySelector('a[href^="https://cloud.hitkeep"]')).toBeNull();
+    });
+
+    it('keeps Pro monthly on signup and password recovery links', async () => {
+        plan = 'pro';
+        billing = 'monthly';
+        fixture.destroy();
+        fixture = TestBed.createComponent(Login);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const element = fixture.nativeElement as HTMLElement;
+        const signup = element.querySelector<HTMLAnchorElement>('.hk-auth-footer a[href^="/signup?"]');
+        const recovery = element.querySelector<HTMLAnchorElement>('a[href^="/forgot-password?"]');
+        expect(signup).not.toBeNull();
+        expect(recovery).not.toBeNull();
+        for (const link of [signup, recovery]) {
+            const params = new URL(link!.href).searchParams;
+            expect(params.get('plan')).toBe('pro');
+            expect(params.get('billing')).toBe('monthly');
+            expect(params.has('token')).toBe(false);
+            expect(params.has('email')).toBe(false);
+        }
     });
 
     it('hides the signup link when hosted signup is unavailable', async () => {

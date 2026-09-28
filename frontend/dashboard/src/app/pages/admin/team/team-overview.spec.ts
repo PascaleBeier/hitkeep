@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { TeamOverviewPage } from './team-overview';
@@ -12,9 +13,18 @@ import { vi } from 'vitest';
 
 describe('TeamOverviewPage', () => {
     let fixture: ComponentFixture<TeamOverviewPage>;
+    let catalogCurrency = 'EUR';
+    let routeQuery = convertToParamMap({});
+    let multipleTeams = false;
+    let billingState = { team_id: '00000000-0000-0000-0000-000000000001', plan_code: 'free', subscription_status: 'free', pending_plan_code: '', billing: '' };
     type TeamOverviewTestAccess = TeamOverviewPage & {
         openBillingPortal(): void;
         startUpgradeCheckout(): void;
+        startRecoveryCheckout(): void;
+        continueOnFree(): void;
+        confirmRecoveryTeam(): void;
+        recoveryKind(): string | null;
+        recoveryIntent(): { plan: string; billing: string };
         redirectTo(url: string): void;
     };
     let systemStatusResponse: {
@@ -59,6 +69,10 @@ describe('TeamOverviewPage', () => {
     const activeTeam = signal<Team | null>(createActiveTeam());
 
     beforeEach(async () => {
+        catalogCurrency = 'EUR';
+        routeQuery = convertToParamMap({});
+        multipleTeams = false;
+        billingState = { team_id: '00000000-0000-0000-0000-000000000001', plan_code: 'free', subscription_status: 'free', pending_plan_code: '', billing: '' };
         activeTeam.set(createActiveTeam());
         systemStatusResponse = {
             needs_setup: false,
@@ -169,11 +183,24 @@ describe('TeamOverviewPage', () => {
                 })
             ],
             providers: [
+                provideRouter([]),
                 provideTranslocoLocale({ langToLocaleMapping: { en: 'en-US' } }),
+                {
+                    provide: ActivatedRoute,
+                    useValue: {
+                        snapshot: {
+                            get queryParamMap() {
+                                return routeQuery;
+                            }
+                        }
+                    }
+                },
                 {
                     provide: TeamService,
                     useValue: {
-                        activeTeam
+                        activeTeam,
+                        activeTeamId: () => activeTeam()?.id ?? '',
+                        hasMultipleTeams: () => multipleTeams
                     }
                 },
                 {
@@ -187,7 +214,8 @@ describe('TeamOverviewPage', () => {
                     useValue: {
                         createBillingPortalSession: vi.fn().mockReturnValue(of({ url: 'https://billing.stripe.test/session' })),
                         createBillingCheckoutSession: vi.fn().mockReturnValue(of({ url: 'https://checkout.stripe.test/session' })),
-                        getPlans: vi.fn().mockReturnValue(
+                        getBillingState: vi.fn().mockImplementation(() => of(billingState)),
+                        getPlans: vi.fn().mockImplementation(() =>
                             of([
                                 {
                                     code: 'free',
@@ -204,6 +232,7 @@ describe('TeamOverviewPage', () => {
                                 {
                                     code: 'pro',
                                     name: 'Pro',
+                                    prices: { annual: { amount_minor: 15000, currency: catalogCurrency }, monthly: { amount_minor: 1500, currency: catalogCurrency } },
                                     entitlements: {
                                         max_sites_per_team: 10,
                                         max_team_members: 5,
@@ -216,6 +245,7 @@ describe('TeamOverviewPage', () => {
                                 {
                                     code: 'business',
                                     name: 'Business',
+                                    prices: { annual: { amount_minor: 39000, currency: catalogCurrency }, monthly: { amount_minor: 3900, currency: catalogCurrency } },
                                     entitlements: {
                                         max_sites_per_team: 50,
                                         max_team_members: 20,
@@ -285,8 +315,9 @@ describe('TeamOverviewPage', () => {
         expect(text).toContain('€390');
     });
 
-    it('formats the same annual tiers in USD for the US jurisdiction', async () => {
+    it('formats the catalog annual tiers in USD for the US jurisdiction', async () => {
         fixture.destroy();
+        catalogCurrency = 'USD';
         systemStatusResponse.cloud = {
             ...systemStatusResponse.cloud!,
             jurisdiction: 'US',
@@ -380,6 +411,62 @@ describe('TeamOverviewPage', () => {
             billing: 'annual',
             locale: 'en'
         });
+        expect(redirectSpy).toHaveBeenCalledWith('https://checkout.stripe.test/session');
+    });
+
+    async function showRecovery(params: Record<string, string>, state: typeof billingState, hasMultipleTeams = false): Promise<TeamOverviewTestAccess> {
+        fixture.destroy();
+        routeQuery = convertToParamMap(params);
+        billingState = state;
+        multipleTeams = hasMultipleTeams;
+        fixture = TestBed.createComponent(TeamOverviewPage);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        return fixture.componentInstance as TeamOverviewTestAccess;
+    }
+
+    it('restores canceled Pro monthly from stored state and waits for an explicit retry', async () => {
+        const component = await showRecovery({ checkout: 'canceled', plan: 'pro', billing: 'annual', team: billingState.team_id }, { ...billingState, subscription_status: 'pending_checkout', pending_plan_code: 'pro', billing: 'monthly' });
+        const cloudService = TestBed.inject(CloudService);
+        const redirectSpy = vi.spyOn(component, 'redirectTo').mockImplementation(() => undefined);
+
+        expect(component.recoveryKind()).toBe('canceled');
+        expect(component.recoveryIntent()).toEqual({ plan: 'pro', billing: 'monthly' });
+        expect(cloudService.createBillingCheckoutSession).not.toHaveBeenCalled();
+
+        component.startRecoveryCheckout();
+        expect(cloudService.createBillingCheckoutSession).toHaveBeenCalledWith({ plan_code: 'pro', billing: 'monthly', locale: 'en' });
+        expect(redirectSpy).toHaveBeenCalledWith('https://checkout.stripe.test/session');
+    });
+
+    it('does not treat a cancellation query as payment state', async () => {
+        const component = await showRecovery({ checkout: 'canceled', plan: 'business', billing: 'annual', team: billingState.team_id }, billingState);
+        expect(component.recoveryKind()).toBe('unavailable');
+        component.startRecoveryCheckout();
+        expect(TestBed.inject(CloudService).createBillingCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('shows an active subscription without another purchase or Free continuation', async () => {
+        const component = await showRecovery({ checkout: 'canceled', plan: 'pro', billing: 'monthly', team: billingState.team_id }, { ...billingState, plan_code: 'pro', subscription_status: 'active' });
+        expect(component.recoveryKind()).toBe('paid');
+        component.startRecoveryCheckout();
+        component.continueOnFree();
+        expect(TestBed.inject(CloudService).createBillingCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('requires explicit team confirmation when the user has multiple teams', async () => {
+        const component = await showRecovery(
+            { checkout: 'canceled', plan: 'business', billing: 'monthly', team: billingState.team_id },
+            { ...billingState, subscription_status: 'pending_checkout', pending_plan_code: 'business', billing: 'monthly' },
+            true
+        );
+        component.startRecoveryCheckout();
+        expect(TestBed.inject(CloudService).createBillingCheckoutSession).not.toHaveBeenCalled();
+        component.confirmRecoveryTeam();
+        const redirectSpy = vi.spyOn(component, 'redirectTo').mockImplementation(() => undefined);
+        component.startRecoveryCheckout();
+        expect(TestBed.inject(CloudService).createBillingCheckoutSession).toHaveBeenCalledWith({ plan_code: 'business', billing: 'monthly', locale: 'en' });
         expect(redirectSpy).toHaveBeenCalledWith('https://checkout.stripe.test/session');
     });
 

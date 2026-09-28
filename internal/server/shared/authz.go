@@ -127,6 +127,33 @@ func (c *Context) RequireTeamCapability(capability auth.Capability) func(http.Ha
 	}
 }
 
+// RequireActiveTeamCapability checks a human user's current team on routes without a team ID path parameter.
+func (c *Context) RequireActiveTeamCapability(capability auth.Capability) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			userID := GetUserIDFromContext(r)
+			if userID == uuid.Nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if c.Store == nil {
+				http.Error(w, "Service not available", http.StatusServiceUnavailable)
+				return
+			}
+			teamID, err := c.Store.GetActiveTenantID(r.Context(), userID)
+			if err != nil {
+				http.Error(w, "Unable to resolve active team", http.StatusBadRequest)
+				return
+			}
+			if !c.userHasTeamCapability(r.Context(), teamID, userID, capability) {
+				http.Error(w, "Access denied", http.StatusForbidden)
+				return
+			}
+			next(w, r)
+		}
+	}
+}
+
 func teamIDFromRequest(r *http.Request, w http.ResponseWriter) (uuid.UUID, bool) {
 	teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
 	if err != nil {

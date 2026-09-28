@@ -9,7 +9,9 @@ import { MessageModule } from '@openng/optimus-ui/message';
 import { Brand } from '@components/brand/brand';
 import { AuthCard } from '@core/components/auth-card/auth-card';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { BillingInterval, CloudService } from '@services/cloud.service';
+import { BillingInterval } from '@services/cloud.service';
+import { AnalyticsService } from '@services/analytics.service';
+import { cloudBillingReviewUrl } from '@core/utils/cloud-purchase-intent';
 import { CloudSignupTrackingService } from '@services/cloud-signup-tracking.service';
 
 type PaidPlan = 'pro' | 'business';
@@ -39,17 +41,12 @@ type PaidPlan = 'pro' | 'business';
                     </header>
 
                     <div class="hk-auth-form" aria-live="polite">
-                        @if (checkoutFailed()) {
-                            <p-message severity="error">{{ 'signup.verified.checkoutFailed' | transloco }}</p-message>
-                            <p-button [label]="'signup.verified.retryCheckout' | transloco" [loading]="checkoutPending()" [fluid]="true" (onClick)="startCheckout()" />
+                        @if (cloudReady()) {
+                            <p-button [label]="'signup.reviewPayment' | transloco" [fluid]="true" (onClick)="reviewPayment()" />
+                            <p-button [label]="'signup.verified.continueFree' | transloco" severity="secondary" [text]="true" [fluid]="true" (onClick)="continueFree()" />
                         } @else {
-                            <div class="flex items-center justify-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-4 text-sm">
-                                <i class="pi pi-spin pi-spinner text-primary" aria-hidden="true"></i>
-                                <span>{{ 'signup.verified.openingCheckout' | transloco }}</span>
-                            </div>
+                            <p-message severity="info">{{ 'signup.checkingCloud' | transloco }}</p-message>
                         }
-
-                        <p-button [label]="'signup.verified.continueFree' | transloco" severity="secondary" [text]="true" [fluid]="true" (onClick)="continueFree()" />
                         <p class="m-0 text-center text-xs text-[var(--p-text-muted-color)]">
                             {{ 'signup.verified.freeNote' | transloco }}
                         </p>
@@ -65,44 +62,35 @@ export class VerifiedSignup {
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
-    private readonly cloud = inject(CloudService);
+    private readonly analytics = inject(AnalyticsService);
     private readonly tracking = inject(CloudSignupTrackingService);
     private readonly activeLanguage = injectActiveLang();
 
     protected readonly plan = signal<PaidPlan>(this.normalizePlan(this.route.snapshot.queryParamMap.get('plan')));
     protected readonly billing = signal<BillingInterval>(this.normalizeBilling(this.route.snapshot.queryParamMap.get('billing')));
-    protected readonly checkoutPending = signal(false);
-    protected readonly checkoutFailed = signal(false);
+    protected readonly cloudReady = signal(false);
 
     constructor() {
-        this.tracking.install();
-        this.track('signup_verified');
-        this.startCheckout();
-    }
-
-    protected startCheckout(): void {
-        if (this.checkoutPending()) {
-            return;
-        }
-        this.checkoutPending.set(true);
-        this.checkoutFailed.set(false);
-        this.cloud
-            .createBillingCheckoutSession({
-                plan_code: this.plan(),
-                billing: this.billing(),
-                locale: this.activeLanguage()
-            })
+        this.analytics
+            .getSystemStatus()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
-                next: ({ url }) => {
-                    this.track('checkout_started');
-                    this.document.defaultView?.location.assign(url);
+                next: (status) => {
+                    if (!status.cloud?.hosted) {
+                        void this.router.navigateByUrl('/dashboard');
+                        return;
+                    }
+                    this.cloudReady.set(true);
+                    this.tracking.install();
+                    this.track('signup_verified');
                 },
-                error: () => {
-                    this.checkoutPending.set(false);
-                    this.checkoutFailed.set(true);
-                }
+                error: () => void this.router.navigateByUrl('/dashboard')
             });
+    }
+
+    protected reviewPayment(): void {
+        if (!this.cloudReady()) return;
+        void this.router.navigateByUrl(cloudBillingReviewUrl({ plan: this.plan(), billing: this.billing() }));
     }
 
     protected continueFree(): void {

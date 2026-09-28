@@ -102,6 +102,24 @@ func (c *stripeSDKClient) CreatePortalSession(ctx context.Context, input createP
 	}, nil
 }
 
+func (c *stripeSDKClient) GetPrice(ctx context.Context, priceID string) (*stripePriceOutput, error) {
+	params := &stripe.PriceRetrieveParams{}
+	setStripeVersionHeader(&params.Params)
+	loaded, err := c.client.V1Prices.Retrieve(ctx, strings.TrimSpace(priceID), params)
+	if err != nil {
+		return nil, fmt.Errorf("get stripe price: %w", err)
+	}
+	if loaded == nil || loaded.Recurring == nil {
+		return nil, nil
+	}
+	return &stripePriceOutput{
+		AmountMinor: loaded.UnitAmount,
+		Currency:    string(loaded.Currency),
+		Interval:    string(loaded.Recurring.Interval),
+		Active:      loaded.Active,
+	}, nil
+}
+
 func (c *stripeSDKClient) GetCharge(ctx context.Context, chargeID string) (*stripeChargeOutput, error) {
 	params := &stripe.ChargeRetrieveParams{}
 	setStripeVersionHeader(&params.Params)
