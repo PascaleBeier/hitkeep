@@ -19,9 +19,13 @@ These surfaces form one build-time chain. The developer catalog owns supported b
 
 ## Filesystem operation boundaries
 
-The layout move does not change filesystem behavior. Ordinary injectable host reads and writes remain Afero candidates in `aianalytics`, `blocking`, `devtool`, `importables`, and `ipmeta/ipmetagen`. Each future change must preserve permissions, no-overwrite and replacement behavior, error paths, and real-filesystem proof where OS behavior matters.
+The layout move does not change filesystem behavior. The audit of the former Afero and fileflow candidates closed without a migration:
 
-`devtool/runs.go::copyTree` remains the ordinary fileflow copy candidate. Verify final destination paths, conflict behavior, permissions, cleanup, partial failures, and cross-filesystem behavior before changing it. Apply pathologize only to untrusted segments beneath a trusted root; configured paths must not be silently sanitized.
+- `aianalytics`, `importables`, and `ipmeta/ipmetagen` make only a few direct reads and writes. Injecting Afero would widen their function contracts without isolating anything their `t.TempDir` tests don't already isolate.
+- `blocking/spamfeed`, `devtool` runs and artifacts, and `devtool/runs.go::copyTree` deliberately replace files, rotate logs, or swap directories. fileflow never overwrites; it writes a suffixed copy instead. Their tests also rely on real symlinks and file modes, which `MemMapFs` does not model.
+- Untrusted path segments are either allowlisted already or handled by `os.Root`, as in `assetstore`, `devtool/artifacts.go`, `devtool/runs.go::copyTree`, and managed toolchain extraction. Use `os.Root` for new cases. Apply pathologize only to untrusted segments beneath a trusted root; never sanitize configured paths silently.
+
+Afero stays where it is already injected: configuration loading and `config init`.
 
 Keep embedded `io/fs` assets, DuckDB database and migration files, WAL and recovery state, fsync, locks, atomic replacement, process/PID coordination, `/proc`, and cgroup probes native. Fileflow and Afero do not substitute for those durability or process contracts.
 

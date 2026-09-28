@@ -1,24 +1,37 @@
 # Configuration and layout migration
 
-Status: 2.14.0 release candidate, 2026-09-28. The detailed slice history is retained in Git; this page records the current state. The [implementation plan](../architecture/cobra-viper-config-go-layout-migration.md) and [filesystem boundary](filesystem-layout-manifest.md) contain the remaining contracts.
+Status: 2.14.0 release candidate, 2026-09-28. Git keeps the detailed slice history; this page records the current state. The [implementation plan](../architecture/cobra-viper-config-go-layout-migration.md) still holds the 2.x compatibility contract, and the [filesystem boundary](filesystem-layout-manifest.md) records which I/O stays native.
 
 ## Current state
 
 | Area | State | Evidence or remaining gate |
 | --- | --- | --- |
-| Cobra and Viper runtime configuration | Implemented | Catalog-backed flags and strict explicit YAML preserve the legacy env/flag/default and alias behavior in self-hosted and cloud builds. The test-only legacy oracle remains until a stabilization release passes. |
-| Configuration publication | Implemented locally | Example YAML, Docker, Compose, Helm, runtime catalog, and private-doc digest contract are checked. A real cross-repository attestation rehearsal is still required. |
+| Configuration loading | Complete | `config/load.go` uses Viper for catalog defaults, the explicit YAML file, and environment binding (including deprecated names). pflag owns the flags; deprecated flags are normalized onto canonical ones, so the last occurrence still wins. A small argv shim keeps the 2.x single-dash grammar (`-db x`). The reflection setters and stdlib flag set that ran underneath Viper are gone. |
+| Legacy parity | Retired after proof | At `b88cf0b5` the new loader matched the legacy loader for every catalog setting and twelve legacy grammar edge cases, in both self-hosted and billing builds. `config/load_test.go` now characterizes every setting through each source, together with the legacy grammar. |
+| Production commands | Complete | One context-aware `run` serves the root, healthcheck, config fallback, and `help`. Before this change, `hitkeep help` started the server without the signal context. Startup failures return `ExitError` with the same JSON log line, instead of panicking. Recovery subcommands keep their stdlib flag sets, because those flags are local, single-dash, and already follow the 2.x `-h`/exit-2 grammar. |
+| Configuration publication | Implemented locally | Example YAML, Docker, Compose, Helm, runtime catalog, and private-doc digest contract are checked. A real cross-repository attestation rehearsal is still required. `config init` now creates owner-only files (`0600`). |
+| Release and workflow checks | Tool-owned | Pinned `actionlint`, `helm lint --strict`, `zizmor`, and `goreleaser check` gates replace the Go tests that pattern-matched workflow, GoReleaser, chart, and script text. Some Go checks remain, because no linter can make them: version metadata consistency, the mapping from PR gates to CI groups, the cross-repository docs receiver pin, and the tests that execute the real release scripts against a stubbed `gh`. |
 | Upgrade and rollback | Implemented locally | Digest-pinned v2.12 upgrade, repeated same-volume recreation, quiescent rollback, and interrupted default-tenant split recovery passed. Tagged workflow execution remains a release gate. |
-| Release artifacts | Candidate ready | Native builds, snapshot archives, configuration manifest, checksums, and local Homebrew lifecycle have proof. Tagged archive/checksum ownership and Windows/Scoop lifecycle need release evidence. |
-| Filesystem operations | Boundary recorded | The package move leaves I/O behavior unchanged. Afero, fileflow, and pathologize candidates in the [filesystem boundary](filesystem-layout-manifest.md) are separate follow-up work; DuckDB/WAL/fsync/lock operations stay native. |
-| Go package layout | Complete | All former `internal/` Go package trees are at the module root, including `devtool` merged with its existing `cli` and `devmcp` children. Package names, exported APIs, and relative embeds remain unchanged. No compatibility shim was added. |
-| Release QA | Local gates complete | Full QA passed 26 of 27 gates on the moved source; the browser gate passed all 76 tests on a same-commit rerun after one transient translation-key failure. Both image variants and the v2.12 upgrade/recreation gate passed. Tagged workflow and publication checks remain release-time gates. |
+| Release artifacts | Candidate ready | Native builds, snapshot archives, configuration manifest, checksums, and local Homebrew lifecycle have proof. Tagged archive/checksum ownership and the Windows/Scoop lifecycle still need release evidence. |
+| Filesystem operations | Closed | Afero stays where it is injected today. None of the remaining candidates fit fileflow, because fileflow suffixes instead of replacing and the tests need real symlinks and modes. Toolchain extraction now writes through `os.Root`, and QA plan IDs are validated before they name a file. |
+| Go package layout | Complete | All former `internal/` Go package trees are at the module root. Package names, exported APIs, and relative embeds are unchanged. |
+
+## Size
+
+Go lines at the pre-refactor base `f0a9a502`, at the layout-complete candidate `fc8e390f`, and after the simplification:
+
+| Package | Production | Tests |
+| --- | --- | --- |
+| `config` | 987 → 1,306 → 1,266 | 1,171 → 2,340 → 1,868 |
+| `cmd` | 6,516 → 6,711 → 6,609 | 2,602 → 4,220 → 4,222 |
+| `devtool` | 9,607 → 10,357 → 9,911 | 3,411 → 7,005 → 5,021 |
+
+The simplification removed a net 3,068 lines across 55 files.
 
 ## Current proof
 
-- Both the HitKeep and private docs branches contain the latest fetched `origin/main` as of 2026-09-28.
-- The pre-layout candidate passed full QA `20260928T110224-ba0108a8` (26 selected gates); the self-hosted upgrade/image gate passed separately as `20260928T105510-471bb2fa`. The docs build, SEO checks, content metadata validation, and all 13 release tests passed. This evidence predates the final layout move.
-- The `listrefresh` move passed `go test -race ./listrefresh`; all command race-test packages passed, and changed QA `20260928T121951-8ab50b17` passed all nine selected gates. The all-package move passes `go list ./...` and `go test ./...`. Full QA `20260928T125939-0a6d4b2e` passed 26 gates; the sole failing `frontend-e2e` gate passed all 76 tests on the same commit in rerun `20260928T133019-600118d0`. The first browser run showed untranslated menu labels in one export test; that timing failure is not claimed fixed.
-- The draft post is `src/content/blog/hitkeep-2-14-0.mdx` in the private docs branch with `draft: true`. It includes Reports, Ask AI, themes, offline DuckDB startup, and explicit configuration. Current Reports desktop/mobile and Ask AI screenshots are checked in; the Ask AI answer is labeled as seeded demo data.
+- Both the HitKeep and private docs branches contained the latest `origin/main` on 2026-09-28.
+- The layout-complete candidate `fc8e390f` passed full QA `20260928T125939-0a6d4b2e` (26 gates); `frontend-e2e` passed all 76 tests in rerun `20260928T133019-600118d0`. The v2.12 upgrade/recreation gate and both image variants passed.
+- The draft post is `src/content/blog/hitkeep-2-14-0.mdx` in the private docs branch, with `draft: true`.
 
 No stable 2.14.0 release, image, site publication, or tag has been created from this candidate.

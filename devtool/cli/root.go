@@ -541,28 +541,17 @@ func qaCommand(options *options) *cobra.Command {
 	command := startCommand(options, "qa [changed|complete|pr|full]", "qa start", "Run one persisted source-bound QA plan", request, configure)
 	var baseRef string
 	plan := &cobra.Command{Use: "plan [changed|complete|pr|full]", Args: cobra.MaximumNArgs(1)}
-	plan.RunE = func(cmd *cobra.Command, args []string) error {
-		ctx := context.WithValue(cmd.Context(), argsKey{}, args)
-		cmd.SetContext(ctx)
-		return withApp(options, "qa plan", func(ctx context.Context, app *devtool.App) (any, error) {
-			profile := "complete"
-			if values := planArgs(ctx); len(values) > 0 {
-				profile = values[0]
-			}
-			return app.QAPlan(ctx, profile, baseRef)
-		})(cmd, args)
-	}
+	plan.RunE = withArgsApp(options, "qa plan", func(ctx context.Context, app *devtool.App, args []string) (any, error) {
+		profile := "complete"
+		if len(args) > 0 {
+			profile = args[0]
+		}
+		return app.QAPlan(ctx, profile, baseRef)
+	})
 	plan.Flags().StringVar(&baseRef, "base", "", "base ref for change-aware planning")
 	command.AddCommand(plan)
 	command.AddCommand(startCommand(options, "start [changed|complete|pr|full]", "qa start", "Run one persisted source-bound QA plan", request, configure))
 	return command
-}
-
-type argsKey struct{}
-
-func planArgs(ctx context.Context) []string {
-	values, _ := ctx.Value(argsKey{}).([]string)
-	return values
 }
 
 func buildCommand(options *options) *cobra.Command {
