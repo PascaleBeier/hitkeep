@@ -420,7 +420,7 @@ func inputSchema(name string) *jsonschema.Schema {
 		required = []string{"run_id"}
 	case "hk_run_start":
 		properties["kind"] = enum("setup", "qa", "build", "smoke")
-		properties["plan_id"] = &jsonschema.Schema{Type: "string", MaxLength: new(100)}
+		properties["plan_id"] = &jsonschema.Schema{Type: "string", Pattern: `^[0-9a-f]{24}$`}
 		properties["profile"] = enum("changed", "complete", "pr", "full")
 		properties["gate_ids"] = &jsonschema.Schema{Type: "array", Items: gateEnum(), UniqueItems: true, MaxItems: new(len(devtool.CatalogSnapshot().Gates))}
 		properties["variant"] = enum("self-hosted", "cloud")

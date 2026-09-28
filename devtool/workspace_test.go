@@ -167,6 +167,14 @@ func TestCatalogGuardsCloudPublication(t *testing.T) {
 	if err := ValidateRunRequest(RunRequest{Kind: "qa", Profile: "pr", GateIDs: []string{"arbitrary-shell"}}); err == nil {
 		t.Fatal("unknown QA gate was accepted in a run")
 	}
+	for _, planID := range []string{"../../../etc/passwd", "ABCDEF0123456789ABCDEF01", "0123456789abcdef"} {
+		if err := ValidateRunRequest(RunRequest{Kind: "qa", Profile: "pr", PlanID: planID}); err == nil {
+			t.Fatalf("plan ID %q was accepted", planID)
+		}
+	}
+	if err := ValidateRunRequest(RunRequest{Kind: "qa", Profile: "pr", PlanID: "0123456789abcdef01234567"}); err != nil {
+		t.Fatalf("generated plan ID rejected: %v", err)
+	}
 }
 
 func TestGitWorktreesReceiveIsolatedWorkspaceState(t *testing.T) {

@@ -5,7 +5,7 @@ Read this reference only when the change touches the Go runtime, HTTP contracts,
 ## Navigate
 
 - Use `cmd/hitkeep` as the production entry point and inspect nearby orchestration under `cmd/`.
-- Find configuration in `internal/config`, handlers in `server`, public structs in `api`, workers in `worker`, ingestion in `ingest`, and persistence in `database`.
+- Find configuration in `config`, handlers in `server`, public structs in `api`, workers in `worker`, ingestion in `ingest`, and persistence in `database`.
 - Treat the runtime OpenAPI source and the adjacent docs OpenAPI file as one public contract.
 - Follow the detailed database, production MCP, and AI-output invariants in `AGENTS.md`; do not restate or weaken them here.
 

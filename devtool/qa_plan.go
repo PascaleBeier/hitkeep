@@ -212,9 +212,6 @@ func qaSourceSnapshot(root, head string, paths []string) (string, error) {
 }
 
 func (a *App) prepareQARequest(ctx context.Context, request RunRequest) (RunRequest, error) {
-	if request.PlanID == "" {
-		return RunRequest{}, fmt.Errorf("qa plan_id is required")
-	}
 	path := filepath.Join(a.workspace.StateDir, "qa-plans", request.PlanID+".json")
 	raw, err := os.ReadFile(path)
 	if err != nil {

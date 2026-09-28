@@ -29,10 +29,10 @@ needed, then run from the repository root:
 
 ```sh
 go run ./cmd/data-refresh duckdb
-go run ./internal/duckdbextensions/update -check
+go run ./duckdbextensions/update -check
 ```
 
-The standalone `go run ./internal/duckdbextensions/update` refresh command remains available for recovery. Keep the standalone `-check` for release builds: it verifies offline without importing the IP generator's native dependencies.
+The standalone `go run ./duckdbextensions/update` refresh command remains available for recovery. Keep the standalone `-check` for release builds: it verifies offline without importing the IP generator's native dependencies.
 
 The updater derives DuckDB's version from the upstream Go module's documented
 version encoding; it downloads that version's official HTTPS artifacts and

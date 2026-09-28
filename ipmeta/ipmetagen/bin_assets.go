@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -344,23 +343,4 @@ func escapeMetadataField(value string) string {
 	value = strings.ReplaceAll(value, "\t", " ")
 	value = strings.ReplaceAll(value, "\n", " ")
 	return value
-}
-
-func CompactAssetStats(dir string) (map[string]int64, error) {
-	stats := map[string]int64{}
-	for _, pattern := range []string{"data_city.*", "data_asn.*"} {
-		matches, err := filepath.Glob(filepath.Join(dir, pattern))
-		if err != nil {
-			return nil, err
-		}
-		sort.Strings(matches)
-		for _, path := range matches {
-			info, err := os.Stat(path)
-			if err != nil {
-				return nil, err
-			}
-			stats[filepath.Base(path)] = info.Size()
-		}
-	}
-	return stats, nil
 }

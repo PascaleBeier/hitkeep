@@ -1,10 +1,12 @@
 package devtool
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 )
 
 var variants = []Variant{
@@ -117,6 +119,10 @@ func ValidateRunRequest(request RunRequest) error {
 		}
 		if request.PlanID == "" {
 			return errors.New("qa plan_id is required")
+		}
+		// Plan IDs name a file under the state directory, so only accept what qaPlanID produces.
+		if _, err := hex.DecodeString(request.PlanID); err != nil || len(request.PlanID) != 24 || strings.ToLower(request.PlanID) != request.PlanID {
+			return errors.New("qa plan_id must be 24 lowercase hex characters")
 		}
 		for _, id := range request.GateIDs {
 			if _, err := GateByID(id); err != nil {

@@ -344,6 +344,12 @@ func extractToolchainTarGzip(archivePath, destinationRoot string) error {
 		return err
 	}
 	defer compressed.Close()
+	// os.Root refuses paths and symlink chains that resolve outside the staging directory.
+	root, err := os.OpenRoot(destinationRoot)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 	reader := tar.NewReader(compressed)
 	for {
 		header, err := reader.Next()
@@ -353,32 +359,26 @@ func extractToolchainTarGzip(archivePath, destinationRoot string) error {
 		if err != nil {
 			return err
 		}
-		if filepath.IsAbs(header.Name) {
-			return fmt.Errorf("toolchain archive contains absolute path: %s", header.Name)
-		}
 		name := filepath.ToSlash(filepath.Clean(header.Name))
-		if name == ".." || strings.HasPrefix(name, "../") {
+		if filepath.IsAbs(header.Name) || name == ".." || strings.HasPrefix(name, "../") {
 			return fmt.Errorf("toolchain archive path escapes destination: %s", header.Name)
 		}
 		_, relative, found := strings.Cut(name, "/")
 		if !found || relative == "" || relative == "." {
 			continue
 		}
-		destination := filepath.Join(destinationRoot, filepath.FromSlash(relative))
-		if !pathWithin(destinationRoot, destination) {
-			return fmt.Errorf("toolchain archive path escapes destination: %s", header.Name)
-		}
+		destination := filepath.FromSlash(relative)
 		mode := os.FileMode(uint32(header.Mode) & 0o777) //nolint:gosec // tar modes are deliberately restricted to Unix permission bits.
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(destination, mode); err != nil {
+			if err := root.MkdirAll(destination, mode); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+			if err := root.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 				return err
 			}
-			file, err := os.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+			file, err := root.OpenFile(destination, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 			if err != nil {
 				return err
 			}
@@ -391,17 +391,13 @@ func extractToolchainTarGzip(archivePath, destinationRoot string) error {
 				return closeErr
 			}
 		case tar.TypeSymlink:
-			if filepath.IsAbs(header.Linkname) {
-				return fmt.Errorf("toolchain archive contains absolute symlink: %s", header.Name)
-			}
-			resolvedTarget := filepath.Clean(filepath.Join(filepath.Dir(destination), filepath.FromSlash(header.Linkname)))
-			if !pathWithin(destinationRoot, resolvedTarget) {
+			if filepath.IsAbs(header.Linkname) || !pathWithin(destinationRoot, filepath.Join(destinationRoot, filepath.Dir(destination), filepath.FromSlash(header.Linkname))) {
 				return fmt.Errorf("toolchain archive symlink escapes destination: %s", header.Name)
 			}
-			if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+			if err := root.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 				return err
 			}
-			if err := os.Symlink(filepath.FromSlash(header.Linkname), destination); err != nil {
+			if err := root.Symlink(filepath.FromSlash(header.Linkname), destination); err != nil {
 				return err
 			}
 		default:

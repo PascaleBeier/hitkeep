@@ -24,7 +24,7 @@ automatically when a release ships a fresher list.
 
 ## Refresh
 
-The list is refresh-on-release (like `internal/ipmeta`), not runtime-updated.
+The list is refresh-on-release (like `ipmeta`), not runtime-updated.
 The scheduled `.github/workflows/data-refresh.yml` workflow runs the `ai-agents`
 target twice a month and opens a pull request when the data changes.
 

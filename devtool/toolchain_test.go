@@ -69,6 +69,25 @@ func TestExtractToolchainArchiveRejectsTraversal(t *testing.T) {
 	}
 }
 
+func TestExtractToolchainArchiveRejectsSymlinkChainEscape(t *testing.T) {
+	archive := toolchainArchiveFixture(t, []tar.Header{
+		{Name: "go/deep", Typeflag: tar.TypeSymlink, Linkname: "."},
+		{Name: "go/deep/esc", Typeflag: tar.TypeSymlink, Linkname: ".."},
+		{Name: "go/deep/esc/x", Typeflag: tar.TypeReg, Mode: 0o600, Size: 1},
+	}, []string{"", "", "x"})
+	parent := t.TempDir()
+	destination := filepath.Join(parent, "staging")
+	if err := os.Mkdir(destination, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractToolchainTarGzip(archive, destination); err == nil {
+		t.Fatal("symlink chain escape was accepted")
+	}
+	if _, err := os.Stat(filepath.Join(parent, "x")); !os.IsNotExist(err) {
+		t.Fatalf("file written outside staging directory: %v", err)
+	}
+}
+
 func toolchainArchiveFixture(t *testing.T, headers []tar.Header, contents []string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "toolchain.tar.gz")
