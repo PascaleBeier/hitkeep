@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/api"
+	"hitkeep/api"
 )
 
 func fireConversionEvents(batch *seedWriteBatch, siteID, sessionID uuid.UUID, goals goalIDs, rng *mrand.Rand, ts time.Time, entryPage string, utm *utmParams) int {

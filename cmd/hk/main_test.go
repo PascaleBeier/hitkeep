@@ -12,7 +12,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 	json "hitkeep/jsonapi"
 )
 

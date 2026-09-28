@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"hitkeep/internal/database"
+	"hitkeep/database"
 )
 
 func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 	if os.Getenv("HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS") == "1" {
-		os.Args = []string{"hitkeep"}
+		os.Args = append([]string{"hitkeep"}, strings.Fields(os.Getenv("HITKEEP_PRODUCTION_SIGNAL_ARGS"))...)
 		main()
 		return
 	}
@@ -30,14 +30,18 @@ func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {
 	for _, signal := range []struct {
 		name string
 		sig  os.Signal
+		args string
 	}{
 		{name: "SIGINT", sig: os.Interrupt},
 		{name: "SIGTERM", sig: syscall.SIGTERM},
+		// 2.x still starts the server for "help"; it must honor signals too.
+		{name: "help SIGTERM", sig: syscall.SIGTERM, args: "help"},
 	} {
 		t.Run(signal.name, func(t *testing.T) {
 			command := exec.Command(os.Args[0], "-test.run=^TestProductionMainSignalCancelsRunningApplication$")
 			command.Env = append(os.Environ(),
 				"HITKEEP_PRODUCTION_SIGNAL_SUBPROCESS=1",
+				"HITKEEP_PRODUCTION_SIGNAL_ARGS="+signal.args,
 				"HITKEEP_HTTP_ADDR=127.0.0.1:0",
 				"HITKEEP_BIND_ADDR="+testSignalAddress(t),
 				"HITKEEP_NSQ_TCP_ADDRESS="+testSignalAddress(t),

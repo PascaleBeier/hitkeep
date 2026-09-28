@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -26,7 +27,7 @@ func TestImportCommandUsesRootConfigurationAndStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	root := NewRootCommand(nil)
+	root := NewRootCommand(slog.New(slog.DiscardHandler))
 	root.SetOut(&stdout)
 	root.SetErr(&stderr)
 	if err := ExecuteRoot(t.Context(), root, []string{"--config", path, "import", "list", "--site", "site"}); err != nil {

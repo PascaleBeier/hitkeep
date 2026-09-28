@@ -15,7 +15,7 @@ function readJson(path) {
 }
 
 // Release metadata drift across the version-bearing files is validated by the
-// developer-docs gate (internal/devtool/docs.go); verify-tracker-package.mjs asserts
+// developer-docs gate (devtool/docs.go); verify-tracker-package.mjs asserts
 // the built bundle embeds this version. Only the local build inputs are compared here.
 const dashboardVersion = readJson(resolve(dashboardDir, "package.json")).version;
 const packageVersion = readJson(resolve(packageDir, "package.json")).version;

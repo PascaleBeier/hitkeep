@@ -45,11 +45,6 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
-    rules:
-      - path: internal/server/.*/.*handlers.go
-        linters:
-          - gosec
-        text: "G706:"
     paths:
       - frontend$
       - node_modules

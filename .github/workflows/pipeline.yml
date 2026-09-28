@@ -300,19 +300,19 @@ jobs:
             archive="$release_dir/hitkeep_${release_version}_Linux_${arch}.tar.gz"
             staging="$(mktemp -d)"
             cp "hitkeep-linux-${arch}" LICENSE README.md hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "$staging/"
-            mkdir -p "$staging/internal/duckdbextensions"
-            cp internal/duckdbextensions/LICENSE.* "$staging/internal/duckdbextensions/"
+            mkdir -p "$staging/duckdbextensions"
+            cp duckdbextensions/LICENSE.* "$staging/duckdbextensions/"
             chmod 0755 "$staging/hitkeep-linux-${arch}"
-            chmod 0644 "$staging/LICENSE" "$staging/README.md" "$staging"/internal/duckdbextensions/LICENSE.* "$staging/hitkeep-configuration.json" "$staging/hitkeep.example.yaml" "$staging/hitkeep-configuration-manifest.json"
+            chmod 0644 "$staging/LICENSE" "$staging/README.md" "$staging"/duckdbextensions/LICENSE.* "$staging/hitkeep-configuration.json" "$staging/hitkeep.example.yaml" "$staging/hitkeep-configuration-manifest.json"
             (
               cd "$staging"
               tar --format=posix --owner=0 --group=0 --numeric-owner --mtime="@${timestamp}" --pax-option=delete=atime,delete=ctime --no-recursion -cf - \
-                "hitkeep-linux-${arch}" LICENSE README.md internal/duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json \
+                "hitkeep-linux-${arch}" LICENSE README.md duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json \
                 | gzip -n > "$archive"
             )
-            diff -u <(printf '%s\n' LICENSE README.md internal/duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
+            diff -u <(printf '%s\n' LICENSE README.md duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json "hitkeep-linux-${arch}" | LC_ALL=C sort) <(tar -tzf "$archive" | LC_ALL=C sort)
             test "$(tar -tvzf "$archive" "hitkeep-linux-${arch}" | awk '{print $1}')" = "-rwxr-xr-x"
-            for file in LICENSE README.md internal/duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
+            for file in LICENSE README.md duckdbextensions/LICENSE.* hitkeep-configuration.json hitkeep.example.yaml hitkeep-configuration-manifest.json; do
               test "$(tar -tvzf "$archive" "$file" | awk '{print $1}')" = "-rw-r--r--"
               cmp <(tar -xOzf "$archive" "$file") "$file"
             done

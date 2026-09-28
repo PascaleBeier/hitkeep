@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 )
 
 const workspaceCatalogTTL = 5 * time.Second

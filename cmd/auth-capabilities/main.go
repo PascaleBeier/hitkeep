@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"hitkeep/internal/auth"
+	"hitkeep/auth"
 )
 
 func main() {

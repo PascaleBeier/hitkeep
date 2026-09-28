@@ -33,9 +33,6 @@ func ExecuteRoot(ctx context.Context, root *cobra.Command, args []string) error 
 	if err != nil {
 		return err
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if configFile != "" {
 		ctx = context.WithValue(ctx, rootConfigFileContextKey{}, configFile)
 	} else if len(args) > 0 && strings.HasPrefix(args[0], "-") && args[0] != "--version" {
@@ -49,30 +46,15 @@ func ExecuteRoot(ctx context.Context, root *cobra.Command, args []string) error 
 }
 
 type rootActions struct {
-	run        func([]string, string) error
-	runContext func(context.Context, []string, string) error
-	recover    func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
-	importData func(context.Context, []string, io.Reader, io.Writer, io.Writer, string) error
-}
-
-func (actions rootActions) runWithContext(ctx context.Context, args []string, configFile string) error {
-	if actions.runContext != nil {
-		return actions.runContext(ctx, args, configFile)
-	}
-	return actions.run(args, configFile)
+	run     func(context.Context, []string, string) error
+	recover func(context.Context, []string, io.Reader, io.Writer, io.Writer) error
 }
 
 // NewRootCommand routes production commands while their existing parsers remain authoritative.
 func NewRootCommand(logger *slog.Logger) *cobra.Command {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	actions := rootActions{
-		run: func(args []string, configFile string) error {
-			return run(logger, args, configFile)
-		},
-		runContext: func(ctx context.Context, args []string, configFile string) error {
-			return runContext(ctx, logger, args, configFile)
+		run: func(ctx context.Context, args []string, configFile string) error {
+			return run(ctx, logger, args, configFile)
 		},
 		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
 			return Recover(ctx, args, in, out, errOut, logger, rootConfigFile(ctx))
@@ -84,7 +66,7 @@ func NewRootCommand(logger *slog.Logger) *cobra.Command {
 		newUpdateSpamListsCommand(logger),
 		newUpdateAIAgentListsCommand(logger),
 		newConfigCommand(afero.NewOsFs(), logger, func(command *cobra.Command, args []string) error {
-			return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
+			return actions.run(command.Context(), args, rootConfigFile(command.Context()))
 		}),
 	)
 	return root
@@ -146,10 +128,7 @@ func newUpdateSpamListsCommand(logger *slog.Logger) *cobra.Command {
 		outputDescription: "Output path for the compiled spam filter cache",
 		run: func(ctx context.Context, outputPath string, conf *runtimeconfig.Config, out, errOut io.Writer, logger *slog.Logger) error {
 			if outputPath == "" {
-				outputPath = conf.SpamFilterPath
-				if outputPath == "" {
-					outputPath = conf.DataPath + "/spam-filter.json"
-				}
+				outputPath = conf.SpamFilterCachePath()
 			}
 			return UpdateSpamLists(ctx, outputPath, out, errOut, logger)
 		},
@@ -160,7 +139,7 @@ func newUpdateAIAgentListsCommand(logger *slog.Logger) *cobra.Command {
 	return newUpdateListCommand(logger, updateListCommandSpec{
 		use:               "update-ai-agent-lists",
 		short:             "Update AI agent lists",
-		outputDefault:     "internal/aianalytics/default_ai_agents.json",
+		outputDefault:     "aianalytics/default_ai_agents.json",
 		outputDescription: "Output path for the assembled AI agent master list",
 		run: func(ctx context.Context, outputPath string, _ *runtimeconfig.Config, out, errOut io.Writer, logger *slog.Logger) error {
 			return UpdateAIAgentLists(ctx, outputPath, out, errOut, logger)
@@ -204,7 +183,7 @@ func newConfigInitCommand(fs afero.Fs) *cobra.Command {
 		Short: "Write the canonical example configuration",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			file, err := fs.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+			file, err := fs.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) // may hold secrets
 			if err != nil {
 				return fmt.Errorf("create configuration file %q: %w", outputPath, err)
 			}
@@ -257,7 +236,7 @@ func newRootCommand(actions rootActions) *cobra.Command {
 			}
 			configFile := rootConfigFile(command.Context())
 			if len(args) == 0 {
-				return actions.runWithContext(command.Context(), args, configFile)
+				return actions.run(command.Context(), args, configFile)
 			}
 			if args[0] == "recover" {
 				return actions.recover(command.Context(), args[1:], command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr())
@@ -266,18 +245,18 @@ func newRootCommand(actions rootActions) *cobra.Command {
 				_, err := fmt.Fprintln(command.OutOrStdout(), Version)
 				return err
 			}
-			return actions.runWithContext(command.Context(), args, configFile)
+			return actions.run(command.Context(), args, configFile)
 		},
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
-	root.AddCommand(newHealthcheckCommand(actions.runWithContext))
+	root.AddCommand(newHealthcheckCommand(actions.run))
 	root.SetHelpCommand(&cobra.Command{
 		Use:                "help",
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
 		RunE: func(command *cobra.Command, args []string) error {
-			return actions.run(append([]string{"help"}, args...), rootConfigFile(command.Context()))
+			return actions.run(command.Context(), append([]string{"help"}, args...), rootConfigFile(command.Context()))
 		},
 	})
 	return root

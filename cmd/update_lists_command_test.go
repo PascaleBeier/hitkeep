@@ -42,7 +42,7 @@ func TestUpdateListCommandMetadata(t *testing.T) {
 			command:           newUpdateAIAgentListsCommand(logger),
 			use:               "update-ai-agent-lists",
 			short:             "Update AI agent lists",
-			outputDefault:     "internal/aianalytics/default_ai_agents.json",
+			outputDefault:     "aianalytics/default_ai_agents.json",
 			outputDescription: "Output path for the assembled AI agent master list",
 		},
 	}

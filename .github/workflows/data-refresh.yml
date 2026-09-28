@@ -72,7 +72,7 @@ jobs:
       - name: Test embedded AI agent data
         if: env.SELECTED == 'true' && matrix.target == 'ai-agents'
         timeout-minutes: 30
-        run: go test ./internal/aianalytics ./internal/database
+        run: go test ./aianalytics ./database
 
       - name: Generate embedded spam lists
         if: env.SELECTED == 'true' && matrix.target == 'spam'
@@ -82,7 +82,7 @@ jobs:
       - name: Test embedded spam data
         if: env.SELECTED == 'true' && matrix.target == 'spam'
         timeout-minutes: 30
-        run: go test ./internal/blocking
+        run: go test ./blocking
 
       - name: Generate embedded IP metadata
         if: env.SELECTED == 'true' && matrix.target == 'ipmeta'
@@ -94,7 +94,7 @@ jobs:
       - name: Test embedded IP metadata
         if: env.SELECTED == 'true' && matrix.target == 'ipmeta'
         timeout-minutes: 30
-        run: go test ./cmd/ipmeta-generate ./internal/ipmeta/refresh ./internal/ipmeta ./internal/ipmeta/ipmetagen
+        run: go test ./cmd/ipmeta-generate ./ipmeta/refresh ./ipmeta ./ipmeta/ipmetagen
 
       - name: Update DuckDB Go dependency
         if: env.SELECTED == 'true' && matrix.target == 'duckdb'
@@ -111,12 +111,12 @@ jobs:
       - name: Verify DuckDB extension bundle
         if: env.SELECTED == 'true' && matrix.target == 'duckdb'
         timeout-minutes: 15
-        run: go run ./internal/duckdbextensions/update -check
+        run: go run ./duckdbextensions/update -check
 
       - name: Test DuckDB bundle and database behavior
         if: env.SELECTED == 'true' && matrix.target == 'duckdb'
         timeout-minutes: 45
-        run: go test ./internal/duckdbextensions ./internal/database ./internal/takeout
+        run: go test ./duckdbextensions ./database ./takeout
 
       - name: Open refresh pull request
         if: env.SELECTED == 'true'
@@ -133,14 +133,14 @@ jobs:
           set -euo pipefail
 
           case "$TARGET" in
-            ai-agents) paths=(internal/aianalytics/default_ai_agents.json) ;;
-            spam) paths=(internal/blocking/default_spam_filter.json) ;;
-            ipmeta) paths=(internal/ipmeta/data_country_lite.go internal/ipmeta/data_country.hk.zst internal/ipmeta/data_city_network_lite.go internal/ipmeta/data_city.hk.zst internal/ipmeta/data_asn.hk.zst) ;;
+            ai-agents) paths=(aianalytics/default_ai_agents.json) ;;
+            spam) paths=(blocking/default_spam_filter.json) ;;
+            ipmeta) paths=(ipmeta/data_country_lite.go ipmeta/data_country.hk.zst ipmeta/data_city_network_lite.go ipmeta/data_city.hk.zst ipmeta/data_asn.hk.zst) ;;
             duckdb)
-              paths=(go.mod go.sum internal/duckdbextensions/manifest.json)
+              paths=(go.mod go.sum duckdbextensions/manifest.json)
               for platform in linux_amd64 linux_arm64 osx_amd64 osx_arm64; do
                 for extension in httpfs aws excel; do
-                  paths+=("internal/duckdbextensions/assets/$platform/$extension.duckdb_extension.gz")
+                  paths+=("duckdbextensions/assets/$platform/$extension.duckdb_extension.gz")
                 done
               done
               ;;

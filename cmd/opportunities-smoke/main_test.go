@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/internal/opportunities/smokegate"
+	"hitkeep/opportunities/smokegate"
 )
 
 func clearSmokeEnvironment(t *testing.T) {

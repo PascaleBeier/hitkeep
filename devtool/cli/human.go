@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 )
 
 const (

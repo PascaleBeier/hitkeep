@@ -1,0 +1,477 @@
+package database
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+
+	"hitkeep/api"
+)
+
+// aiBotCategoryDimPrefix namespaces the per-category AI agent top lists inside
+// the shared dim column of the GetSiteStats top-list query.
+const aiBotCategoryDimPrefix = "ai_bot_cat::"
+
+// GetSiteAnalyticsBounds returns the observed timestamp span for a site's hits.
+// Zero values mean the site has no stored hits yet.
+func (s *Store) GetSiteAnalyticsBounds(ctx context.Context, siteID uuid.UUID) (time.Time, time.Time, error) {
+	var from, to sql.NullTime
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT MIN(timestamp), MAX(timestamp)
+		FROM hits
+		WHERE site_id = ?
+	`, siteID).Scan(&from, &to); err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("query site analytics bounds: %w", err)
+	}
+	if !from.Valid || !to.Valid {
+		return time.Time{}, time.Time{}, nil
+	}
+	return from.Time.UTC(), to.Time.UTC(), nil
+}
+
+// GetSiteStats returns aggregated KPIs and time-series data using the AnalyticsParams struct.
+func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*api.SiteStats, error) {
+	// Authorization is handled by the handler middleware (SitePerm/RequirePermission).
+	// Tenant analytics stores do not contain the control-plane sites table.
+
+	stats := &api.SiteStats{
+		ChartData:       []api.ChartDataPoint{},
+		TopPages:        []api.MetricStat{},
+		TopLandingPages: []api.MetricStat{},
+		TopExitPages:    []api.MetricStat{},
+		TopReferrers:    []api.MetricStat{},
+		TopDevices:      []api.MetricStat{},
+		TopCountries:    []api.MetricStat{},
+		TopBrowsers:     []api.MetricStat{},
+		TopAIBots:       []api.MetricStat{},
+		TopAISources:    []api.MetricStat{},
+		TopLanguages:    []api.MetricStat{},
+		TopUTMCampaigns: []api.MetricStat{},
+		TopUTMContents:  []api.MetricStat{},
+		TopUTMMediums:   []api.MetricStat{},
+		TopUTMSources:   []api.MetricStat{},
+		TopUTMTerms:     []api.MetricStat{},
+		Goals:           []api.GoalStats{},
+		Funnels:         []api.Funnel{},
+	}
+
+	filterSQL, filterArgs := buildHitFilters(params.Filters, "h")
+	sessionSQL, sessionArgs, err := s.buildSessionFilter(ctx, params, "h")
+	if err != nil {
+		return nil, err
+	}
+	filterSQL += sessionSQL
+	filterArgs = append(filterArgs, sessionArgs...)
+	liveThreshold := time.Now().Add(-5 * time.Minute)
+	liveQuery := "SELECT COUNT(DISTINCT h.session_id) FROM hits h WHERE h.site_id = ? AND h.timestamp >= ?" + filterSQL
+	err = s.db.QueryRowContext(ctx, liveQuery, append([]any{params.SiteID, liveThreshold}, filterArgs...)...).Scan(&stats.LiveVisitors)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc live visitors: %w", err)
+	}
+
+	truncUnit := truncUnitForRange(params.Start, params.End)
+	rollupKind := rollupKindFromTruncUnit(truncUnit)
+	gridStart := truncToUnit(params.Start, truncUnit)
+	gridEnd := truncToUnit(params.End, truncUnit)
+	useRollups := len(params.Filters) == 0 && canUseRollupsForTruncUnit(truncUnit)
+	if sessionSQL != "" {
+		useRollups = false
+	}
+
+	if useRollups {
+		if err := s.refreshDirtyRollupsInRange(ctx, params.SiteID, dirtyRollupSession, rollupKind, gridStart, gridEnd); err != nil {
+			return nil, fmt.Errorf("failed to refresh session rollups: %w", err)
+		}
+	}
+
+	err = s.queryKpis(ctx, params, filterSQL, filterArgs, useRollups, rollupKind, &stats.TotalPageviews, &stats.UniqueSessions, &stats.BounceRate, &stats.AvgSessionDuration, &stats.PagesPerSession)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc KPIs: %w", err)
+	}
+	err = s.queryUTMKpis(
+		ctx,
+		params,
+		filterSQL,
+		filterArgs,
+		&stats.UTMCampaignHits,
+		&stats.UTMContentHits,
+		&stats.UTMMediumHits,
+		&stats.UTMSourceHits,
+		&stats.UTMTermHits,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calc UTM KPIs: %w", err)
+	}
+
+	if useRollups {
+		stats.ChartData, err = s.queryHybridChartData(ctx, params, truncUnit, rollupKind)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query hybrid chart data: %w", err)
+		}
+	} else {
+		rows, err := s.queryChartData(ctx, params, gridStart, gridEnd, truncUnit, filterSQL, filterArgs, useRollups, rollupKind)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query chart data: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var p api.ChartDataPoint
+			if err := rows.Scan(&p.Time, &p.Pageviews, &p.Visitors); err != nil {
+				return nil, err
+			}
+			stats.ChartData = append(stats.ChartData, p)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("failed to read chart data rows: %w", err)
+		}
+	}
+
+	// Top lists via GROUPING SETS to keep a single scan.
+	//nolint:gosec // filterSQL is derived from a fixed allowlist
+	topQuery := fmt.Sprintf(`
+		WITH base AS (
+			-- The category derives from the agent name the inner select already
+			-- resolved, so the ~200-branch user-agent pattern walk runs once per
+			-- row instead of once for the name and once for the category.
+			SELECT
+				classified.*,
+				hk_ai_bot_category_from_name(classified.ai_bot) AS ai_bot_category
+			FROM (
+				SELECT
+					h.path AS path,
+					hk_referrer(h.referrer) AS referrer,
+					hk_device(h.viewport_width) AS device,
+					hk_country(h.country_code) AS country,
+					COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
+					COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
+					hk_asn(h.asn, h.asn_org) AS asn,
+					hk_browser(h.user_agent) AS browser,
+					hk_ai_bot(h.user_agent) AS ai_bot,
+					hk_ai_source(h.referrer) AS ai_source,
+					h.session_id AS session_id,
+					CASE
+						WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
+						ELSE lower(split_part(TRIM(h.language), '-', 1))
+					END AS language,
+					COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)') AS utm_campaign,
+					COALESCE(NULLIF(TRIM(h.utm_content), ''), '(Unspecified)') AS utm_content,
+					COALESCE(NULLIF(TRIM(h.utm_medium), ''), '(Unspecified)') AS utm_medium,
+					COALESCE(NULLIF(TRIM(h.utm_source), ''), '(Unspecified)') AS utm_source,
+					COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
+				FROM hits h
+				WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+			) classified
+		),
+		agg AS (
+			SELECT
+				CASE
+					WHEN GROUPING(path) = 0 THEN 'path'
+					WHEN GROUPING(referrer) = 0 THEN 'referrer'
+					WHEN GROUPING(device) = 0 THEN 'device'
+					WHEN GROUPING(country) = 0 THEN 'country'
+					WHEN GROUPING(city) = 0 THEN 'city'
+					WHEN GROUPING(provider) = 0 THEN 'provider'
+					WHEN GROUPING(asn) = 0 THEN 'asn'
+					WHEN GROUPING(browser) = 0 THEN 'browser'
+					WHEN GROUPING(ai_bot) = 0 THEN 'ai_bot'
+					WHEN GROUPING(ai_bot_category) = 0 THEN 'ai_bot_category'
+					WHEN GROUPING(language) = 0 THEN 'language'
+					WHEN GROUPING(utm_campaign) = 0 THEN 'utm_campaign'
+					WHEN GROUPING(utm_content) = 0 THEN 'utm_content'
+					WHEN GROUPING(utm_medium) = 0 THEN 'utm_medium'
+					WHEN GROUPING(utm_source) = 0 THEN 'utm_source'
+					WHEN GROUPING(utm_term) = 0 THEN 'utm_term'
+					ELSE '__summary__'
+				END AS dim,
+				COALESCE(path, referrer, device, country, city, provider, asn, browser, ai_bot, ai_bot_category, language, utm_campaign, utm_content, utm_medium, utm_source, utm_term) AS name,
+				COUNT(*) AS val,
+				COUNT(*) FILTER (WHERE ai_bot IS NOT NULL) AS ai_bot_hits,
+				COUNT(DISTINCT session_id) FILTER (WHERE ai_source IS NOT NULL) AS ai_source_visits
+			FROM base
+			GROUP BY GROUPING SETS (
+				(path),
+				(referrer),
+				(device),
+				(country),
+				(city),
+				(provider),
+				(asn),
+				(browser),
+				(ai_bot),
+				(ai_bot_category),
+				(language),
+				(utm_campaign),
+				(utm_content),
+				(utm_medium),
+				(utm_source),
+				(utm_term),
+				()
+			)
+		),
+		ai_source_agg AS (
+			SELECT
+				'ai_source' AS dim,
+				ai_source AS name,
+				COUNT(DISTINCT session_id) AS val,
+				NULL AS ai_bot_hits,
+				NULL AS ai_source_visits
+			FROM base
+			WHERE ai_source IS NOT NULL
+			GROUP BY ai_source
+		),
+		ai_bot_category_breakdown AS (
+			-- One dim per category so the shared per-dim ranking yields a
+			-- top list of agents within each category.
+			SELECT
+				'%s' || ai_bot_category AS dim,
+				ai_bot AS name,
+				COUNT(*) AS val,
+				NULL AS ai_bot_hits,
+				NULL AS ai_source_visits
+			FROM base
+			WHERE ai_bot IS NOT NULL AND ai_bot_category IS NOT NULL
+			GROUP BY ai_bot_category, ai_bot
+		),
+		ranked AS (
+			SELECT
+				dim,
+				name,
+				val,
+				ai_bot_hits,
+				ai_source_visits,
+				ROW_NUMBER() OVER (PARTITION BY dim ORDER BY val DESC) AS rn
+			FROM (
+				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM agg
+				UNION ALL
+				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM ai_source_agg
+				UNION ALL
+				SELECT dim, name, val, ai_bot_hits, ai_source_visits FROM ai_bot_category_breakdown
+			)
+			WHERE dim = '__summary__' OR name IS NOT NULL
+		)
+		SELECT dim, name, val, ai_bot_hits, ai_source_visits
+		FROM ranked
+		WHERE dim = '__summary__' OR rn <= 10
+		ORDER BY CASE WHEN dim = '__summary__' THEN 0 ELSE 1 END, dim, val DESC;
+	`, filterSQL, aiBotCategoryDimPrefix)
+
+	topRows, err := s.db.QueryContext(ctx, topQuery, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer topRows.Close()
+
+	for topRows.Next() {
+		var dim string
+		var name sql.NullString
+		var value sql.NullInt64
+		var aiBotHits sql.NullInt64
+		var aiSourceVisits sql.NullInt64
+		if err := topRows.Scan(&dim, &name, &value, &aiBotHits, &aiSourceVisits); err != nil {
+			return nil, err
+		}
+		if dim == "__summary__" {
+			if aiBotHits.Valid {
+				stats.AIBotHits = int(aiBotHits.Int64)
+			}
+			if aiSourceVisits.Valid {
+				stats.AISourceVisits = int(aiSourceVisits.Int64)
+			}
+			continue
+		}
+		if !name.Valid || !value.Valid {
+			continue
+		}
+		m := api.MetricStat{
+			Name:  name.String,
+			Value: int(value.Int64),
+		}
+		if category, ok := strings.CutPrefix(dim, aiBotCategoryDimPrefix); ok {
+			if stats.TopAIBotsByCategory == nil {
+				stats.TopAIBotsByCategory = make(map[string][]api.MetricStat)
+			}
+			stats.TopAIBotsByCategory[category] = append(stats.TopAIBotsByCategory[category], m)
+			continue
+		}
+		switch dim {
+		case "path":
+			stats.TopPages = append(stats.TopPages, m)
+		case "referrer":
+			stats.TopReferrers = append(stats.TopReferrers, m)
+		case "device":
+			stats.TopDevices = append(stats.TopDevices, m)
+		case "country":
+			stats.TopCountries = append(stats.TopCountries, m)
+		case "city":
+			stats.TopCities = append(stats.TopCities, m)
+		case "provider":
+			stats.TopProviders = append(stats.TopProviders, m)
+		case "asn":
+			stats.TopASNs = append(stats.TopASNs, m)
+		case "browser":
+			stats.TopBrowsers = append(stats.TopBrowsers, m)
+		case "ai_bot":
+			stats.TopAIBots = append(stats.TopAIBots, m)
+		case "ai_bot_category":
+			stats.TopAIBotCategories = append(stats.TopAIBotCategories, m)
+		case "ai_source":
+			stats.TopAISources = append(stats.TopAISources, m)
+		case "language":
+			stats.TopLanguages = append(stats.TopLanguages, m)
+		case "utm_campaign":
+			stats.TopUTMCampaigns = append(stats.TopUTMCampaigns, m)
+		case "utm_content":
+			stats.TopUTMContents = append(stats.TopUTMContents, m)
+		case "utm_medium":
+			stats.TopUTMMediums = append(stats.TopUTMMediums, m)
+		case "utm_source":
+			stats.TopUTMSources = append(stats.TopUTMSources, m)
+		case "utm_term":
+			stats.TopUTMTerms = append(stats.TopUTMTerms, m)
+		}
+	}
+	if err := topRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read top metric rows: %w", err)
+	}
+
+	//nolint:gosec // filterSQL is derived from a fixed allowlist
+	landingExitQuery := fmt.Sprintf(`
+		WITH matching_sessions AS (
+			SELECT DISTINCT h.session_id
+			FROM hits h
+			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+		),
+		session_hits AS (
+			SELECT
+				h.session_id,
+				h.path,
+				h.timestamp,
+				h.page_id
+			FROM hits h
+			INNER JOIN matching_sessions ms ON ms.session_id = h.session_id
+			WHERE h.site_id = ?
+		),
+		ranked_hits AS (
+			SELECT
+				session_id,
+				path,
+				ROW_NUMBER() OVER (
+					PARTITION BY session_id
+					ORDER BY timestamp ASC, path ASC, page_id ASC
+				) AS landing_rn,
+				ROW_NUMBER() OVER (
+					PARTITION BY session_id
+					ORDER BY timestamp DESC, path DESC, page_id DESC
+				) AS exit_rn
+			FROM session_hits
+		),
+		aggregated AS (
+			SELECT 'landing' AS kind, path AS name, COUNT(*) AS val
+			FROM ranked_hits
+			WHERE landing_rn = 1
+			GROUP BY path
+			UNION ALL
+			SELECT 'exit' AS kind, path AS name, COUNT(*) AS val
+			FROM ranked_hits
+			WHERE exit_rn = 1
+			GROUP BY path
+		),
+		ranked AS (
+			SELECT
+				kind,
+				name,
+				val,
+				ROW_NUMBER() OVER (PARTITION BY kind ORDER BY val DESC, name ASC) AS rn
+			FROM aggregated
+		)
+		SELECT kind, name, val
+		FROM ranked
+		WHERE rn <= 10
+		ORDER BY kind, val DESC, name ASC;
+	`, filterSQL)
+
+	landingExitArgs := append([]any{params.SiteID, params.Start, params.End}, filterArgs...)
+	landingExitArgs = append(landingExitArgs, params.SiteID)
+	landingExitRows, err := s.db.QueryContext(ctx, landingExitQuery, landingExitArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer landingExitRows.Close()
+
+	for landingExitRows.Next() {
+		var kind string
+		var m api.MetricStat
+		if err := landingExitRows.Scan(&kind, &m.Name, &m.Value); err != nil {
+			return nil, err
+		}
+		switch kind {
+		case "landing":
+			stats.TopLandingPages = append(stats.TopLandingPages, m)
+		case "exit":
+			stats.TopExitPages = append(stats.TopExitPages, m)
+		}
+	}
+	if err := landingExitRows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read landing and exit rows: %w", err)
+	}
+
+	if err := s.augmentImportedSiteStats(ctx, params, truncUnit, stats); err != nil {
+		return nil, err
+	}
+
+	goals, err := s.GetGoals(ctx, params.SiteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch goals: %w", err)
+	}
+
+	for _, goal := range goals {
+		conversions, err := s.queryGoalConversions(ctx, params, goal, filterSQL, filterArgs)
+		if goal.Type == "event" && err == nil && canIncludeImportedSiteAggregates(params, truncUnit) {
+			importedConversions, importErr := s.queryImportedEventGoalConversions(ctx, params, goal.Value)
+			if importErr != nil {
+				return nil, importErr
+			}
+			conversions += importedConversions
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to calc goal conversions: %w", err)
+		}
+
+		rate := 0.0
+		if stats.UniqueSessions > 0 {
+			rate = (float64(conversions) / float64(stats.UniqueSessions)) * 100
+		}
+
+		stats.Goals = append(stats.Goals, api.GoalStats{
+			GoalID:         goal.ID,
+			Name:           goal.Name,
+			Conversions:    conversions,
+			ConversionRate: rate,
+		})
+	}
+
+	funnels, err := s.GetFunnels(ctx, params.SiteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch funnels: %w", err)
+	}
+	stats.Funnels = funnels
+
+	// Both ends must be present: the compare params are parsed leniently, so a
+	// half-specified window would measure against [start, zero time] and report
+	// an empty baseline as a 100% drop.
+	if !params.CompareStart.IsZero() && !params.CompareEnd.IsZero() {
+		comparison, err := s.GetComparisonStats(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calc comparison stats: %w", err)
+		}
+		stats.Comparison = comparison
+	}
+
+	return stats, nil
+}

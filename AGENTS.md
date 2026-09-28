@@ -30,14 +30,14 @@ This file is public guidance for AI-assisted contributions to HitKeep. It is wri
 ## Repository Map
 
 - `cmd/`: application entry points and tools.
-- `internal/config`: runtime configuration.
-- `internal/server`: HTTP server, handlers, middleware, and API surfaces.
-- `internal/database`: DuckDB stores, migrations, and tenant-aware queries.
-- `internal/ingest`: ingest consumers.
-- `internal/worker`: background workers.
-- `internal/mcpserver`: optional read-only Model Context Protocol server.
-- `internal/ai` and `internal/opportunities`: optional AI provider integration and validated opportunity generation.
-- `internal/devtool`: developer-only application services used by `cmd/hk`; production builds must not depend on it.
+- `config/`: runtime configuration.
+- `server`: HTTP server, handlers, middleware, and API surfaces.
+- `database`: DuckDB stores, migrations, and tenant-aware queries.
+- `ingest`: ingest consumers.
+- `worker`: background workers.
+- `mcpserver`: optional read-only Model Context Protocol server.
+- `ai` and `opportunities`: optional AI provider integration and validated opportunity generation.
+- `devtool`: developer-only application services used by `cmd/hk`; production builds must not depend on it.
 - `frontend/dashboard`: Angular dashboard and tracker source.
 - `frontend/dashboard/public/i18n`: dashboard translation JSON files.
 - `frontend/dashboard/src/app/core/i18n`: dashboard locale helpers and OptimusUI locale synchronization.
@@ -61,7 +61,7 @@ Do not create or delete Git worktrees through `hk`. The developer MCP must not r
 
 HitKeep runs on embedded DuckDB, which has no cascading deletes, no deferred constraints, and rewrites whole rows when an indexed column changes. The codebase encodes the safe patterns once; follow them instead of re-deriving workarounds.
 
-- Give new site-scoped tables a `site_id` column and new team-scoped tables a `tenant_id` (or `team_id`) column. Deletion plans are derived from the live schema (`internal/database/fk_cleanup.go`), so correctly scoped tables are cleaned up, transferred, and purged automatically.
+- Give new site-scoped tables a `site_id` column and new team-scoped tables a `tenant_id` (or `team_id`) column. Deletion plans are derived from the live schema (`database/fk_cleanup.go`), so correctly scoped tables are cleaned up, transferred, and purged automatically.
 - Do not add static per-table delete or copy lists. If a table reaches its owner only through another table and the schema declares no foreign key for that hop, register the relationship in the relevant spec's `extraEdges` (see `siteDeleteSpec` and `tenantPurgeSpec`). Tables that must be nulled instead of deleted belong in `policyTables` with dedicated policy code.
 - `Migrate` and `MigrateTenant` validate the cleanup plans after applying migrations. A table that references `sites` or `tenants` without a scope column fails startup with an explanatory error; fix the schema or register the exception rather than weakening the check.
 - Updating a unique-indexed column on a foreign-key-referenced table (for example `sites.domain` or `users.email`) needs the shadow-row sequence; follow `Store.UpdateSiteDomain` or `Store.UpdateUserProfile`, including the separate transaction for the final shadow cleanup.

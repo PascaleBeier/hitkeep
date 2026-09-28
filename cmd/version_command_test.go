@@ -28,7 +28,7 @@ func TestVersionCommand(t *testing.T) {
 			var gotArgs []string
 			var gotConfig string
 			root := newRootCommand(rootActions{
-				run: func(args []string, configFile string) error {
+				run: func(_ context.Context, args []string, configFile string) error {
 					gotArgs = append([]string(nil), args...)
 					gotConfig = configFile
 					return nil
@@ -62,7 +62,7 @@ func TestVersionCommand(t *testing.T) {
 func TestVersionCommandSubprocess(t *testing.T) {
 	if os.Getenv(versionCommandSubprocessEnv) == "1" {
 		root := newRootCommand(rootActions{
-			run: func([]string, string) error {
+			run: func(context.Context, []string, string) error {
 				os.Exit(42)
 				return nil
 			},

@@ -226,4 +226,4 @@ Do not copy build tags, cloud defaults, port assignments, tool versions, or QA m
 - Do not include credentials, customer data, private infrastructure details, or private screenshots.
 - Follow the repository's conventional-commit and release guidance.
 
-New developer workflows belong in `internal/devtool` and must be exposed consistently through the human CLI, structured CLI output, and MCP adapters. Do not add parallel Make or shell-script entry points.
+New developer workflows belong in `devtool` and must be exposed consistently through the human CLI, structured CLI output, and MCP adapters. Do not add parallel Make or shell-script entry points.

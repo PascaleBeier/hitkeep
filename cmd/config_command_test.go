@@ -41,6 +41,9 @@ func TestConfigInitWritesCanonicalExampleWithoutOverwriting(t *testing.T) {
 	if !bytes.Equal(contents, runtimeconfig.RenderExampleYAML()) {
 		t.Fatal("config init output differs from the canonical generated example")
 	}
+	if info, err := os.Stat(outputPath); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("config init file mode = %v, %v; want 0600", info.Mode().Perm(), err)
+	}
 
 	const existing = "operator-owned\n"
 	if err := os.WriteFile(outputPath, []byte(existing), 0o600); err != nil {
@@ -113,7 +116,7 @@ func TestConfigFallbackUsesPublicRootRuntime(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	configPath := filepath.Join(t.TempDir(), "missing.yaml")
 	args := []string{"config", "foo"}
-	want := runContext(context.Background(), logger, args, configPath)
+	want := run(context.Background(), logger, args, configPath)
 	if want == nil {
 		t.Fatal("legacy runtime accepted missing explicit configuration")
 	}
@@ -142,7 +145,7 @@ func TestConfigCommandPreservesLegacyFallback(t *testing.T) {
 				var got []string
 				var gotConfig string
 				actions := rootActions{
-					runContext: func(gotCtx context.Context, args []string, configFile string) error {
+					run: func(gotCtx context.Context, args []string, configFile string) error {
 						if gotCtx.Err() != context.Canceled {
 							t.Fatalf("fallback context error = %v, want %v", gotCtx.Err(), context.Canceled)
 						}
@@ -156,7 +159,7 @@ func TestConfigCommandPreservesLegacyFallback(t *testing.T) {
 					afero.NewMemMapFs(),
 					slog.New(slog.NewTextHandler(io.Discard, nil)),
 					func(command *cobra.Command, args []string) error {
-						return actions.runWithContext(command.Context(), args, rootConfigFile(command.Context()))
+						return actions.run(command.Context(), args, rootConfigFile(command.Context()))
 					},
 				))
 				root.SetOut(io.Discard)

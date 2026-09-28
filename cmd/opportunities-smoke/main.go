@@ -17,12 +17,12 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	hitai "hitkeep/ai"
+	"hitkeep/auth"
 	"hitkeep/config"
-	hitai "hitkeep/internal/ai"
-	"hitkeep/internal/auth"
-	"hitkeep/internal/database"
-	"hitkeep/internal/opportunities"
-	"hitkeep/internal/opportunities/smokegate"
+	"hitkeep/database"
+	"hitkeep/opportunities"
+	"hitkeep/opportunities/smokegate"
 )
 
 type recordingRecorder struct {

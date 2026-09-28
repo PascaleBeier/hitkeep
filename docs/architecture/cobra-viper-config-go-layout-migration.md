@@ -1,12 +1,14 @@
+> Status (2026-09-28): implemented. The loader runs on Viper and pflag directly, the legacy oracle is retired after exact parity, and the Go packages live at the module root. Sections 3 and 9 remain the binding 2.x compatibility contract; [the status record](../config-refactor/README.md) lists the remaining release-time gates. The phase plan below is historical.
+
 # HitKeep 2.x Cobra, Viper, Configuration, Filesystem, and Go Layout Migration
 
-Status: implementation in progress
+Status: implemented locally; tagged release validation pending
 
 Target: backward-compatible HitKeep 2.x releases
 
 Contraction target: HitKeep 3.0 or later
 
-Last updated: 2026-08-26
+Last updated: 2026-09-28
 
 ## 1. Outcome
 
@@ -23,19 +25,19 @@ This is not one large refactor. It is a sequence of independently releasable 2.x
 
 ### Implementation baseline
 
-| Area | State on `feat/config_refactor` | Remaining proof |
+| Area | State | Remaining proof |
 |---|---|---|
-| Catalog, example YAML, Viper assembly | Runtime cutover, strict explicit YAML, and catalog-wide self-hosted/cloud build-variant parity implemented | stabilization and final legacy-oracle contraction |
-| Production Cobra routing and config commands | 2.x compatibility router and config commands implemented | full Cobra flag ownership, command-context propagation, subprocess stream/exit grammar, and final help/version contract |
-| Distribution drift validation | Data-path publication policy enforces exact Docker, Compose, Helm, example, and canonical-example paths/defaults | classify remaining settings, identical example distribution, private-docs attestation, and semantic Compose/Helm upgrade gates |
-| Issue #288 | Candidate recreation, quiescent legacy rollback, all-19-boundary forced process-kill recovery, and parallel Docker/Compose/Helm release wiring implemented | transitive release-finalizer interruption dependency and authenticated disposable-cluster Helm execution |
-| GoReleaser | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, native version checks, and exact-SHA snapshot publication proven | one stabilization release plus Darwin/Windows CGO and package-manager lifecycle feasibility |
-| Filesystem policy | Bounded Afero/fileflow adoption implemented | complete operation inventory and further waves only where semantics fit |
-| Flat Go layout | Eight move-only foundations completed (`appurl`, `exportfmt`, `hklog`, `analyticscatalog`, `jsonapi`, `localization`, `config`, `mcptest`) plus the developer CLI leaf `internal/devtool/cli` → `devtool/cli`; approximately 30 direct `internal/` domain families remain | complete the owner/dependency/filesystem manifests before another wave, then resume dependency-ordered moves and final active-path audit |
+| Catalog, example YAML, Viper assembly | Viper owns defaults, the explicit file, and environment binding; pflag owns flags. Legacy parity was proven and the oracle retired | stabilization release |
+| Production Cobra routing and config commands | 2.x compatibility router with one context-aware run path; recovery subcommands keep their local stdlib flag grammar | tagged subprocess checks |
+| Distribution drift validation | Data-path publication policy enforces exact Docker, Compose, Helm, example, and canonical-example paths/defaults | private-docs attestation rehearsal |
+| Issue #288 | Candidate recreation, quiescent legacy rollback, forced process-kill recovery, and Docker/Compose/Helm release wiring implemented | tagged release execution |
+| GoReleaser | Tagged Linux amd64/arm64 archives, checksums, raw cloud assets, and native version checks proven | Darwin/Windows CGO and package-manager lifecycle |
+| Filesystem policy | Closed: remaining I/O stays native or uses `os.Root` | none |
+| Flat Go layout | Complete | none |
 
 ## 2. Why this work is necessary
 
-HitKeep already has the beginnings of a canonical configuration model: `internal/config.Config` carries `env`, `flag`, `default`, `docdefault`, `desc`, `deprecated`, `sensitive`, and `cloud` metadata; `internal/config.Catalog` exposes a schema-versioned catalog; and catalog tests check coverage. Configuration loading is still assembled by the current loader, while startup and recovery routing remain distributed across the production and developer command surfaces.
+HitKeep already has the beginnings of a canonical configuration model: `config.Config` (then `internal/config`) carries `env`, `flag`, `default`, `docdefault`, `desc`, `deprecated`, `sensitive`, and `cloud` metadata; `config.Catalog` exposes a schema-versioned catalog; and catalog tests check coverage. Configuration loading is still assembled by the current loader, while startup and recovery routing remain distributed across the production and developer command surfaces.
 
 That split allows a configuration change to be correct in Go and wrong in a publishing surface.
 

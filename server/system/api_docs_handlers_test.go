@@ -1,0 +1,1674 @@
+package system
+
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"slices"
+	"strings"
+	"testing"
+	"unsafe"
+
+	"hitkeep/config"
+	"hitkeep/exportfmt"
+	"hitkeep/server/shared"
+)
+
+func TestOpenAPISpecV1FormatParameterIncludesAllExportFormats(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+
+	components := requireMap(t, spec, "components")
+	parameters := requireMap(t, components, "parameters")
+	formatParam := requireMap(t, parameters, "format")
+	schema := requireMap(t, formatParam, "schema")
+
+	gotFormats := asStringSlice(t, schema["enum"])
+	wantFormats := exportfmt.SupportedFormats()
+	if !reflect.DeepEqual(gotFormats, wantFormats) {
+		t.Fatalf("unexpected format enum, got %v want %v", gotFormats, wantFormats)
+	}
+
+	description, ok := formatParam["description"].(string)
+	if !ok {
+		t.Fatalf("expected format parameter description to be string, got %T", formatParam["description"])
+	}
+	if !strings.Contains(description, "json") || !strings.Contains(description, "ndjson") {
+		t.Fatalf("format parameter description should mention json/ndjson, got %q", description)
+	}
+}
+
+func TestOpenAPISpecV1ExposesOnlyCurrentReportsContract(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/user/report-subscriptions",
+		"/api/user/report-subscriptions/digest",
+		"/api/user/report-subscriptions/sites/{site_id}",
+	} {
+		if _, ok := paths[path]; ok {
+			t.Fatalf("obsolete report subscription path %s remains documented", path)
+		}
+	}
+	for _, schema := range []string{"DigestSubscription", "SiteReportSubscription", "ReportSubscriptions"} {
+		if _, ok := schemas[schema]; ok {
+			t.Fatalf("obsolete report subscription schema %s remains documented", schema)
+		}
+	}
+
+	reportDefinition := requireMap(t, schemas, "ReportDefinition")
+	properties := requireMap(t, reportDefinition, "properties")
+	if _, ok := properties["source"]; ok {
+		t.Fatal("migration-only report source remains in the public contract")
+	}
+}
+
+func TestOpenAPISpecV1DocumentsReadinessRecoveryResponse(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+	componentResponses := requireMap(t, components, "responses")
+
+	readinessSchema := requireMap(t, schemas, "ReadinessUnavailable")
+	readinessProps := requireMap(t, readinessSchema, "properties")
+	reasonSchema := requireMap(t, readinessProps, "reason")
+	reasons := asStringSlice(t, reasonSchema["enum"])
+	for _, want := range []string{"not_leader", "database_unavailable", "database_recovering", "database_needs_attention"} {
+		if !slices.Contains(reasons, want) {
+			t.Fatalf("expected readiness reason enum to include %q, got %v", want, reasons)
+		}
+	}
+
+	readyPath := requireMap(t, paths, "/readyz")
+	getOperation := requireMap(t, readyPath, "get")
+	responses := requireMap(t, getOperation, "responses")
+	unavailable := requireMap(t, responses, "503")
+	headers := requireMap(t, unavailable, "headers")
+	if _, ok := headers["Retry-After"]; !ok {
+		t.Fatal("expected /readyz 503 response to document Retry-After")
+	}
+	content := requireMap(t, unavailable, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	responseSchema := requireMap(t, jsonContent, "schema")
+	if got, _ := responseSchema["$ref"].(string); got != "#/components/schemas/ReadinessUnavailable" {
+		t.Fatalf("unexpected /readyz 503 schema ref %q", got)
+	}
+
+	databaseUnavailable := requireMap(t, componentResponses, "DatabaseUnavailable")
+	databaseUnavailableContent := requireMap(t, databaseUnavailable, "content")
+	databaseUnavailableJSON := requireMap(t, databaseUnavailableContent, "application/json")
+	databaseUnavailableSchema := requireMap(t, databaseUnavailableJSON, "schema")
+	if got, _ := databaseUnavailableSchema["$ref"].(string); got != "#/components/schemas/DatabaseUnavailable" {
+		t.Fatalf("unexpected database unavailable schema ref %q", got)
+	}
+}
+
+func TestOpenAPISpecV1DocumentsWebhookManagementAndSigning(t *testing.T) {
+	spec := openAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/admin/webhooks",
+		"/api/admin/webhooks/{webhookID}/test",
+		"/api/sites/{id}/webhooks",
+		"/api/sites/{id}/webhooks/{webhookID}/deliveries",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected webhook path %s", path)
+		}
+	}
+	for _, schema := range []string{"Webhook", "WebhookInput", "WebhookSecretResponse", "WebhookDelivery", "WebhookEventDescriptor", "WebhookEventPayload"} {
+		if _, ok := schemas[schema]; !ok {
+			t.Fatalf("expected webhook schema %s", schema)
+		}
+	}
+	for _, tc := range []struct {
+		path    string
+		method  string
+		summary string
+	}{
+		{"/api/admin/webhooks/{webhookID}/rotate", "post", "Rotate instance webhook signing secret"},
+		{"/api/sites/{id}/webhooks/{webhookID}/rotate", "post", "Rotate site webhook signing secret"},
+		{"/api/admin/webhooks/{webhookID}/test", "post", "Queue instance webhook test"},
+		{"/api/sites/{id}/webhooks/{webhookID}/test", "post", "Queue site webhook test"},
+		{"/api/admin/webhooks/{webhookID}/deliveries", "get", "List instance webhook delivery outcomes"},
+		{"/api/sites/{id}/webhooks/{webhookID}/deliveries", "get", "List site webhook delivery outcomes"},
+	} {
+		pathItem := requireMap(t, paths, tc.path)
+		operation := requireMap(t, pathItem, tc.method)
+		if got, _ := operation["summary"].(string); got != tc.summary {
+			t.Errorf("unexpected summary for %s %s: got %q, want %q", tc.method, tc.path, got, tc.summary)
+		}
+	}
+	testPath := requireMap(t, paths, "/api/admin/webhooks/{webhookID}/test")
+	testOp := requireMap(t, testPath, "post")
+	description, _ := testOp["description"].(string)
+	for _, required := range []string{"X-HitKeep-Timestamp", "X-HitKeep-Signature", "timestamp + \".\" + body"} {
+		if !strings.Contains(description, required) {
+			t.Fatalf("expected signing description to contain %q, got %q", required, description)
+		}
+	}
+}
+
+func TestOpenAPISpecV1TakeoutAndExportPathsListAllFormats(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	tests := []struct {
+		path             string
+		expectedContains []string
+	}{
+		{
+			path:             "/api/user/takeout",
+			expectedContains: []string{"xlsx", "csv", "parquet", "json", "ndjson"},
+		},
+		{
+			path:             "/api/sites/{id}/takeout",
+			expectedContains: []string{"xlsx", "csv", "parquet", "json", "ndjson"},
+		},
+		{
+			path:             "/api/sites/{id}/hits/export",
+			expectedContains: []string{"xlsx", "csv", "parquet", "json", "ndjson"},
+		},
+		{
+			path:             "/api/share/{token}/sites/{id}/hits/export",
+			expectedContains: []string{"xlsx", "csv", "parquet", "json", "ndjson"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			pathItem := requireMap(t, paths, tc.path)
+			getOp := requireMap(t, pathItem, "get")
+
+			description, ok := getOp["description"].(string)
+			if !ok {
+				t.Fatalf("expected description for %s to be string, got %T", tc.path, getOp["description"])
+			}
+
+			for _, expected := range tc.expectedContains {
+				if !strings.Contains(description, expected) {
+					t.Fatalf("expected description for %s to contain %q, got %q", tc.path, expected, description)
+				}
+			}
+
+			parameters, ok := getOp["parameters"].([]any)
+			if !ok {
+				t.Fatalf("expected parameters for %s to be []any, got %T", tc.path, getOp["parameters"])
+			}
+			if !hasFormatParamRef(parameters) {
+				t.Fatalf("expected parameters for %s to include format parameter ref", tc.path)
+			}
+		})
+	}
+}
+
+func TestOpenAPISpecV1EcommerceSummaryDocumentsGeoNetworkAggregates(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	pathItem := requireMap(t, paths, "/api/sites/{id}/ecommerce")
+	getOp := requireMap(t, pathItem, "get")
+	description, ok := getOp["description"].(string)
+	if !ok {
+		t.Fatalf("expected ecommerce description to be string, got %T", getOp["description"])
+	}
+	for _, want := range []string{"city", "provider", "ASN"} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("expected ecommerce description to mention %q, got %q", want, description)
+		}
+	}
+
+	summarySchema := requireMap(t, schemas, "EcommerceSummary")
+	properties := requireMap(t, summarySchema, "properties")
+	for _, prop := range []string{"top_cities", "top_providers", "top_asns"} {
+		if _, ok := properties[prop]; !ok {
+			t.Fatalf("expected EcommerceSummary to include %s", prop)
+		}
+	}
+}
+
+func TestOpenAPISpecV1BrowserIngestDocumentsGeoNetworkBoundary(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	pathItem := requireMap(t, paths, "/ingest")
+	postOp := requireMap(t, pathItem, "post")
+	description, ok := postOp["description"].(string)
+	if !ok {
+		t.Fatalf("expected browser ingest description to be string, got %T", postOp["description"])
+	}
+	for _, want := range []string{
+		"resolved request IP",
+		"exclusions, spam filtering, and country, region, city, provider, and ASN lookup",
+		"derived country, region, city, provider, and ASN",
+		"does not store the raw visitor IP",
+	} {
+		if !strings.Contains(description, want) {
+			t.Fatalf("expected browser ingest description to mention %q, got %q", want, description)
+		}
+	}
+	if strings.Contains(description, "geolocation") {
+		t.Fatalf("expected browser ingest description to avoid generic geolocation wording, got %q", description)
+	}
+}
+
+func TestOpenAPISpecV1TeamSchemasExposeUsageAndEntitlements(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	teamSchema := requireMap(t, schemas, "Team")
+	teamProperties := requireMap(t, teamSchema, "properties")
+
+	if _, ok := teamProperties["usage"]; !ok {
+		t.Fatalf("expected Team schema to include usage")
+	}
+	if _, ok := teamProperties["entitlements"]; !ok {
+		t.Fatalf("expected Team schema to include entitlements")
+	}
+	if _, ok := teamProperties["plan"]; !ok {
+		t.Fatalf("expected Team schema to include plan")
+	}
+
+	if _, ok := schemas["TeamUsageSummary"]; !ok {
+		t.Fatalf("expected TeamUsageSummary schema to exist")
+	}
+	if _, ok := schemas["TeamEntitlements"]; !ok {
+		t.Fatalf("expected TeamEntitlements schema to exist")
+	}
+	if _, ok := schemas["TeamPlan"]; !ok {
+		t.Fatalf("expected TeamPlan schema to exist")
+	}
+	if _, ok := schemas["CloudStatus"]; !ok {
+		t.Fatalf("expected CloudStatus schema to exist")
+	}
+}
+
+func TestOpenAPISpecV1IncludesCloudSignupPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	tags, ok := spec["tags"].([]map[string]string)
+	if !ok {
+		t.Fatalf("expected tags to be []map[string]string, got %T", spec["tags"])
+	}
+	if !hasTag(tags, "Cloud") {
+		t.Fatalf("expected top-level Cloud tag to exist")
+	}
+
+	paths := requireMap(t, spec, "paths")
+
+	signupPath, ok := paths["/api/cloud/signup"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/signup path to exist")
+	}
+	resendPath, ok := paths["/api/cloud/signup/resend-verification"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/signup/resend-verification path to exist")
+	}
+	portalPath, ok := paths["/api/cloud/billing/portal"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/billing/portal path to exist")
+	}
+	checkoutPath, ok := paths["/api/cloud/billing/checkout"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/billing/checkout path to exist")
+	}
+	webhookPath, ok := paths["/api/cloud/webhooks/stripe"]
+	if !ok {
+		t.Fatalf("expected /api/cloud/webhooks/stripe path to exist")
+	}
+
+	signupPost := requireMap(t, signupPath.(map[string]any), "post")
+	assertCloudOperation(t, signupPost)
+	assertCloudOperation(t, requireMap(t, resendPath.(map[string]any), "post"))
+	assertCloudOperation(t, requireMap(t, portalPath.(map[string]any), "post"))
+	assertCloudOperation(t, requireMap(t, checkoutPath.(map[string]any), "post"))
+	assertCloudOperation(t, requireMap(t, webhookPath.(map[string]any), "post"))
+
+	signupResponses := requireMap(t, signupPost, "responses")
+	signupCreated := requireMap(t, signupResponses, "201")
+	signupContent := requireMap(t, signupCreated, "content")
+	signupJSON := requireMap(t, signupContent, "application/json")
+	signupSchema := requireMap(t, signupJSON, "schema")
+	signupProperties := requireMap(t, signupSchema, "properties")
+	if _, ok := signupProperties["retry_after_seconds"]; !ok {
+		t.Fatalf("expected signup response to expose optional retry_after_seconds")
+	}
+
+	resendPost := requireMap(t, resendPath.(map[string]any), "post")
+	resendResponses := requireMap(t, resendPost, "responses")
+	resendAccepted := requireMap(t, resendResponses, "202")
+	resendContent := requireMap(t, resendAccepted, "content")
+	resendJSON := requireMap(t, resendContent, "application/json")
+	resendSchema := requireMap(t, resendJSON, "schema")
+	resendProperties := requireMap(t, resendSchema, "properties")
+	statusSchema := requireMap(t, resendProperties, "status")
+	if got := statusSchema["enum"]; !reflect.DeepEqual(got, []string{"accepted"}) {
+		t.Fatalf("expected resend status enum [accepted], got %#v", got)
+	}
+	if _, ok := resendProperties["retry_after_seconds"]; !ok {
+		t.Fatalf("expected resend response retry_after_seconds")
+	}
+}
+
+func TestOpenAPISpecV1MarksEveryCloudOperationInternal(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	cloudOperations := 0
+
+	for path, rawPathItem := range paths {
+		pathItem, ok := rawPathItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		for method, rawOperation := range pathItem {
+			operation, ok := rawOperation.(map[string]any)
+			if !ok {
+				continue
+			}
+			rawTags, ok := operation["tags"]
+			if !ok {
+				continue
+			}
+			for _, tag := range asStringSlice(t, rawTags) {
+				if tag != "Cloud" {
+					continue
+				}
+				cloudOperations++
+				t.Run(method+" "+path, func(t *testing.T) {
+					assertCloudOperation(t, operation)
+				})
+			}
+		}
+	}
+
+	if cloudOperations == 0 {
+		t.Fatal("expected at least one Cloud operation")
+	}
+}
+
+func TestOpenAPISpecV1IncludesAdminSystemPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	expectedSchemas := []string{
+		"SystemFeatureStatus",
+		"SystemInfo",
+		"SystemHealth",
+		"SystemAIStatus",
+		"SystemSearchConsoleStatus",
+		"SystemStorage",
+		"SystemIngestStats",
+		"SystemBackupStatus",
+		"SystemDatabaseStatus",
+		"SystemSpamStatus",
+		"SystemCacheStatus",
+		"SystemMailStatus",
+		"SystemActionResponse",
+		"InstanceAuditEntry",
+		"InstanceAuditListResponse",
+	}
+	for _, schemaName := range expectedSchemas {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+	aiStatusSchema := requireMap(t, schemas, "SystemAIStatus")
+	aiStatusProps := requireMap(t, aiStatusSchema, "properties")
+	for _, prop := range []string{"ask_ai_enabled", "ask_ai_available"} {
+		if _, ok := aiStatusProps[prop]; !ok {
+			t.Fatalf("expected SystemAIStatus.%s property to exist", prop)
+		}
+	}
+	configModeSchema := requireMap(t, aiStatusProps, "config_mode")
+	configModeEnum := asStringSlice(t, configModeSchema["enum"])
+	for _, want := range []string{"cloud_managed", "self_hosted"} {
+		if !slices.Contains(configModeEnum, want) {
+			t.Fatalf("expected SystemAIStatus.config_mode enum to include %q, got %v", want, configModeEnum)
+		}
+	}
+
+	expectedPaths := []string{
+		"/api/admin/system",
+		"/api/admin/system/health",
+		"/api/admin/system/ai",
+		"/api/admin/system/search-console",
+		"/api/admin/system/storage",
+		"/api/admin/system/ingest",
+		"/api/admin/system/backups",
+		"/api/admin/system/database",
+		"/api/admin/system/database/checkpoint",
+		"/api/admin/system/spam-filter",
+		"/api/admin/system/spam-filter/refresh",
+		"/api/admin/system/caches",
+		"/api/admin/system/mail",
+		"/api/admin/system/mail/test",
+		"/api/admin/system/audit",
+		"/api/admin/system/audit/export",
+		"/api/admin/teams",
+		"/api/admin/teams/{id}",
+		"/api/admin/teams/{id}/archive",
+	}
+	for _, path := range expectedPaths {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected %s path to exist", path)
+		}
+	}
+
+	adminTeamsSchema := requireMap(t, schemas, "AdminTeam")
+	adminTeamsProps := requireMap(t, adminTeamsSchema, "properties")
+	for _, prop := range []string{"id", "name", "is_default", "is_archived", "member_count", "site_count", "created_at"} {
+		if _, ok := adminTeamsProps[prop]; !ok {
+			t.Fatalf("expected AdminTeam.%s property to exist", prop)
+		}
+	}
+
+	mailTestPath := requireMap(t, paths, "/api/admin/system/mail/test")
+	postOp := requireMap(t, mailTestPath, "post")
+	if !strings.Contains(postOp["description"].(string), "real test email") {
+		t.Fatalf("expected mail test description to mention real test email, got %q", postOp["description"])
+	}
+
+	ingestPath := requireMap(t, paths, "/api/admin/system/ingest")
+	ingestOp := requireMap(t, ingestPath, "get")
+	if !strings.Contains(ingestOp["description"].(string), "tenant analytics databases") {
+		t.Fatalf("expected ingest description to mention tenant databases, got %q", ingestOp["description"])
+	}
+
+	auditPath := requireMap(t, paths, "/api/admin/system/audit")
+	auditOp := requireMap(t, auditPath, "get")
+	auditResponses := requireMap(t, auditOp, "responses")
+	if _, ok := auditResponses["400"]; !ok {
+		t.Fatalf("expected audit list to document invalid filter response")
+	}
+
+	auditExportPath := requireMap(t, paths, "/api/admin/system/audit/export")
+	getOp := requireMap(t, auditExportPath, "get")
+	params, ok := getOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected audit export parameters to be []any, got %T", getOp["parameters"])
+	}
+	if !hasNamedParam(params, "format") {
+		t.Fatalf("expected audit export to include format parameter")
+	}
+	if !hasNamedParam(params, "limit") {
+		t.Fatalf("expected audit export to include limit parameter")
+	}
+	exportResponses := requireMap(t, getOp, "responses")
+	if _, ok := exportResponses["400"]; !ok {
+		t.Fatalf("expected audit export to document invalid filter response")
+	}
+	if _, ok := exportResponses["403"]; !ok {
+		t.Fatalf("expected audit export to document owner-only response")
+	}
+}
+
+func TestOpenAPISpecV1IncludesAskAIPathAndSchemas(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{
+		"AskAIStatus",
+		"AskAIFilter",
+		"AskAIMessage",
+		"AskAIRequest",
+		"AskAICitation",
+		"AskAIChartSeries",
+		"AskAIChart",
+		"AskAIAction",
+		"AskAIResponse",
+		"AskAIStreamEvent",
+		"AskAIHistoryEntry",
+		"AskAIHistoryResponse",
+	} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	systemStatusSchema := requireMap(t, schemas, "SystemStatus")
+	systemStatusProps := requireMap(t, systemStatusSchema, "properties")
+	if ref, _ := requireMap(t, systemStatusProps, "ask_ai")["$ref"].(string); ref != "#/components/schemas/AskAIStatus" {
+		t.Fatalf("expected SystemStatus.ask_ai to reference AskAIStatus, got %q", ref)
+	}
+
+	requestSchema := requireMap(t, schemas, "AskAIRequest")
+	requestProps := requireMap(t, requestSchema, "properties")
+	if _, ok := requestProps["query"]; !ok {
+		t.Fatalf("expected AskAIRequest.query property")
+	}
+	for _, forbidden := range []string{"raw_prompt", "raw_provider_response", "provider_headers", "credentials"} {
+		if _, ok := requestProps[forbidden]; ok {
+			t.Fatalf("AskAIRequest schema leaked forbidden field %q", forbidden)
+		}
+	}
+
+	actionSchema := requireMap(t, schemas, "AskAIAction")
+	actionProps := requireMap(t, actionSchema, "properties")
+	actionTypeEnum := asStringSlice(t, requireMap(t, actionProps, "type")["enum"])
+	for _, want := range []string{"navigate", "download_export"} {
+		if !slices.Contains(actionTypeEnum, want) {
+			t.Fatalf("expected AskAIAction.type enum to include %q, got %v", want, actionTypeEnum)
+		}
+	}
+
+	chartSchema := requireMap(t, schemas, "AskAIChart")
+	chartProps := requireMap(t, chartSchema, "properties")
+	chartTypeEnum := asStringSlice(t, requireMap(t, chartProps, "type")["enum"])
+	for _, want := range []string{"line", "bar", "table"} {
+		if !slices.Contains(chartTypeEnum, want) {
+			t.Fatalf("expected AskAIChart.type enum to include %q, got %v", want, chartTypeEnum)
+		}
+	}
+
+	streamEventSchema := requireMap(t, schemas, "AskAIStreamEvent")
+	streamEventProps := requireMap(t, streamEventSchema, "properties")
+	streamEventTypeEnum := asStringSlice(t, requireMap(t, streamEventProps, "type")["enum"])
+	for _, want := range []string{"progress", "delta", "final", "error"} {
+		if !slices.Contains(streamEventTypeEnum, want) {
+			t.Fatalf("expected AskAIStreamEvent.type enum to include %q, got %v", want, streamEventTypeEnum)
+		}
+	}
+	if _, ok := streamEventProps["delta_markdown"]; !ok {
+		t.Fatalf("expected AskAIStreamEvent.delta_markdown property")
+	}
+	if _, ok := streamEventProps["tool_name"]; !ok {
+		t.Fatalf("expected AskAIStreamEvent.tool_name property")
+	}
+	historyEntrySchema := requireMap(t, schemas, "AskAIHistoryEntry")
+	historyEntryProps := requireMap(t, historyEntrySchema, "properties")
+	for _, forbidden := range []string{"query", "answer_markdown", "raw_prompt", "raw_provider_response", "provider_headers", "credentials"} {
+		if _, ok := historyEntryProps[forbidden]; ok {
+			t.Fatalf("AskAIHistoryEntry schema leaked forbidden field %q", forbidden)
+		}
+	}
+
+	pathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai")
+	postOp := requireMap(t, pathItem, "post")
+	if !strings.Contains(postOp["description"].(string), "human dashboard session") {
+		t.Fatalf("expected Ask AI path to document dashboard-session boundary, got %q", postOp["description"])
+	}
+	security, ok := postOp["security"].([]any)
+	if !ok || len(security) != 1 {
+		t.Fatalf("expected Ask AI path to use one cookie security requirement, got %#v", postOp["security"])
+	}
+	firstSecurity, ok := security[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected Ask AI security requirement map, got %#v", security[0])
+	}
+	if _, ok := firstSecurity["cookieAuth"]; !ok {
+		t.Fatalf("expected Ask AI path to use cookieAuth security, got %#v", firstSecurity)
+	}
+	body := requireMap(t, postOp, "requestBody")
+	content := requireMap(t, body, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	bodySchema := requireMap(t, jsonContent, "schema")
+	if ref, _ := bodySchema["$ref"].(string); ref != "#/components/schemas/AskAIRequest" {
+		t.Fatalf("expected Ask AI request schema ref, got %q", ref)
+	}
+	responses := requireMap(t, postOp, "responses")
+	okResp := requireMap(t, responses, "200")
+	okContent := requireMap(t, okResp, "content")
+	okJSON := requireMap(t, okContent, "application/json")
+	okSchema := requireMap(t, okJSON, "schema")
+	if ref, _ := okSchema["$ref"].(string); ref != "#/components/schemas/AskAIResponse" {
+		t.Fatalf("expected Ask AI response schema ref, got %q", ref)
+	}
+
+	streamPathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai/events")
+	streamPostOp := requireMap(t, streamPathItem, "post")
+	if !strings.Contains(streamPostOp["description"].(string), "Server-Sent Events") {
+		t.Fatalf("expected Ask AI stream path to document SSE behavior, got %q", streamPostOp["description"])
+	}
+	streamResponses := requireMap(t, streamPostOp, "responses")
+	streamOK := requireMap(t, streamResponses, "200")
+	streamContent := requireMap(t, streamOK, "content")
+	streamEventContent := requireMap(t, streamContent, "text/event-stream")
+	streamSchema := requireMap(t, streamEventContent, "schema")
+	if ref, _ := streamSchema["$ref"].(string); ref != "#/components/schemas/AskAIStreamEvent" {
+		t.Fatalf("expected Ask AI stream event schema ref, got %q", ref)
+	}
+
+	historyPathItem := requireMap(t, paths, "/api/sites/{id}/ask-ai/history")
+	historyGetOp := requireMap(t, historyPathItem, "get")
+	if !strings.Contains(historyGetOp["description"].(string), "audit-safe") {
+		t.Fatalf("expected Ask AI history path to document audit-safe behavior, got %q", historyGetOp["description"])
+	}
+	historyResponses := requireMap(t, historyGetOp, "responses")
+	historyOK := requireMap(t, historyResponses, "200")
+	historyContent := requireMap(t, historyOK, "content")
+	historyJSON := requireMap(t, historyContent, "application/json")
+	historySchema := requireMap(t, historyJSON, "schema")
+	if ref, _ := historySchema["$ref"].(string); ref != "#/components/schemas/AskAIHistoryResponse" {
+		t.Fatalf("expected Ask AI history response schema ref, got %q", ref)
+	}
+}
+
+func TestOpenAPISpecV1IncludesOpportunityPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{"Opportunity", "OpportunityEvidence", "OpportunityScoreBreakdown", "OpportunityListResponse", "SharedOpportunity", "SharedOpportunityListResponse", "OpportunityGenerateResponse", "OpportunityDigestPreviewResponse", "OpportunityDigestPreviewItem", "OpportunityStatusUpdateRequest"} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+	opportunitySchema := requireMap(t, schemas, "Opportunity")
+	opportunityProperties := requireMap(t, opportunitySchema, "properties")
+	for _, forbidden := range []string{"title", "summary", "next_action", "impact_label", "route_label", "plan"} {
+		if _, ok := opportunityProperties[forbidden]; ok {
+			t.Fatalf("Opportunity schema leaked prose field %q", forbidden)
+		}
+	}
+	for _, required := range []string{"type_key", "title_key", "summary_key", "action_key", "copy_params", "impact_label_key", "route_label_key", "score_breakdown", "cited_evidence_ids"} {
+		if _, ok := opportunityProperties[required]; !ok {
+			t.Fatalf("Opportunity schema missing localization field %q", required)
+		}
+	}
+	evidenceSchema := requireMap(t, schemas, "OpportunityEvidence")
+	evidenceProperties := requireMap(t, evidenceSchema, "properties")
+	if _, ok := evidenceProperties["label"]; ok {
+		t.Fatalf("OpportunityEvidence schema leaked prose label")
+	}
+	if _, ok := evidenceProperties["label_key"]; !ok {
+		t.Fatalf("OpportunityEvidence schema missing label_key")
+	}
+	for _, forbidden := range []string{"team_id", "ai_run_id"} {
+		if _, ok := opportunityProperties[forbidden]; ok {
+			t.Fatalf("Opportunity schema leaked internal field %q", forbidden)
+		}
+	}
+	generateResponseSchema := requireMap(t, schemas, "OpportunityGenerateResponse")
+	generateResponseProperties := requireMap(t, generateResponseSchema, "properties")
+	if _, ok := generateResponseProperties["ai_run_id"]; ok {
+		t.Fatalf("OpportunityGenerateResponse schema leaked internal ai_run_id")
+	}
+	digestPreviewItemSchema := requireMap(t, schemas, "OpportunityDigestPreviewItem")
+	digestPreviewItemProperties := requireMap(t, digestPreviewItemSchema, "properties")
+	for _, forbidden := range []string{"title", "summary", "digest", "action", "team_id", "ai_run_id", "raw_prompt", "raw_provider_response"} {
+		if _, ok := digestPreviewItemProperties[forbidden]; ok {
+			t.Fatalf("OpportunityDigestPreviewItem schema leaked forbidden field %q", forbidden)
+		}
+	}
+	for _, required := range []string{"title_key", "action_key", "digest_key", "copy_params", "impact_label_key", "score_breakdown", "evidence", "cited_evidence_ids"} {
+		if _, ok := digestPreviewItemProperties[required]; !ok {
+			t.Fatalf("OpportunityDigestPreviewItem schema missing localization field %q", required)
+		}
+	}
+	sharedOpportunitySchema := requireMap(t, schemas, "SharedOpportunity")
+	sharedOpportunityProperties := requireMap(t, sharedOpportunitySchema, "properties")
+	for _, forbidden := range []string{"team_id", "ai_run_id"} {
+		if _, ok := sharedOpportunityProperties[forbidden]; ok {
+			t.Fatalf("SharedOpportunity schema leaked internal field %q", forbidden)
+		}
+	}
+
+	expected := map[string]string{
+		"/api/sites/{id}/opportunities":                 "get",
+		"/api/sites/{id}/opportunities/digest-preview":  "get",
+		"/api/sites/{id}/opportunities/generate":        "post",
+		"/api/sites/{id}/opportunities/{opportunityID}": "patch",
+		"/api/sites/{id}/realtime":                      "get",
+		"/api/share/{token}/sites/{id}/opportunities":   "get",
+		"/api/share/{token}/sites/{id}/realtime":        "get",
+	}
+	for path, method := range expected {
+		pathItem := requireMap(t, paths, path)
+		if _, ok := pathItem[method]; !ok {
+			t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+		}
+	}
+
+	generatePath := requireMap(t, paths, "/api/sites/{id}/opportunities/generate")
+	postOp := requireMap(t, generatePath, "post")
+	if !strings.Contains(postOp["description"].(string), "deterministic opportunity detectors") {
+		t.Fatalf("expected generate description to mention deterministic detectors, got %q", postOp["description"])
+	}
+}
+
+func TestOpenAPISpecV1MarksDashboardInternalPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	for _, path := range []string{
+		"/api/sites/{id}/realtime",
+		"/api/share/{token}/sites/{id}/realtime",
+		"/api/user/bootstrap",
+	} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		if internal, ok := getOp["x-internal"].(bool); !ok || !internal {
+			t.Fatalf("expected GET %s to be marked x-internal=true, got %#v", path, getOp["x-internal"])
+		}
+	}
+}
+
+func TestOpenAPISpecV1IncludesAIFetchCorrelationPath(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	pathItem := requireMap(t, paths, "/api/sites/{id}/ai-fetch/correlation")
+	getOp := requireMap(t, pathItem, "get")
+	responses := requireMap(t, getOp, "responses")
+	okResp := requireMap(t, responses, "200")
+	content := requireMap(t, okResp, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	schema := requireMap(t, jsonContent, "schema")
+
+	if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/AIFetchCorrelationReport" {
+		t.Fatalf("expected AI fetch correlation schema ref, got %q", ref)
+	}
+	if _, ok := schemas["AIFetchCorrelationReport"]; !ok {
+		t.Fatalf("expected AIFetchCorrelationReport schema to exist")
+	}
+}
+
+func TestOpenAPISpecV1IncludesAIFetchEndpointsAndSchemas(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{
+		"AIFetch",
+		"AIFetchIngestPayload",
+		"AIFetchOverview",
+		"AIFetchSeriesPoint",
+	} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	ingestPath := requireMap(t, paths, "/api/sites/{id}/ingest/ai-fetch")
+	postOp := requireMap(t, ingestPath, "post")
+	requestBody := requireMap(t, postOp, "requestBody")
+	content := requireMap(t, requestBody, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	requestSchema := requireMap(t, jsonContent, "schema")
+	if ref, _ := requestSchema["$ref"].(string); ref != "#/components/schemas/AIFetchIngestPayload" {
+		t.Fatalf("expected AI fetch ingest payload schema ref, got %q", ref)
+	}
+
+	overviewPath := requireMap(t, paths, "/api/sites/{id}/ai-fetch/overview")
+	overviewOp := requireMap(t, overviewPath, "get")
+	overviewResponses := requireMap(t, overviewOp, "responses")
+	overviewOK := requireMap(t, overviewResponses, "200")
+	overviewContent := requireMap(t, overviewOK, "content")
+	overviewJSON := requireMap(t, overviewContent, "application/json")
+	overviewSchema := requireMap(t, overviewJSON, "schema")
+	if ref, _ := overviewSchema["$ref"].(string); ref != "#/components/schemas/AIFetchOverview" {
+		t.Fatalf("expected AI fetch overview schema ref, got %q", ref)
+	}
+
+	timeseriesPath := requireMap(t, paths, "/api/sites/{id}/ai-fetch/timeseries")
+	timeseriesOp := requireMap(t, timeseriesPath, "get")
+	timeseriesResponses := requireMap(t, timeseriesOp, "responses")
+	timeseriesOK := requireMap(t, timeseriesResponses, "200")
+	timeseriesContent := requireMap(t, timeseriesOK, "content")
+	timeseriesJSON := requireMap(t, timeseriesContent, "application/json")
+	timeseriesSchema := requireMap(t, timeseriesJSON, "schema")
+	items := requireMap(t, timeseriesSchema, "items")
+	if ref, _ := items["$ref"].(string); ref != "#/components/schemas/AIFetchSeriesPoint" {
+		t.Fatalf("expected AI fetch timeseries item schema ref, got %q", ref)
+	}
+}
+
+func TestOpenAPISpecV1IncludesAIActivityReport(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	stat := requireMap(t, schemas, "AIActivityStat")
+	statProperties := requireMap(t, stat, "properties")
+	for _, property := range []string{"name", "value", "tracked_hits", "fetch_count"} {
+		if _, ok := statProperties[property]; !ok {
+			t.Fatalf("expected AIActivityStat property %q", property)
+		}
+	}
+
+	point := requireMap(t, schemas, "AIActivitySeriesPoint")
+	pointProperties := requireMap(t, point, "properties")
+	for _, property := range []string{"time", "ai_requests", "tracked_hits", "fetch_count", "referral_visits"} {
+		if _, ok := pointProperties[property]; !ok {
+			t.Fatalf("expected AIActivitySeriesPoint property %q", property)
+		}
+	}
+
+	report := requireMap(t, schemas, "AIActivityReport")
+	reportProperties := requireMap(t, report, "properties")
+	for _, property := range []string{
+		"ai_requests", "tracked_hits", "fetch_count", "referral_visits", "paths_crawled", "unique_agents", "pageviews",
+		"error_rate_4xx", "error_rate_5xx", "median_response_ms", "total_bytes",
+		"top_agents", "top_categories", "top_paths", "top_sources", "top_families", "top_resource_types", "top_error_paths",
+		"top_agents_by_category", "series", "comparison",
+	} {
+		if _, ok := reportProperties[property]; !ok {
+			t.Fatalf("expected AIActivityReport property %q", property)
+		}
+	}
+
+	for _, listProperty := range []string{"top_agents", "top_categories", "top_paths", "top_sources", "top_families", "top_resource_types", "top_error_paths"} {
+		list := requireMap(t, reportProperties, listProperty)
+		items := requireMap(t, list, "items")
+		if ref, _ := items["$ref"].(string); ref != "#/components/schemas/AIActivityStat" {
+			t.Fatalf("expected %s items to reference AIActivityStat, got %q", listProperty, ref)
+		}
+	}
+
+	series := requireMap(t, reportProperties, "series")
+	seriesItems := requireMap(t, series, "items")
+	if ref, _ := seriesItems["$ref"].(string); ref != "#/components/schemas/AIActivitySeriesPoint" {
+		t.Fatalf("expected series items to reference AIActivitySeriesPoint, got %q", ref)
+	}
+
+	comparison := requireMap(t, reportProperties, "comparison")
+	if kind, _ := comparison["type"].(string); kind != "object" {
+		t.Fatalf("expected comparison to be an object, got %q", kind)
+	}
+	comparisonProperties := requireMap(t, comparison, "properties")
+	for _, property := range []string{"ai_requests", "tracked_hits", "fetch_count", "referral_visits", "paths_crawled", "unique_agents", "pageviews"} {
+		if _, ok := comparisonProperties[property]; !ok {
+			t.Fatalf("expected comparison property %q", property)
+		}
+	}
+
+	for _, path := range []string{
+		"/api/sites/{id}/ai-activity",
+		"/api/share/{token}/sites/{id}/ai-activity",
+	} {
+		pathItem := requireMap(t, paths, path)
+		operation := requireMap(t, pathItem, "get")
+		responses := requireMap(t, operation, "responses")
+		ok200 := requireMap(t, responses, "200")
+		content := requireMap(t, ok200, "content")
+		jsonContent := requireMap(t, content, "application/json")
+		schema := requireMap(t, jsonContent, "schema")
+		if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/AIActivityReport" {
+			t.Fatalf("expected AI activity report schema ref for %s, got %q", path, ref)
+		}
+		parameters, _ := operation["parameters"].([]any)
+		refs := map[string]bool{}
+		for _, parameter := range parameters {
+			if item, ok := parameter.(map[string]any); ok {
+				if ref, ok := item["$ref"].(string); ok {
+					refs[ref] = true
+				}
+			}
+		}
+		for _, ref := range []string{"#/components/parameters/goalIDQuery", "#/components/parameters/funnelIDQuery"} {
+			if !refs[ref] {
+				t.Fatalf("expected %s parameter on %s", ref, path)
+			}
+		}
+	}
+}
+
+func TestOpenAPISpecV1FilterParameterDocumentsAIDimensions(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	components := requireMap(t, spec, "components")
+	parameters := requireMap(t, components, "parameters")
+	filter := requireMap(t, parameters, "filter")
+
+	description, _ := filter["description"].(string)
+	for _, dimension := range []string{"ai_bot", "ai_bot_category", "ai_source"} {
+		if !strings.Contains(description, dimension) {
+			t.Fatalf("expected filter description to document %q, got %q", dimension, description)
+		}
+	}
+}
+
+func TestOpenAPISpecV1IncludesWebVitalsEndpointsAndSchemas(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{"WebVitalIngestPayload", "WebVitalSummaryMetric", "WebVitalSeriesPoint", "WebVitalPageRow", "WebVitalMetricBreakdown", "WebVitalDimensionRow"} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+	for _, path := range []string{
+		"/ingest/web-vitals",
+		"/api/sites/{id}/web-vitals/summary",
+		"/api/sites/{id}/web-vitals/timeseries",
+		"/api/sites/{id}/web-vitals/pages",
+		"/api/sites/{id}/web-vitals/breakdown",
+		"/api/share/{token}/sites/{id}/web-vitals/summary",
+		"/api/share/{token}/sites/{id}/web-vitals/timeseries",
+		"/api/share/{token}/sites/{id}/web-vitals/pages",
+		"/api/share/{token}/sites/{id}/web-vitals/breakdown",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected %s path to exist", path)
+		}
+	}
+
+	timeseriesPath := requireMap(t, paths, "/api/sites/{id}/web-vitals/timeseries")
+	timeseriesOp := requireMap(t, timeseriesPath, "get")
+	params, _ := timeseriesOp["parameters"].([]any)
+	if !hasParamRef(params, "#/components/parameters/webVitalMetric") {
+		t.Fatalf("expected web vital metric parameter on timeseries")
+	}
+
+	ingestPayload := requireMap(t, schemas, "WebVitalIngestPayload")
+	properties := requireMap(t, ingestPayload, "properties")
+	if _, ok := properties["mid"]; !ok {
+		t.Fatalf("expected WebVitalIngestPayload to document optional mid")
+	}
+	if _, ok := properties["rating"]; ok {
+		t.Fatalf("WebVitalIngestPayload must not document client-side rating")
+	}
+}
+
+func TestOpenAPISpecV1DocumentsScopedTrafficExclusions(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, path := range []string{
+		"/api/admin/exclusions",
+		"/api/user/teams/{id}/exclusions",
+		"/api/user/teams/{id}/exclusions/{ruleID}",
+		"/api/sites/{id}/exclusions",
+		"/api/sites/{id}/exclusions/{ruleID}",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected traffic exclusion path %s", path)
+		}
+	}
+
+	for _, path := range []string{"/api/user/teams/{id}/exclusions", "/api/sites/{id}/exclusions"} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		params, ok := getOp["parameters"].([]any)
+		if !ok || !hasNamedParam(params, "effective") {
+			t.Fatalf("expected %s to document the effective query parameter", path)
+		}
+	}
+
+	exclusion := requireMap(t, schemas, "IPExclusion")
+	exclusionProps := requireMap(t, exclusion, "properties")
+	for _, field := range []string{"scope", "team_id", "site_id", "user_agent", "path", "inherited"} {
+		if _, ok := exclusionProps[field]; !ok {
+			t.Fatalf("expected IPExclusion to document %s", field)
+		}
+	}
+	typeSchema := requireMap(t, exclusionProps, "type")
+	if got := asStringSlice(t, typeSchema["enum"]); !reflect.DeepEqual(got, []string{"cidr", "country", "user_agent", "path"}) {
+		t.Fatalf("unexpected IPExclusion type enum: %v", got)
+	}
+
+	create := requireMap(t, schemas, "IPExclusionCreateRequest")
+	createProps := requireMap(t, create, "properties")
+	for _, field := range []string{"cidr", "country_code", "user_agent", "path", "description"} {
+		if _, ok := createProps[field]; !ok {
+			t.Fatalf("expected IPExclusionCreateRequest to document %s", field)
+		}
+	}
+
+	webVital := requireMap(t, schemas, "WebVitalIngestPayload")
+	if _, ok := requireMap(t, webVital, "properties")["ua"]; !ok {
+		t.Fatal("expected WebVitalIngestPayload to document transient ua context")
+	}
+
+	eventPath := requireMap(t, paths, "/ingest/event")
+	eventPost := requireMap(t, eventPath, "post")
+	eventRequest := requireMap(t, eventPost, "requestBody")
+	eventContent := requireMap(t, eventRequest, "content")
+	eventJSON := requireMap(t, eventContent, "application/json")
+	eventSchema := requireMap(t, eventJSON, "schema")
+	eventProps := requireMap(t, eventSchema, "properties")
+	for _, field := range []string{"path", "ua"} {
+		if _, ok := eventProps[field]; !ok {
+			t.Fatalf("expected browser event payload to document transient %s context", field)
+		}
+	}
+}
+
+func TestOpenAPISpecV1IncludesAIChatbotExportPath(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	exportPath := requireMap(t, paths, "/api/sites/{id}/ai-chatbots/export")
+	getOp := requireMap(t, exportPath, "get")
+	params, ok := getOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected parameters slice on AI chatbot export path")
+	}
+	if !hasFormatParamRef(params) {
+		t.Fatalf("expected AI chatbot export path to include shared format parameter")
+	}
+	if !hasParamRef(params, "#/components/parameters/filter") {
+		t.Fatalf("expected AI chatbot export path to document repeatable filter parameter")
+	}
+}
+
+func TestOpenAPISpecV1IncludesAIFetchExportPath(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	exportPath := requireMap(t, paths, "/api/sites/{id}/ai-fetch/export")
+	getOp := requireMap(t, exportPath, "get")
+	params, ok := getOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected parameters slice on AI fetch export path")
+	}
+	if !hasFormatParamRef(params) {
+		t.Fatalf("expected AI fetch export path to include shared format parameter")
+	}
+}
+
+func TestOpenAPISpecV1IncludesEventAnalyticsPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{"EventSeriesPoint", "EventAudience"} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	for _, path := range []string{
+		"/api/sites/{id}/events/names",
+		"/api/sites/{id}/events/properties",
+		"/api/sites/{id}/events/breakdown",
+		"/api/sites/{id}/events/timeseries",
+		"/api/sites/{id}/events/audience",
+		"/api/share/{token}/sites/{id}/events/names",
+		"/api/share/{token}/sites/{id}/events/properties",
+		"/api/share/{token}/sites/{id}/events/breakdown",
+		"/api/share/{token}/sites/{id}/events/timeseries",
+		"/api/share/{token}/sites/{id}/events/audience",
+	} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		if _, ok := getOp["parameters"].([]any); !ok {
+			t.Fatalf("expected parameters for %s to be []any", path)
+		}
+	}
+
+	timeseriesPath := requireMap(t, paths, "/api/sites/{id}/events/timeseries")
+	timeseriesOp := requireMap(t, timeseriesPath, "get")
+	timeseriesParams, ok := timeseriesOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected parameters to be []any, got %T", timeseriesOp["parameters"])
+	}
+	if !hasParamRef(timeseriesParams, "#/components/parameters/filter") {
+		t.Fatalf("expected event timeseries to document repeatable filter parameter")
+	}
+	if !hasParamRef(timeseriesParams, "#/components/parameters/eventDimensionKey") {
+		t.Fatalf("expected event timeseries to document deprecated dimension_key parameter")
+	}
+}
+
+func TestOpenAPISpecV1EventAudienceDocumentsGeoNetworkAggregates(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	for _, path := range []string{
+		"/api/sites/{id}/events/audience",
+		"/api/share/{token}/sites/{id}/events/audience",
+	} {
+		pathItem := requireMap(t, paths, path)
+		getOp := requireMap(t, pathItem, "get")
+		description, _ := getOp["description"].(string)
+		for _, want := range []string{"cities", "providers", "ASNs"} {
+			if !strings.Contains(description, want) {
+				t.Fatalf("expected %s description to mention %q, got %q", path, want, description)
+			}
+		}
+	}
+}
+
+func TestOpenAPISpecV1IncludesGoogleSearchConsoleConnectionPaths(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+
+	expected := map[string]string{
+		"/api/user/teams/{id}/integrations/google-search-console/status":     "get",
+		"/api/user/teams/{id}/integrations/google-search-console/connect":    "post",
+		"/api/user/teams/{id}/integrations/google-search-console/properties": "get",
+		"/api/sites/{id}/integrations/google-search-console":                 "get",
+		"/api/sites/{id}/integrations/google-search-console/property":        "put",
+		"/api/sites/{id}/integrations/google-search-console/sync":            "post",
+		"/api/user/teams/{id}/integrations/google-search-console":            "delete",
+		"/api/integrations/google-search-console/oauth/callback":             "get",
+	}
+	for path, method := range expected {
+		pathItem := requireMap(t, paths, path)
+		if _, ok := pathItem[method]; !ok {
+			t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+		}
+	}
+
+	mappingPath := requireMap(t, paths, "/api/sites/{id}/integrations/google-search-console")
+	getOp := requireMap(t, mappingPath, "get")
+	responses := requireMap(t, getOp, "responses")
+	okResp := requireMap(t, responses, "200")
+	content := requireMap(t, okResp, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	schema := requireMap(t, jsonContent, "schema")
+	properties := requireMap(t, schema, "properties")
+	if _, ok := properties["sync_status"]; !ok {
+		t.Fatalf("expected site mapping schema to expose sync_status")
+	}
+}
+
+func TestOpenAPISpecV1DocumentsRedactedOIDCSSOFlows(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for path, methods := range map[string][]string{
+		"/api/auth/sso":                 {"get"},
+		"/api/auth/sso/invite":          {"post"},
+		"/api/auth/sso/start":           {"post"},
+		"/api/auth/sso/callback":        {"get"},
+		"/api/user/teams/{id}/sso":      {"get", "put", "delete"},
+		"/api/user/teams/{id}/sso/test": {"post"},
+	} {
+		pathItem := requireMap(t, paths, path)
+		for _, method := range methods {
+			if _, ok := pathItem[method]; !ok {
+				t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+			}
+		}
+	}
+
+	responseSchema := requireMap(t, schemas, "TeamSSOConfig")
+	responseProperties := requireMap(t, responseSchema, "properties")
+	if _, ok := responseProperties["client_secret"]; ok {
+		t.Fatal("redacted TeamSSOConfig must not expose client_secret")
+	}
+	if _, ok := responseProperties["client_secret_configured"]; !ok {
+		t.Fatal("redacted TeamSSOConfig should expose client_secret_configured")
+	}
+	if _, ok := responseProperties["auto_provision"]; !ok {
+		t.Fatal("TeamSSOConfig should expose auto_provision")
+	}
+	inputSchema := requireMap(t, schemas, "TeamSSOInput")
+	inputProperties := requireMap(t, inputSchema, "properties")
+	secret := requireMap(t, inputProperties, "client_secret")
+	if writeOnly, _ := secret["writeOnly"].(bool); !writeOnly {
+		t.Fatal("TeamSSOInput client_secret should be writeOnly")
+	}
+}
+
+func TestOpenAPISpecV1DocumentsSocialAuthenticationWithoutProviderSubjects(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for path, methods := range map[string][]string{
+		"/api/auth/social/providers":                 {"get"},
+		"/api/auth/social/{provider}/start":          {"post"},
+		"/api/auth/social/{provider}/callback":       {"get"},
+		"/api/auth/social/preview":                   {"post"},
+		"/api/auth/social/complete":                  {"post"},
+		"/api/auth/social/confirm":                   {"get"},
+		"/api/cloud/signup/social/complete":          {"post"},
+		"/api/user/security/social/{provider}/start": {"post"},
+		"/api/user/security/social/{provider}":       {"delete"},
+	} {
+		pathItem := requireMap(t, paths, path)
+		for _, method := range methods {
+			if _, ok := pathItem[method]; !ok {
+				t.Fatalf("expected %s %s in OpenAPI paths", method, path)
+			}
+		}
+	}
+
+	securityStatus := requireMap(t, schemas, "UserSecurityStatus")
+	securityProperties := requireMap(t, securityStatus, "properties")
+	if _, ok := securityProperties["password_login_enabled"]; !ok {
+		t.Fatal("UserSecurityStatus should expose password_login_enabled")
+	}
+	if _, ok := securityProperties["social_identities"]; !ok {
+		t.Fatal("UserSecurityStatus should expose redacted social identity summaries")
+	}
+	identity := requireMap(t, schemas, "UserSocialIdentity")
+	identityProperties := requireMap(t, identity, "properties")
+	if _, ok := identityProperties["subject"]; ok {
+		t.Fatal("UserSocialIdentity must not expose immutable provider subjects")
+	}
+}
+
+func TestOpenAPISpecV1IncludesSearchConsoleReportPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{
+		"SearchConsoleOverview",
+		"SearchConsoleSeriesResponse",
+		"SearchConsoleDimensionResponse",
+	} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+
+	overviewPath := requireMap(t, paths, "/api/sites/{id}/search-console/overview")
+	overviewOp := requireMap(t, overviewPath, "get")
+	overviewResponses := requireMap(t, overviewOp, "responses")
+	overviewOK := requireMap(t, overviewResponses, "200")
+	overviewContent := requireMap(t, overviewOK, "content")
+	overviewJSON := requireMap(t, overviewContent, "application/json")
+	overviewSchema := requireMap(t, overviewJSON, "schema")
+	if ref, _ := overviewSchema["$ref"].(string); ref != "#/components/schemas/SearchConsoleOverview" {
+		t.Fatalf("expected Search Console overview schema ref, got %q", ref)
+	}
+
+	breakdownPath := requireMap(t, paths, "/api/sites/{id}/search-console/breakdowns")
+	breakdownOp := requireMap(t, breakdownPath, "get")
+	breakdownParams, ok := breakdownOp["parameters"].([]any)
+	if !ok {
+		t.Fatalf("expected parameters to be []any, got %T", breakdownOp["parameters"])
+	}
+	if !hasNamedParam(breakdownParams, "dimension") {
+		t.Fatalf("expected Search Console breakdowns to document dimension parameter")
+	}
+}
+
+func TestOpenAPISpecV1IncludesServerSideIngestPaths(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+
+	for _, path := range []string{"/api/ingest/server/pageview", "/api/ingest/server/event"} {
+		t.Run(path, func(t *testing.T) {
+			pathItem := requireMap(t, paths, path)
+			postOp := requireMap(t, pathItem, "post")
+
+			assertServerSideIngestDescription(t, path, postOp)
+			assertAPIClientOnlyOperation(t, path, postOp)
+			assertServerSideIngestSchema(t, path, requestJSONSchema(t, postOp))
+		})
+	}
+}
+
+func TestOpenAPISpecV1IncludesQRCampaignEndpointsAndAttribution(t *testing.T) {
+	spec := OpenAPISpecV1("https://hitkeep.test")
+	tags, ok := spec["tags"].([]map[string]string)
+	if !ok {
+		t.Fatalf("expected tags to be []map[string]string, got %T", spec["tags"])
+	}
+	if !hasTag(tags, "QR Campaigns") {
+		t.Fatalf("expected top-level QR Campaigns tag to exist")
+	}
+
+	paths := requireMap(t, spec, "paths")
+	components := requireMap(t, spec, "components")
+	parameters := requireMap(t, components, "parameters")
+	schemas := requireMap(t, components, "schemas")
+
+	for _, schemaName := range []string{"QRCode", "QRCodeRequest", "QRCodeAsset", "QRCodeSummary", "QRCodeOpenSeriesPoint", "QRCodeShareLink"} {
+		if _, ok := schemas[schemaName]; !ok {
+			t.Fatalf("expected %s schema to exist", schemaName)
+		}
+	}
+	hitProperties := requireMap(t, requireMap(t, schemas, "Hit"), "properties")
+	if _, ok := hitProperties["qr_code_id"]; !ok {
+		t.Fatalf("expected Hit schema to include qr_code_id")
+	}
+	filterParam := requireMap(t, parameters, "filter")
+	filterDescription, ok := filterParam["description"].(string)
+	if !ok || !strings.Contains(filterDescription, "qr_code_id") {
+		t.Fatalf("expected filter parameter to document qr_code_id, got %q", filterDescription)
+	}
+
+	for _, path := range []string{
+		"/q/{token}",
+		"/api/sites/{id}/qr-codes",
+		"/api/sites/{id}/qr-codes/{qrID}",
+		"/api/sites/{id}/qr-codes/{qrID}/asset",
+		"/api/sites/{id}/qr-codes/{qrID}/summary",
+		"/api/sites/{id}/qr-codes/{qrID}/opens/timeseries",
+		"/api/sites/{id}/qr-codes/{qrID}/takeout",
+		"/api/sites/{id}/qr-codes/{qrID}/share",
+		"/api/sites/{id}/qr-codes/{qrID}/share/{shareID}",
+		"/api/share/{token}/sites/{id}/qr-codes",
+		"/api/share/{token}/sites/{id}/qr-codes/{qrID}",
+		"/api/share/{token}/sites/{id}/qr-codes/{qrID}/asset",
+		"/api/share/{token}/sites/{id}/qr-codes/{qrID}/summary",
+		"/api/share/{token}/sites/{id}/qr-codes/{qrID}/opens/timeseries",
+		"/api/share/{token}/sites/{id}/qr-codes/{qrID}/takeout",
+		"/api/qr-share/{token}/qr-code",
+		"/api/qr-share/{token}/qr-code/asset",
+		"/api/qr-share/{token}/qr-code/summary",
+		"/api/qr-share/{token}/qr-code/opens/timeseries",
+		"/api/qr-share/{token}/qr-code/takeout",
+	} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected QR path %s to exist", path)
+		}
+	}
+
+	browserIngestPost := requireMap(t, requireMap(t, paths, "/ingest"), "post")
+	browserDescription, ok := browserIngestPost["description"].(string)
+	if !ok || !strings.Contains(browserDescription, "hk_qr") {
+		t.Fatalf("expected browser ingest description to document hk_qr, got %q", browserDescription)
+	}
+	browserSchema := requestJSONSchema(t, browserIngestPost)
+	browserProperties := requireMap(t, browserSchema, "properties")
+	if _, ok := browserProperties["qr"]; !ok {
+		t.Fatalf("expected browser ingest schema to include compact qr field")
+	}
+
+	serverIngestPost := requireMap(t, requireMap(t, paths, "/api/ingest/server/pageview"), "post")
+	serverDescription, ok := serverIngestPost["description"].(string)
+	if !ok || !strings.Contains(serverDescription, "hk_qr QR attribution") {
+		t.Fatalf("expected server-side ingest description to document hk_qr, got %q", serverDescription)
+	}
+	serverSchema := requestJSONSchema(t, serverIngestPost)
+	serverURL := requireMap(t, requireMap(t, serverSchema, "properties"), "url")
+	serverURLDescription, ok := serverURL["description"].(string)
+	if !ok || !strings.Contains(serverURLDescription, "hk_qr") {
+		t.Fatalf("expected server-side url schema to document hk_qr, got %q", serverURLDescription)
+	}
+}
+
+func assertServerSideIngestDescription(t *testing.T, path string, postOp map[string]any) {
+	t.Helper()
+	description, ok := postOp["description"].(string)
+	if !ok || !strings.Contains(description, "trusted server-side") || !strings.Contains(description, "API client") {
+		t.Fatalf("expected trusted API client description, got %q", description)
+	}
+	if path == "/api/ingest/server/pageview" && (!strings.Contains(description, "UTM values and hk_qr QR attribution are read from the query string in url") || !strings.Contains(description, "not from top-level JSON fields")) {
+		t.Fatalf("expected server-side pageview description to document URL-based UTM extraction, got %q", description)
+	}
+	if !strings.Contains(description, "derived country, region, city, provider, and ASN") || !strings.Contains(description, "does not store the raw visitor IP") {
+		t.Fatalf("expected server-side ingest description to document derived geo/network metadata and raw IP boundary, got %q", description)
+	}
+	if !strings.Contains(description, "exclusions, spam filtering, and country, region, city, provider, and ASN lookup") {
+		t.Fatalf("expected server-side ingest description to document explicit visitor_ip metadata lookup, got %q", description)
+	}
+	if strings.Contains(description, "geolocation") {
+		t.Fatalf("expected server-side ingest description to avoid generic geolocation wording, got %q", description)
+	}
+}
+
+func assertAPIClientOnlyOperation(t *testing.T, path string, postOp map[string]any) {
+	t.Helper()
+	if !operationHasAPIClientOnlySecurity(postOp) {
+		t.Fatalf("expected %s to use API-client-only security, got %+v", path, postOp["security"])
+	}
+	responses := requireMap(t, postOp, "responses")
+	if _, ok := responses["429"]; !ok {
+		t.Fatalf("expected %s to document 429 rate limit response", path)
+	}
+}
+
+func requestJSONSchema(t *testing.T, postOp map[string]any) map[string]any {
+	t.Helper()
+	requestBody := requireMap(t, postOp, "requestBody")
+	content := requireMap(t, requestBody, "content")
+	jsonContent := requireMap(t, content, "application/json")
+	return requireMap(t, jsonContent, "schema")
+}
+
+func assertServerSideIngestSchema(t *testing.T, path string, schema map[string]any) {
+	t.Helper()
+	required := asStringSlice(t, schema["required"])
+	for _, field := range []string{"url", "timestamp", "visitor_ip", "user_agent"} {
+		if !containsString(required, field) {
+			t.Fatalf("expected %s request to require %q, got %v", path, field, required)
+		}
+	}
+	properties := requireMap(t, schema, "properties")
+	assertServerSideIngestProperties(t, path, properties)
+}
+
+func assertServerSideIngestProperties(t *testing.T, path string, properties map[string]any) {
+	t.Helper()
+	if _, ok := properties["dnt"]; !ok {
+		t.Fatalf("expected %s request schema to include optional dnt", path)
+	}
+	visitorIP := requireMap(t, properties, "visitor_ip")
+	visitorIPDescription, ok := visitorIP["description"].(string)
+	if !ok || !strings.Contains(visitorIPDescription, "country, region, city, provider, and ASN") || !strings.Contains(visitorIPDescription, "does not store the raw visitor IP") {
+		t.Fatalf("expected %s visitor_ip schema to document derived geo/network metadata and raw IP boundary, got %q", path, visitorIPDescription)
+	}
+	for _, field := range []string{"is_unique", "tracker_source", "tracker_version"} {
+		if _, ok := properties[field]; ok {
+			t.Fatalf("did not expect %s request schema to expose %s", path, field)
+		}
+	}
+	if path != "/api/ingest/server/pageview" {
+		return
+	}
+	for _, field := range []string{"utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"} {
+		if _, ok := properties[field]; ok {
+			t.Fatalf("did not expect %s request schema to expose %s; UTM values come from url", path, field)
+		}
+	}
+}
+
+func hasFormatParamRef(params []any) bool {
+	return hasParamRef(params, "#/components/parameters/format")
+}
+
+func hasParamRef(params []any, want string) bool {
+	for _, p := range params {
+		pm, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		ref, ok := pm["$ref"].(string)
+		if !ok {
+			continue
+		}
+		if ref == want {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNamedParam(params []any, name string) bool {
+	for _, p := range params {
+		pm, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		if pm["name"] == name {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(values []string, want string) bool {
+	return slices.Contains(values, want)
+}
+
+func operationHasAPIClientOnlySecurity(op map[string]any) bool {
+	security, ok := op["security"].([]any)
+	if !ok || len(security) != 2 {
+		return false
+	}
+	var bearer, apiKey bool
+	for _, item := range security {
+		entry, ok := item.(map[string]any)
+		if !ok || len(entry) != 1 {
+			return false
+		}
+		if _, ok := entry["bearerAuth"]; ok {
+			bearer = true
+		}
+		if _, ok := entry["apiKeyAuth"]; ok {
+			apiKey = true
+		}
+		if _, ok := entry["cookieAuth"]; ok {
+			return false
+		}
+	}
+	return bearer && apiKey
+}
+
+func requireMap(t *testing.T, m map[string]any, key string) map[string]any {
+	t.Helper()
+	raw, ok := m[key]
+	if !ok {
+		t.Fatalf("expected key %q to exist", key)
+	}
+	out, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("expected key %q to be map[string]any, got %T", key, raw)
+	}
+	return out
+}
+
+func asStringSlice(t *testing.T, v any) []string {
+	t.Helper()
+	switch values := v.(type) {
+	case []string:
+		out := make([]string, len(values))
+		copy(out, values)
+		return out
+	case []any:
+		out := make([]string, 0, len(values))
+		for _, item := range values {
+			str, ok := item.(string)
+			if !ok {
+				t.Fatalf("expected enum item to be string, got %T", item)
+			}
+			out = append(out, str)
+		}
+		return out
+	default:
+		t.Fatalf("expected []string or []any, got %T", v)
+		return nil
+	}
+}
+
+func hasTag(tags []map[string]string, name string) bool {
+	for _, tag := range tags {
+		if tag["name"] == name {
+			return true
+		}
+	}
+	return false
+}
+
+func assertCloudOperation(t *testing.T, op map[string]any) {
+	t.Helper()
+
+	gotAvailability, ok := op["x-hitkeep-availability"].(string)
+	if !ok || gotAvailability != "cloud" {
+		t.Fatalf("expected x-hitkeep-availability=cloud, got %#v", op["x-hitkeep-availability"])
+	}
+
+	buildTags := asStringSlice(t, op["x-hitkeep-build-tags"])
+	if !reflect.DeepEqual(buildTags, []string{"billing"}) {
+		t.Fatalf("unexpected cloud build tags, got %v", buildTags)
+	}
+
+	internal, ok := op["x-internal"].(bool)
+	if !ok || !internal {
+		t.Fatalf("expected x-internal=true, got %#v", op["x-internal"])
+	}
+}
+
+func TestHandleGetAPIDocV1ServesMemoizedDocument(t *testing.T) {
+	h := &handler{ctx: &shared.Context{Config: &config.Config{PublicURL: "https://memo.hitkeep.test"}}}
+
+	first := httptest.NewRecorder()
+	h.handleGetAPIDocV1().ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	second := httptest.NewRecorder()
+	h.handleGetAPIDocV1().ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+
+	if first.Code != http.StatusOK || second.Code != http.StatusOK {
+		t.Fatalf("expected both responses to be 200, got %d and %d", first.Code, second.Code)
+	}
+	if !bytes.Equal(first.Body.Bytes(), second.Body.Bytes()) {
+		t.Fatal("expected identical OpenAPI document bytes across requests")
+	}
+	if !bytes.Contains(first.Body.Bytes(), []byte("https://memo.hitkeep.test")) {
+		t.Fatal("expected the configured public URL in the served document")
+	}
+
+	// The document is encoded once, when the handler is built: every request
+	// must write the very same buffer instead of rebuilding the spec.
+	memoized := h.handleGetAPIDocV1()
+	firstWrite := &sliceCapturingResponseWriter{header: http.Header{}}
+	memoized.ServeHTTP(firstWrite, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	secondWrite := &sliceCapturingResponseWriter{header: http.Header{}}
+	memoized.ServeHTTP(secondWrite, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	if unsafe.SliceData(firstWrite.written) != unsafe.SliceData(secondWrite.written) {
+		t.Fatal("expected the memoized document buffer to be reused")
+	}
+
+	otherHost := &handler{ctx: &shared.Context{Config: &config.Config{PublicURL: "https://other.hitkeep.test"}}}
+	other := httptest.NewRecorder()
+	otherHost.handleGetAPIDocV1().ServeHTTP(other, httptest.NewRequest(http.MethodGet, "/api/docs/v1/openapi.json", nil))
+	if bytes.Contains(other.Body.Bytes(), []byte("https://memo.hitkeep.test")) {
+		t.Fatal("expected a different public URL to produce its own document")
+	}
+	if !bytes.Contains(other.Body.Bytes(), []byte("https://other.hitkeep.test")) {
+		t.Fatal("expected the second public URL in its own document")
+	}
+}
+
+// sliceCapturingResponseWriter keeps the exact slice handed to Write so a test
+// can compare backing buffers across requests.
+type sliceCapturingResponseWriter struct {
+	header  http.Header
+	written []byte
+}
+
+func (w *sliceCapturingResponseWriter) Header() http.Header { return w.header }
+
+func (w *sliceCapturingResponseWriter) Write(p []byte) (int, error) {
+	w.written = p
+	return len(p), nil
+}
+
+func (w *sliceCapturingResponseWriter) WriteHeader(int) {}
+
+func TestOpenAPISpecV1DocumentsSiteSetupState(t *testing.T) {
+	spec := openAPISpecV1("http://localhost:8080")
+	paths := requireMap(t, spec, "paths")
+	schemas := requireMap(t, requireMap(t, spec, "components"), "schemas")
+
+	setupPath := requireMap(t, paths, "/api/sites/{id}/setup-state")
+	getOp := requireMap(t, setupPath, "get")
+	response := requireMap(t, requireMap(t, getOp, "responses"), "200")
+	content := requireMap(t, requireMap(t, response, "content"), "application/json")
+	schema := requireMap(t, content, "schema")
+	if ref, _ := schema["$ref"].(string); ref != "#/components/schemas/SiteSetupState" {
+		t.Fatalf("expected SiteSetupState response ref, got %q", ref)
+	}
+
+	properties := requireMap(t, requireMap(t, schemas, "SiteSetupState"), "properties")
+	for _, field := range []string{"has_ai_fetches", "has_chatbot_events", "has_custom_events", "has_ecommerce_events", "has_web_vitals"} {
+		flag := requireMap(t, properties, field)
+		if flag["type"] != "boolean" {
+			t.Fatalf("expected %s to be a boolean flag, got %#v", field, flag["type"])
+		}
+	}
+}
