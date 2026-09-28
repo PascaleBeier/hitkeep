@@ -47,6 +47,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY analyticscatalog ./analyticscatalog
+COPY analyticstools ./analyticstools
 COPY appurl ./appurl
 COPY assetstore ./assetstore
 COPY cluster ./cluster
@@ -57,6 +58,7 @@ COPY hklog ./hklog
 COPY internal ./internal
 COPY jsonapi ./jsonapi
 COPY localization ./localization
+COPY mailables ./mailables
 COPY realtime ./realtime
 COPY reporting ./reporting
 COPY skills ./skills
