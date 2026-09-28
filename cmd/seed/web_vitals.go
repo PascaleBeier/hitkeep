@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/api"
+	"hitkeep/database"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
 )
 
 type webVitalsProfile struct {

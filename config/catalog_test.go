@@ -76,7 +76,7 @@ func TestConfigurationPublicationRequirementsCoverPersistentDataPath(t *testing.
 		ConfigurationPublicationCompose:          {"/var/lib/hitkeep/data", []string{"compose.yaml", "compose.cluster.yaml", "compose.dev.yaml"}},
 		ConfigurationPublicationHelm:             {"/var/lib/hitkeep/data", []string{"charts/hitkeep/templates/statefulset.yaml"}},
 		ConfigurationPublicationExample:          {"/var/lib/hitkeep/data", []string{"examples/compose.yml", "examples/compose.caddy-on-demand.yml", "examples/compose.caddy.yml", "examples/compose.nginx-custom-tracking.yml", "examples/compose.traefik-custom-tracking.yml"}},
-		ConfigurationPublicationCanonicalExample: {catalogDefault, []string{"config.example.yaml"}},
+		ConfigurationPublicationCanonicalExample: {catalogDefault, []string{ConfigurationExampleFilename}},
 	}
 	if len(requirement.Surfaces) != len(want) || len(requirement.Defaults) != len(want) || len(requirement.Paths) != len(want) {
 		t.Fatalf("publication requirement membership changed: surfaces=%d defaults=%d paths=%d, want %d", len(requirement.Surfaces), len(requirement.Defaults), len(requirement.Paths), len(want))

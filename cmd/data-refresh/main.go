@@ -11,9 +11,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	duckdbrefresh "hitkeep/internal/duckdbextensions/refresh"
-	iprefresh "hitkeep/internal/ipmeta/refresh"
-	"hitkeep/internal/listrefresh"
+	duckdbrefresh "hitkeep/duckdbextensions/refresh"
+	iprefresh "hitkeep/ipmeta/refresh"
+	"hitkeep/listrefresh"
 )
 
 func main() {
@@ -33,9 +33,9 @@ func run(ctx context.Context, args []string, out io.Writer) error {
 	case "ai-agents", "spam":
 		flags := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
-		defaultPath := "internal/aianalytics/default_ai_agents.json"
+		defaultPath := "aianalytics/default_ai_agents.json"
 		if args[0] == "spam" {
-			defaultPath = "internal/blocking/default_spam_filter.json"
+			defaultPath = "blocking/default_spam_filter.json"
 		}
 		outputPath := flags.String("output", defaultPath, "generated list path")
 		if err := flags.Parse(args[1:]); err != nil {

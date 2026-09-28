@@ -18,36 +18,23 @@ import (
 
 	"hitkeep/cluster"
 	"hitkeep/config"
+	"hitkeep/database"
+	"hitkeep/duckdbextensions"
+	"hitkeep/entitlements"
 	"hitkeep/hklog"
-	"hitkeep/internal/database"
-	"hitkeep/internal/duckdbextensions"
-	"hitkeep/internal/entitlements"
-	"hitkeep/internal/ingest"
-	"hitkeep/internal/mailer"
-	"hitkeep/internal/searchconsole"
-	"hitkeep/internal/server"
-	"hitkeep/internal/webhookdispatcher"
-	"hitkeep/internal/worker"
+	"hitkeep/ingest"
+	"hitkeep/mailer"
 	"hitkeep/public"
 	"hitkeep/realtime"
+	"hitkeep/searchconsole"
+	"hitkeep/server"
+	"hitkeep/webhookdispatcher"
+	"hitkeep/worker"
 )
 
 var Version = "snapshot"
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func run(logger *slog.Logger, args []string, configFile string) error {
-	return runContext(context.Background(), logger, args, configFile)
-}
-
-func runContext(ctx context.Context, logger *slog.Logger, args []string, configFile string) error {
-	if logger == nil {
-		panic("hitkeepcmd: logger is required")
-	}
+func run(ctx context.Context, logger *slog.Logger, args []string, configFile string) (err error) {
 	conf, err := config.LoadArgs(args, configFile, logger)
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
@@ -71,10 +58,14 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 		return nil
 	}
 
+	// Startup failures keep the 2.x report: one JSON log line on stdout, exit 1.
+	fail := func(cause any) error {
+		logger.Error("Application startup panicked", "error", cause)
+		return &ExitError{Code: 1}
+	}
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Application startup panicked", "error", r)
-			os.Exit(1)
+			err = fail(r)
 		}
 	}()
 
@@ -89,7 +80,9 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 	g, gCtx := errgroup.WithContext(ctx)
 
 	clusterManager, err := cluster.NewManager(conf, logger)
-	check(err)
+	if err != nil {
+		return fail(err)
+	}
 	defer func() {
 		if err := clusterManager.Shutdown(); err != nil {
 			logger.Error("Failed to shutdown cluster manager", "error", err)
@@ -97,7 +90,6 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 	}()
 
 	publicFS := public.FS()
-	check(err)
 
 	mailSvc, err := mailer.New(conf)
 	if err != nil {
@@ -114,20 +106,14 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 		var leaderShutdown func()
 
 		store, tenantMgr, producer, leaderShutdown, err = startLeaderServices(gCtx, conf, logger, logLevel, realtimeBroker)
-		check(err)
+		if err != nil {
+			return fail(err)
+		}
 
 		// Start Retention Worker
 		var s3Conf *worker.S3Config
 		if worker.IsS3ArchivePath(conf.ArchivePath) {
-			s3Conf = &worker.S3Config{
-				AccessKeyID:     conf.S3AccessKeyID,
-				SecretAccessKey: conf.S3SecretAccessKey,
-				SessionToken:    conf.S3SessionToken,
-				Region:          conf.S3Region,
-				Endpoint:        conf.S3Endpoint,
-				URLStyle:        conf.S3URLStyle,
-				UseSSL:          conf.S3UseSSL,
-			}
+			s3Conf = s3Config(conf)
 			if s3Conf.AccessKeyID != "" {
 				logger.Info("S3 archive enabled", "mode", "static credentials", "region", s3Conf.Region)
 			} else {
@@ -151,7 +137,7 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 		go cloudLifecycleWorker.Start(gCtx)
 
 		// Start cloud retention sync worker (daily reconciliation safety net
-		// for the webhook-triggered sync in internal/server/cloud). No-op in
+		// for the webhook-triggered sync in server/cloud). No-op in
 		// non-billing builds.
 		cloudRetentionSyncWorker := worker.NewCloudRetentionSyncWorker(tenantMgr, entitlements.NewService(store, ent, conf), conf)
 		go cloudRetentionSyncWorker.Start(gCtx)
@@ -189,15 +175,7 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 	if tenantMgr != nil && conf.BackupPath != "" {
 		var backupS3 *worker.S3Config
 		if worker.IsS3ArchivePath(conf.BackupPath) {
-			backupS3 = &worker.S3Config{
-				AccessKeyID:     conf.S3AccessKeyID,
-				SecretAccessKey: conf.S3SecretAccessKey,
-				SessionToken:    conf.S3SessionToken,
-				Region:          conf.S3Region,
-				Endpoint:        conf.S3Endpoint,
-				URLStyle:        conf.S3URLStyle,
-				UseSSL:          conf.S3UseSSL,
-			}
+			backupS3 = s3Config(conf)
 		}
 		backupWorker := worker.NewBackupWorker(tenantMgr, conf.DataPath, conf.BackupPath,
 			conf.BackupIntervalMinutes, conf.BackupRetentionCount, backupS3, httpServer.BackupStatus())
@@ -222,8 +200,22 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 
 	logger.Info("Application is running. Press Ctrl+C to exit.")
 
-	check(g.Wait())
+	if err := g.Wait(); err != nil {
+		return fail(err)
+	}
 	return nil
+}
+
+func s3Config(conf *config.Config) *worker.S3Config {
+	return &worker.S3Config{
+		AccessKeyID:     conf.S3AccessKeyID,
+		SecretAccessKey: conf.S3SecretAccessKey,
+		SessionToken:    conf.S3SessionToken,
+		Region:          conf.S3Region,
+		Endpoint:        conf.S3Endpoint,
+		URLStyle:        conf.S3URLStyle,
+		UseSSL:          conf.S3UseSSL,
+	}
 }
 
 func logMailerConfigurationError(logger *slog.Logger, conf *config.Config) {
@@ -311,14 +303,14 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 			return nil, nil, nil, nil, fmt.Errorf("reopen control database after default tenant split: %w", err)
 		}
 	}
+	compaction := database.DefaultCompactionOptions()
+	compaction.MemoryLimit = conf.DuckDBMemoryLimit
+	compaction.Threads = conf.DuckDBThreads
+	compaction.Logger = logger
 	if conf.DBCompactOnStart {
 		if err := store.Close(); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("close database before startup compaction: %w", err)
 		}
-		compaction := database.DefaultCompactionOptions()
-		compaction.MemoryLimit = conf.DuckDBMemoryLimit
-		compaction.Threads = conf.DuckDBThreads
-		compaction.Logger = logger
 		if result, err := database.MaybeCompactDatabase(ctx, conf.DBPath, compaction, database.PrepareSharedSchema); err != nil {
 			logger.Warn("Skipping database compaction at startup", "path", conf.DBPath, "error", err)
 		} else if result.Compacted {
@@ -333,10 +325,6 @@ func startLeaderServices(ctx context.Context, conf *config.Config, logger *slog.
 
 	var tenantOpts []database.TenantStoreManagerOption
 	if conf.DBCompactOnStart {
-		compaction := database.DefaultCompactionOptions()
-		compaction.MemoryLimit = conf.DuckDBMemoryLimit
-		compaction.Threads = conf.DuckDBThreads
-		compaction.Logger = logger
 		tenantOpts = append(tenantOpts, database.WithTenantCompaction(compaction))
 	}
 	tenantOpts = append(tenantOpts, database.WithTenantDataPlane(true))

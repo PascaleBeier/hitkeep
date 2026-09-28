@@ -2,12 +2,13 @@ package config
 
 import (
 	"bytes"
-	"flag"
 	"log/slog"
 	"net/netip"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
@@ -32,11 +33,29 @@ func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
 
 func mustLoadConfig(t *testing.T, args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {
 	t.Helper()
-	conf, err := loadViper(args, getEnv, nil, "", loggerArgs...)
+	conf, err := loadWithEnv(t, args, getEnv, afero.NewMemMapFs(), "", loggerArgs...)
 	if err != nil {
 		t.Fatalf("load configuration: %v", err)
 	}
 	return conf
+}
+
+// loadWithEnv replaces every catalog environment variable with getEnv's value,
+// because Viper reads the process environment.
+func loadWithEnv(t *testing.T, args []string, getEnv func(string, string) string, fs afero.Fs, configFile string, loggerArgs ...*slog.Logger) (*Config, error) {
+	t.Helper()
+	for _, setting := range Catalog().Settings {
+		for _, name := range append([]string{setting.Environment}, setting.DeprecatedEnvironments...) {
+			if name != "" {
+				t.Setenv(name, getEnv(name, ""))
+			}
+		}
+	}
+	var logger *slog.Logger
+	if len(loggerArgs) > 0 {
+		logger = loggerArgs[0]
+	}
+	return load(args, fs, configFile, logger)
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -163,7 +182,7 @@ func TestJWTSecretGeneratedWhenMissing(t *testing.T) {
 
 func TestNormalizeAuthSessionConfig(t *testing.T) {
 	conf := &Config{AuthSessionMinutes: -1, AuthRememberMeDays: -2, AuthSessionWarningSeconds: 5}
-	NormalizeAuthSessionConfig(conf)
+	normalizeAuthSessionConfig(conf)
 	if conf.AuthSessionMinutes != 15 {
 		t.Fatalf("expected default session minutes, got %d", conf.AuthSessionMinutes)
 	}
@@ -175,7 +194,7 @@ func TestNormalizeAuthSessionConfig(t *testing.T) {
 	}
 
 	conf = &Config{AuthSessionMinutes: 10, AuthSessionWarningSeconds: 900}
-	NormalizeAuthSessionConfig(conf)
+	normalizeAuthSessionConfig(conf)
 	if conf.AuthSessionWarningSeconds != 300 {
 		t.Fatalf("expected warning to stay before expiry, got %d", conf.AuthSessionWarningSeconds)
 	}
@@ -270,7 +289,7 @@ func TestTrustedProxiesDefaultIsWildcard(t *testing.T) {
 }
 
 func TestParseTrustedProxiesWildcard(t *testing.T) {
-	networks := parseTrustedProxies("*")
+	networks := parseTrustedProxies("*", slog.Default())
 	if len(networks) == 0 {
 		t.Fatalf("expected wildcard to parse into trust-all proxy networks")
 	}
@@ -519,95 +538,6 @@ func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
 	}
 }
 
-func TestDeprecatedFlagsStillWork(t *testing.T) {
-	conf := mustLoadConfig(t, []string{"-http", ":3000", "-db", "/tmp/test.db"}, func(key, fallback string) string {
-		return fallback
-	})
-	if conf.HTTPAddr != ":3000" {
-		t.Fatalf("expected deprecated --http to set HTTPAddr, got %q", conf.HTTPAddr)
-	}
-	if conf.DBPath != "/tmp/test.db" {
-		t.Fatalf("expected deprecated --db to set DBPath, got %q", conf.DBPath)
-	}
-}
-
-func TestNewAndDeprecatedFlagsFollowArgumentOrder(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{
-			name: "canonical follows deprecated",
-			args: []string{"--http", ":3000", "--http-addr", ":4000"},
-			want: ":4000",
-		},
-		{
-			name: "deprecated follows canonical",
-			args: []string{"--http-addr", ":4000", "--http", ":3000"},
-			want: ":3000",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			conf := mustLoadConfig(t, tt.args, func(key, fallback string) string {
-				return fallback
-			})
-			if conf.HTTPAddr != tt.want {
-				t.Fatalf("HTTPAddr = %q, want %q", conf.HTTPAddr, tt.want)
-			}
-		})
-	}
-}
-
-func TestEnvMappedToCorrectFields(t *testing.T) {
-	env := map[string]string{
-		"HITKEEP_HTTP_ADDR":        ":5000",
-		"HITKEEP_MAIL_DRIVER":      "log",
-		"HITKEEP_S3_REGION":        "eu-west-2",
-		"HITKEEP_MCP_ENABLED":      "true",
-		"HITKEEP_SPAM_FILTER_PATH": "/data/spam.json",
-	}
-	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
-		if val, ok := env[key]; ok {
-			return val
-		}
-		return fallback
-	})
-	if conf.HTTPAddr != ":5000" {
-		t.Fatalf("expected HTTPAddr :5000, got %q", conf.HTTPAddr)
-	}
-	if conf.MailDriver != "log" {
-		t.Fatalf("expected MailDriver log, got %q", conf.MailDriver)
-	}
-	if conf.S3Region != "eu-west-2" {
-		t.Fatalf("expected S3Region eu-west-2, got %q", conf.S3Region)
-	}
-	if !conf.MCPEnabled {
-		t.Fatalf("expected MCPEnabled true")
-	}
-	if conf.SpamFilterPath != "/data/spam.json" {
-		t.Fatalf("expected SpamFilterPath /data/spam.json, got %q", conf.SpamFilterPath)
-	}
-}
-
-func TestDeprecatedFlagsDoNotAppearInNewHelp(t *testing.T) {
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var conf Config
-	registerFlags(fs, &conf)
-	displayedFlags := make(map[string]bool)
-	fs.VisitAll(func(f *flag.Flag) {
-		displayedFlags[f.Name] = true
-	})
-	if !displayedFlags["http-addr"] {
-		t.Fatal("expected --http-addr in registered flags")
-	}
-	if !displayedFlags["http"] {
-		t.Fatal("expected --http (deprecated) in registered flags")
-	}
-}
-
 func TestLogValueRedactsSecrets(t *testing.T) {
 	conf := &Config{
 		JWTSecret:                       "my-secret-key-12345",
@@ -734,19 +664,6 @@ func TestLoadGoogleSearchConsoleConfigFromEnv(t *testing.T) {
 	}
 	if conf.GoogleSearchConsoleRedirectURL != "https://analytics.example.com/api/integrations/google-search-console/oauth/callback" {
 		t.Fatalf("expected GoogleSearchConsoleRedirectURL from env, got %q", conf.GoogleSearchConsoleRedirectURL)
-	}
-}
-
-func TestFlagHealthcheckRegistered(t *testing.T) {
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var conf Config
-	registerFlags(fs, &conf)
-	f := fs.Lookup("healthcheck")
-	if f == nil {
-		t.Fatal("expected --healthcheck flag to be registered")
-	}
-	if f.DefValue != "false" {
-		t.Fatalf("expected default false, got %q", f.DefValue)
 	}
 }
 

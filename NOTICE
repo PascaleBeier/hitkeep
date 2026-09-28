@@ -7,7 +7,7 @@ HitKeep ships with embedded third-party datasets. The datasets below retain
 their own licenses and attribution requirements, separate from HitKeep's
 source license.
 
-## AI agent user-agent master list (internal/aianalytics/default_ai_agents.json)
+## AI agent user-agent master list (aianalytics/default_ai_agents.json)
 
 Assembled from the following sources:
 
@@ -22,13 +22,13 @@ Assembled from the following sources:
 - crawler-user-agents — https://github.com/monperrus/crawler-user-agents
   License: MIT
 
-## IP geolocation data (internal/ipmeta)
+## IP geolocation data (ipmeta)
 
 This product includes IP2Location LITE data available from
 https://lite.ip2location.com. HitKeep uses the IP2Location LITE database for
 IP geolocation.
 
-## Spam filter data (internal/blocking/default_spam_filter.json)
+## Spam filter data (blocking/default_spam_filter.json)
 
 - Matomo referrer spam list — https://github.com/matomo-org/referrer-spam-list
   License: Public Domain

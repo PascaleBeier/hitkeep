@@ -1,0 +1,570 @@
+package admin
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/google/uuid"
+
+	"hitkeep/api"
+	authcore "hitkeep/auth"
+	"hitkeep/database"
+	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
+	"hitkeep/webhooks"
+)
+
+type handler struct {
+	ctx *shared.Context
+}
+
+func Register(mux *http.ServeMux, ctx *shared.Context) {
+	h := &handler{ctx: ctx}
+
+	// System overview and health
+	mux.HandleFunc("GET /api/admin/system", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetSystem()))
+	mux.HandleFunc("GET /api/admin/system/report", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetSystemReport()))
+	mux.HandleFunc("GET /api/admin/system/health", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetHealth()))
+	mux.HandleFunc("GET /api/admin/system/search-console", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetSearchConsole()))
+	mux.HandleFunc("GET /api/admin/system/ai", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetAI()))
+	mux.HandleFunc("GET /api/admin/system/storage", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetStorage()))
+	mux.HandleFunc("GET /api/admin/system/ingest", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetIngestStats()))
+	mux.HandleFunc("GET /api/admin/system/activation", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewActivation,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetActivation()))
+	mux.HandleFunc("POST /api/admin/system/activation/{team_id}/plan", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleSetActivationTeamPlan()))
+	mux.HandleFunc("GET /api/admin/system/backups", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetBackups()))
+	mux.HandleFunc("GET /api/admin/system/database", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetDatabase()))
+	mux.HandleFunc("POST /api/admin/system/database/checkpoint", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleRunDatabaseCheckpoint()))
+	mux.HandleFunc("GET /api/admin/system/spam-filter", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetSpamFilter()))
+	mux.HandleFunc("POST /api/admin/system/spam-filter/refresh", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleRefreshSpamFilter()))
+	mux.HandleFunc("GET /api/admin/system/import-stage-cleanup", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetImportStageCleanup()))
+	mux.HandleFunc("POST /api/admin/system/import-stage-cleanup/run", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleRunImportStageCleanup()))
+	mux.HandleFunc("GET /api/admin/system/caches", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetCaches()))
+	mux.HandleFunc("GET /api/admin/system/mail", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewSystem,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleGetMail()))
+	mux.HandleFunc("POST /api/admin/system/mail/test", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceRunMaintenance,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleTestMail()))
+	mux.HandleFunc("GET /api/admin/system/audit", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceViewAudit,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleListAudit()))
+	mux.HandleFunc("GET /api/admin/system/audit/export", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceExportAudit,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleExportAudit()))
+
+	mux.HandleFunc("GET /api/admin/users", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleListUsers()))
+	mux.HandleFunc("POST /api/admin/users/{id}/disable-2fa", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleDisableUser2FA()))
+	mux.HandleFunc("POST /api/admin/users/{id}/role", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleUpdateUserRole()))
+	mux.HandleFunc("DELETE /api/admin/users/{id}", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleDeleteUser()))
+	mux.HandleFunc("GET /api/admin/sites", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleAdminListSites()))
+	mux.HandleFunc("DELETE /api/admin/sites/{id}", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleAdminDeleteSite()))
+	mux.HandleFunc("GET /api/admin/teams", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleAdminListTeams()))
+	mux.HandleFunc("POST /api/admin/teams/{id}/archive", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleAdminArchiveTeam()))
+	mux.HandleFunc("DELETE /api/admin/teams/{id}", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageUsers,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleAdminDeleteTeam()))
+	mux.HandleFunc("GET /api/admin/exclusions", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageSiteExclusions,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleListInstanceExclusions()))
+	mux.HandleFunc("POST /api/admin/exclusions", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageSiteExclusions,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleCreateInstanceExclusion()))
+	mux.HandleFunc("DELETE /api/admin/exclusions/{ruleID}", ctx.Handler(shared.HandlerConfig{
+		InstancePerm: authcore.PermInstanceManageSiteExclusions,
+		RateLimiter:  ctx.ApiLimiter,
+	}, h.handleDeleteInstanceExclusion()))
+
+	mux.HandleFunc("GET /api/sites/{id}/members", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteView,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleGetSiteMembers()))
+	mux.HandleFunc("POST /api/sites/{id}/members", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageTeam,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleAddSiteMember()))
+	mux.HandleFunc("DELETE /api/sites/{id}/members/{userId}", ctx.Handler(shared.HandlerConfig{
+		SitePerm:    authcore.PermSiteManageTeam,
+		RateLimiter: ctx.ApiLimiter,
+	}, h.handleRemoveSiteMember()))
+}
+
+func (h *handler) handleListUsers() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		users, err := h.ctx.Store.ListUsers(r.Context())
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to list users", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.MarshalWrite(w, users); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleListInstanceExclusions() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		rules, err := h.ctx.Store.ListInstanceExclusions(r.Context())
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to list instance exclusions", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.MarshalWrite(w, rules); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusions response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		userID := shared.GetUserIDFromContext(r)
+		if userID == uuid.Nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		input, message, status, ok := shared.DecodeTrafficExclusionRequest(r)
+		if !ok {
+			http.Error(w, message, status)
+			return
+		}
+		createdRule, err := h.ctx.Store.CreateInstanceTrafficExclusion(r.Context(), database.TrafficExclusionValues{
+			Type:        input.Type,
+			CIDR:        input.CIDR,
+			CountryCode: input.CountryCode,
+			UserAgent:   input.UserAgent,
+			Path:        input.Path,
+			Description: input.Description,
+		}, userID)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to create instance exclusion", "error", err, "type", input.Type)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+
+		h.refreshIPFilter(r.Context())
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     userID,
+			Action:      "site.exclusion_created",
+			TargetType:  "site_exclusion",
+			TargetID:    createdRule.ID.String(),
+			TargetLabel: input.Label,
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Traffic exclusion created (scope=instance, type=%s, value=%s)", input.Type, input.Label),
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.MarshalWrite(w, createdRule); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusion response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleDeleteInstanceExclusion() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.ctx.Store == nil {
+			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+			return
+		}
+
+		ruleID, err := uuid.Parse(strings.TrimSpace(r.PathValue("ruleID")))
+		if err != nil {
+			http.Error(w, "Invalid rule ID", http.StatusBadRequest)
+			return
+		}
+
+		deleted, err := h.ctx.Store.DeleteInstanceExclusion(r.Context(), ruleID)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete instance exclusion", "error", err, "rule_id", ruleID)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		if !deleted {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+
+		h.refreshIPFilter(r.Context())
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:     shared.GetUserIDFromContext(r),
+			Action:      "site.exclusion_deleted",
+			TargetType:  "site_exclusion",
+			TargetID:    ruleID.String(),
+			TargetLabel: ruleID.String(),
+			Outcome:     "success",
+			Details:     fmt.Sprintf("Traffic exclusion deleted (scope=instance, rule_id=%s)", ruleID),
+		})
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func (h *handler) refreshIPFilter(ctx context.Context) {
+	if h.ctx.IPFilter == nil {
+		return
+	}
+	if err := h.ctx.IPFilter.Refresh(ctx); err != nil {
+		shared.LoggerFromContext(ctx).Warn("Failed to refresh IP filter after exclusion write", "error", err)
+	}
+}
+
+func (h *handler) deleteSite(ctx context.Context, siteID uuid.UUID) error {
+	siteLabel := siteID.String()
+	if site, err := h.ctx.Store.GetSiteByID(ctx, siteID); err == nil && site != nil && strings.TrimSpace(site.Domain) != "" {
+		siteLabel = site.Domain
+	}
+	return h.ctx.DeleteSiteWithWebhookEvent(ctx, siteID, map[string]any{"site_id": siteID.String(), "domain": siteLabel})
+}
+
+func (h *handler) archiveTeam(ctx context.Context, teamID, actorID uuid.UUID) error {
+	if err := h.ctx.Store.AdminArchiveTenant(ctx, teamID, actorID); err != nil {
+		return err
+	}
+	h.ctx.EmitWebhookEvent(ctx, webhooks.Event{
+		Type: webhooks.EventTeamArchived,
+		Data: map[string]any{"team_id": teamID.String()},
+	})
+	return nil
+}
+
+func (h *handler) actorInstanceRole(r *http.Request) (authcore.InstanceRole, error) {
+	if permissionCtx, ok := r.Context().Value(shared.PermissionKey).(shared.PermissionContext); ok && permissionCtx.InstanceRole != "" {
+		return permissionCtx.InstanceRole, nil
+	}
+
+	actorID := shared.GetUserIDFromContext(r)
+	if actorID == uuid.Nil {
+		return authcore.InstanceUser, nil
+	}
+
+	return h.ctx.Store.GetInstanceRole(r.Context(), actorID)
+}
+
+func (h *handler) handleDisableUser2FA() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		targetUserID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
+
+		actorRole, err := h.actorInstanceRole(r)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to resolve actor role for disable-2fa", "error", err)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		if actorRole != authcore.InstanceOwner {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		targetUser, err := h.ctx.Store.GetUserByID(r.Context(), targetUserID)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to load target user for disable-2fa", "error", err, "target_user_id", targetUserID)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		if targetUser == nil {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return
+		}
+
+		result, err := h.ctx.Store.DisableUserMFA(r.Context(), targetUserID)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to disable user MFA", "error", err, "target_user_id", targetUserID)
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		if h.ctx.AuthState != nil {
+			h.ctx.AuthState.ClearUser(targetUserID)
+		}
+
+		actorID := shared.GetUserIDFromContext(r)
+		shared.LoggerFromContext(r.Context()).Info("Admin disabled user MFA",
+			"actor_user_id", actorID,
+			"target_user_id", targetUserID,
+			"totp_disabled", result.TOTPDisabled,
+			"passkeys_deleted", result.PasskeysDeleted,
+			"sessions_invalidated", result.SessionsInvalidated,
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.MarshalWrite(w, api.AdminDisableUserMFAResponse{
+			Status:              "ok",
+			TOTPDisabled:        result.TOTPDisabled,
+			PasskeysDeleted:     result.PasskeysDeleted,
+			SessionsInvalidated: result.SessionsInvalidated,
+		}); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode disable user MFA response", "error", err, "target_user_id", targetUserID)
+		}
+	}
+}
+
+func (h *handler) handleUpdateUserRole() http.HandlerFunc {
+	type request struct {
+		Role string `json:"role"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		targetUserIDStr := r.PathValue("id")
+		targetUserID, err := uuid.Parse(targetUserIDStr)
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
+
+		var req request
+		if err := json.UnmarshalRead(r.Body, &req); err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
+		}
+
+		actorID := shared.GetUserIDFromContext(r)
+		oldRole, _ := h.ctx.Store.GetInstanceRole(r.Context(), targetUserID)
+		targetLabel := targetUserID.String()
+		if target, targetErr := h.ctx.Store.GetUserByID(r.Context(), targetUserID); targetErr == nil && target != nil {
+			targetLabel = target.Email
+		}
+
+		err = h.ctx.Store.UpdateInstanceRole(r.Context(), targetUserID, authcore.InstanceRole(req.Role), actorID)
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to update role", "error", err)
+			http.Error(w, "Failed to update role", http.StatusInternalServerError)
+			return
+		}
+		h.ctx.AppendAuditEvent(r.Context(), r, shared.AuditEvent{
+			ActorID:      actorID,
+			TargetUserID: targetUserID,
+			Action:       "role.updated",
+			TargetType:   "permission",
+			TargetID:     targetUserID.String(),
+			TargetLabel:  targetLabel,
+			Outcome:      "success",
+			Details:      "Instance role changed from " + string(oldRole) + " to " + strings.TrimSpace(req.Role),
+		})
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type: webhooks.EventSystemUserUpdated,
+			Data: map[string]any{
+				"user_id": targetUserID.String(),
+				"role":    strings.TrimSpace(req.Role),
+			},
+		})
+
+		w.WriteHeader(http.StatusOK)
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func (h *handler) handleDeleteUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		targetUserIDStr := r.PathValue("id")
+		targetUserID, err := uuid.Parse(targetUserIDStr)
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
+
+		actorID := shared.GetUserIDFromContext(r)
+
+		if actorID == targetUserID {
+			http.Error(w, "Cannot delete yourself", http.StatusBadRequest)
+			return
+		}
+
+		force := r.URL.Query().Get("force") == "true"
+
+		if force {
+			soleTeams, listErr := h.ctx.Store.ListSoleOwnerTeams(r.Context(), targetUserID)
+			if listErr != nil {
+				shared.LoggerFromContext(r.Context()).Error("Failed to list sole-owner teams for force delete", "error", listErr, "target_user_id", targetUserID)
+				http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+				return
+			}
+			for _, team := range soleTeams {
+				sites, sitesErr := h.ctx.Store.ListSitesForTenant(r.Context(), team.ID)
+				if sitesErr != nil {
+					shared.LoggerFromContext(r.Context()).Error("Failed to list sites for team during force delete", "error", sitesErr, "team_id", team.ID)
+					http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+					return
+				}
+				for _, site := range sites {
+					if delErr := h.deleteSite(r.Context(), site.ID); delErr != nil {
+						shared.LoggerFromContext(r.Context()).Error("Failed to delete site during force delete", "error", delErr, "site_id", site.ID, "team_id", team.ID)
+						http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+						return
+					}
+				}
+
+				if archiveErr := h.archiveTeam(r.Context(), team.ID, actorID); archiveErr != nil {
+					shared.LoggerFromContext(r.Context()).Error("Failed to archive team during force delete", "error", archiveErr, "team_id", team.ID, "target_user_id", targetUserID)
+					http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if h.ctx.TenantStores != nil {
+			blockingTeams, listErr := h.ctx.Store.ListSoleOwnerTeams(r.Context(), targetUserID)
+			if listErr != nil {
+				shared.LoggerFromContext(r.Context()).Error("Failed to list sole-owner teams before delete", "error", listErr, "target_user_id", targetUserID)
+				http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+				return
+			}
+			if len(blockingTeams) > 0 {
+				writeDeleteUserBlocked(r.Context(), w, targetUserID, blockingTeams)
+				return
+			}
+
+			siteIDs, listErr := h.ctx.Store.ListUserSiteIDs(r.Context(), targetUserID)
+			if listErr != nil {
+				shared.LoggerFromContext(r.Context()).Error("Failed to list owned sites before delete", "error", listErr, "target_user_id", targetUserID)
+				http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+				return
+			}
+			for _, siteID := range siteIDs {
+				if delErr := h.deleteSite(r.Context(), siteID); delErr != nil {
+					shared.LoggerFromContext(r.Context()).Error("Failed to delete owned site before user delete", "error", delErr, "site_id", siteID, "target_user_id", targetUserID)
+					http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		err = h.ctx.Store.DeleteUser(r.Context(), targetUserID)
+		if err != nil {
+			if ownsTeamsErr, ok := errors.AsType[*database.UserOwnsTeamsError](err); ok {
+				writeDeleteUserBlocked(r.Context(), w, targetUserID, ownsTeamsErr.Teams)
+				return
+			}
+			shared.LoggerFromContext(r.Context()).Error("Failed to delete user", "error", err)
+			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
+			return
+		}
+		h.ctx.EmitWebhookEvent(r.Context(), webhooks.Event{
+			Type: webhooks.EventSystemUserDeleted,
+			Data: map[string]any{"user_id": targetUserID.String()},
+		})
+
+		w.WriteHeader(http.StatusOK)
+		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
+		}
+	}
+}
+
+func writeDeleteUserBlocked(ctx context.Context, w http.ResponseWriter, targetUserID uuid.UUID, teams []api.Team) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
+	if encodeErr := json.MarshalWrite(w, api.AdminDeleteUserBlockedResponse{
+		Status:  "error",
+		Code:    "user_owns_teams",
+		Message: "Transfer ownership before deleting this user, or use ?force=true to archive their teams.",
+		Teams:   teams,
+	}); encodeErr != nil {
+		shared.LoggerFromContext(ctx).Error("Failed to encode delete user blocked response", "error", encodeErr, "target_user_id", targetUserID)
+	}
+}

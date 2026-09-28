@@ -47,6 +47,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
 COPY analyticscatalog ./analyticscatalog
+COPY analyticstools ./analyticstools
 COPY appurl ./appurl
 COPY assetstore ./assetstore
 COPY cluster ./cluster
@@ -54,9 +55,34 @@ COPY cmd ./cmd
 COPY config ./config
 COPY exportfmt ./exportfmt
 COPY hklog ./hklog
-COPY internal ./internal
+COPY ai ./ai
+COPY aianalytics ./aianalytics
+COPY api ./api
+COPY auth ./auth
+COPY blocking ./blocking
+COPY database ./database
+COPY devtool ./devtool
+COPY duckdbextensions ./duckdbextensions
+COPY entitlements ./entitlements
+COPY importables ./importables
+COPY ingest ./ingest
+COPY ipmeta ./ipmeta
+COPY mailer ./mailer
+COPY mcpserver ./mcpserver
+COPY opportunities ./opportunities
+COPY searchconsole ./searchconsole
+COPY security ./security
+COPY server ./server
+COPY socialauth ./socialauth
+COPY sso ./sso
+COPY takeout ./takeout
+COPY webhookdispatcher ./webhookdispatcher
+COPY webhooks ./webhooks
+COPY worker ./worker
 COPY jsonapi ./jsonapi
+COPY listrefresh ./listrefresh
 COPY localization ./localization
+COPY mailables ./mailables
 COPY realtime ./realtime
 COPY reporting ./reporting
 COPY skills ./skills
@@ -66,7 +92,7 @@ COPY --from=frontend-builder /workspace/public/ ./public/
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     test -n "${GO_BUILD_TAGS}" && \
-    go run ./internal/duckdbextensions/update -check && \
+    go run ./duckdbextensions/update -check && \
     CGO_ENABLED=1 go build \
       -trimpath \
       -tags "${GO_BUILD_TAGS}" \
@@ -94,7 +120,7 @@ LABEL org.opencontainers.image.title="HitKeep" \
 
 COPY --from=data-dir --chown=nonroot:nonroot /var/lib/hitkeep/data /var/lib/hitkeep/data
 
-COPY internal/duckdbextensions/LICENSE.* /usr/share/licenses/hitkeep/
+COPY duckdbextensions/LICENSE.* /usr/share/licenses/hitkeep/
 
 WORKDIR /app
 

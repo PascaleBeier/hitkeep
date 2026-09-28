@@ -11,7 +11,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,26 +18,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"hitkeep/api"
 	runtimeconfig "hitkeep/config"
-	"hitkeep/internal/api"
 	json "hitkeep/jsonapi"
 )
 
 const importCLIChunkSize = 8 << 20
 const defaultImportAPIURL = "http://localhost:8080"
-
-type repeatedStrings []string
-
-func (r *repeatedStrings) String() string {
-	return strings.Join(*r, ",")
-}
-
-func (r *repeatedStrings) Set(value string) error {
-	*r = append(*r, value)
-	return nil
-}
-
-func (*repeatedStrings) Type() string { return "stringSlice" }
 
 type importCommand struct {
 	ctx    context.Context
@@ -52,7 +38,7 @@ type importCommand struct {
 type importCLIOptions struct {
 	siteID   string
 	importID string
-	files    repeatedStrings
+	files    []string
 	dir      string
 	apiURL   string
 	token    string
@@ -120,7 +106,7 @@ func newImportOperationCommand(use, short string, args cobra.PositionalArgs, log
 func bindImportFlags(command *cobra.Command, opts *importCLIOptions) {
 	command.Flags().StringVar(&opts.siteID, "site", "", "Site ID")
 	command.Flags().StringVar(&opts.importID, "import-id", "", "Import ID")
-	command.Flags().Var(&opts.files, "file", "ZIP or CSV file (repeatable)")
+	command.Flags().StringArrayVar(&opts.files, "file", nil, "ZIP or CSV file (repeatable)")
 	command.Flags().StringVar(&opts.dir, "dir", "", "Directory containing import CSV or ZIP files")
 	command.Flags().StringVar(&opts.apiURL, "url", "", "HitKeep base URL")
 	command.Flags().StringVar(&opts.apiURL, "api-url", "", "HitKeep API URL (deprecated alias for --url)")
@@ -519,9 +505,6 @@ func normalizeImportAPIURL(value string) string {
 			value = "https://" + value
 		}
 	}
-	if parsed, err := url.Parse(value); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		return strings.TrimRight(value, "/")
-	}
 	return strings.TrimRight(value, "/")
 }
 
@@ -530,8 +513,7 @@ func isLocalImportHost(value string) bool {
 	host = strings.TrimPrefix(host, "[")
 	return strings.HasPrefix(host, "localhost") ||
 		strings.HasPrefix(host, "127.") ||
-		strings.HasPrefix(host, "::1") ||
-		strings.HasPrefix(host, "[::1]")
+		strings.HasPrefix(host, "::1")
 }
 
 func (c importCommand) check(err error) error {

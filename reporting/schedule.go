@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"hitkeep/internal/api"
+	"hitkeep/api"
 )
 
 var ErrInvalidSchedule = errors.New("invalid report schedule")

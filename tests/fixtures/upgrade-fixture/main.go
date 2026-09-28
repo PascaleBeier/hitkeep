@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"hitkeep/internal/database"
+	"hitkeep/database"
 )
 
 const protocol = "upgrade-fixture-v1"

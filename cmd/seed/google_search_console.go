@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/api"
+	"hitkeep/database"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
-	"hitkeep/internal/searchconsole"
+	"hitkeep/searchconsole"
 )
 
 type searchConsoleSeedStats struct {

@@ -10,10 +10,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/api"
+	"hitkeep/auth"
+	"hitkeep/database"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/auth"
-	"hitkeep/internal/database"
 )
 
 func deleteSiteAnalyticsData(ctx context.Context, store *database.Store, siteID uuid.UUID) {

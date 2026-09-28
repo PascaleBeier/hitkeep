@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 
-	"hitkeep/internal/listrefresh"
+	"hitkeep/listrefresh"
 )
 
 func UpdateSpamLists(ctx context.Context, outputPath string, out, errOut io.Writer, logger *slog.Logger) error {

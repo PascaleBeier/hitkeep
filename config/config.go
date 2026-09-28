@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net/netip"
@@ -11,11 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
-
-	"github.com/spf13/afero"
 )
 
 type Config struct {
@@ -166,15 +163,7 @@ type Config struct {
 func (c *Config) GetTrustedProxyNetworks() []netip.Prefix { return c.trustedProxyNets }
 
 func (c *Config) IsTrustedProxy(ip netip.Addr) bool {
-	if len(c.trustedProxyNets) == 0 {
-		return false
-	}
-	for _, network := range c.trustedProxyNets {
-		if network.Contains(ip.Unmap()) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(c.trustedProxyNets, func(network netip.Prefix) bool { return network.Contains(ip.Unmap()) })
 }
 
 func (c *Config) AuthSessionDuration() time.Duration {
@@ -198,88 +187,11 @@ func (c *Config) AuthRememberMeDuration() time.Duration {
 	return time.Duration(c.AuthRememberMeDays) * 24 * time.Hour
 }
 
-// LoadArgs assembles runtime configuration from explicit arguments and an optional
-// configuration file. It reads environment variables but never process arguments.
-func LoadArgs(args []string, configFile string, loggerArgs ...*slog.Logger) (*Config, error) {
-	return loadViper(args, func(key, fallback string) string {
-		if val := os.Getenv(key); val != "" {
-			return val
-		}
-		return fallback
-	}, afero.NewOsFs(), configFile, loggerArgs...)
-}
-
 func flagName(envKey string) string {
 	return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(envKey, "HITKEEP_")), "_", "-")
 }
 
-func setDefault(fv reflect.Value, def string) {
-	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
-	case reflect.String:
-		fv.SetString(def)
-	case reflect.Int:
-		if n, err := strconv.Atoi(def); err == nil {
-			fv.SetInt(int64(n))
-		}
-	case reflect.Bool:
-		if b, err := strconv.ParseBool(def); err == nil {
-			fv.SetBool(b)
-		}
-	case reflect.Float64:
-		if f, err := strconv.ParseFloat(def, 64); err == nil {
-			fv.SetFloat(f)
-		}
-	}
-}
-
-func setEnvValue(fv reflect.Value, val string) bool {
-	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
-	case reflect.String:
-		fv.SetString(val)
-		return true
-	case reflect.Int:
-		n, err := strconv.Atoi(val)
-		if err != nil {
-			return false
-		}
-		fv.SetInt(int64(n))
-		return true
-	case reflect.Bool:
-		b, err := strconv.ParseBool(val)
-		if err != nil {
-			return false
-		}
-		fv.SetBool(b)
-		return true
-	case reflect.Float64:
-		f, err := strconv.ParseFloat(val, 64)
-		if err != nil {
-			return false
-		}
-		fv.SetFloat(f)
-		return true
-	}
-	return false
-}
-
-func registerFlagVar(fs *flag.FlagSet, fv reflect.Value, name, desc string) {
-	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
-	case reflect.String:
-		fs.StringVar(fv.Addr().Interface().(*string), name, fv.String(), desc)
-	case reflect.Int:
-		fs.IntVar(fv.Addr().Interface().(*int), name, int(fv.Int()), desc)
-	case reflect.Bool:
-		fs.BoolVar(fv.Addr().Interface().(*bool), name, fv.Bool(), desc)
-	case reflect.Float64:
-		fs.Float64Var(fv.Addr().Interface().(*float64), name, fv.Float(), desc)
-	}
-}
-
-func normalizeConfig(conf *Config, loggerArgs ...*slog.Logger) {
-	logger := slog.Default()
-	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
-		logger = loggerArgs[0]
-	}
+func normalizeConfig(conf *Config, logger *slog.Logger) {
 	if conf.JWTSecret == "" {
 		bytes := make([]byte, 32)
 		if _, err := rand.Read(bytes); err == nil {
@@ -302,17 +214,14 @@ func normalizeConfig(conf *Config, loggerArgs ...*slog.Logger) {
 	}
 
 	resolveDuckDBDefaults(conf)
-	NormalizeDatabaseRecoveryConfig(conf)
+	normalizeDatabaseRecoveryConfig(conf)
 
 	NormalizeMCPConfig(conf, logger)
-	NormalizeAuthSessionConfig(conf)
-	NormalizeCustomTrackingConfig(conf)
+	normalizeAuthSessionConfig(conf)
+	normalizeCustomTrackingConfig(conf)
 }
 
-func NormalizeDatabaseRecoveryConfig(conf *Config) {
-	if conf == nil {
-		return
-	}
+func normalizeDatabaseRecoveryConfig(conf *Config) {
 	if conf.DBCheckpointIntervalMinutes < 0 {
 		conf.DBCheckpointIntervalMinutes = 0
 	}
@@ -322,7 +231,7 @@ func NormalizeDatabaseRecoveryConfig(conf *Config) {
 	}
 }
 
-func NormalizeAuthSessionConfig(conf *Config) {
+func normalizeAuthSessionConfig(conf *Config) {
 	if conf.AuthSessionMinutes <= 0 {
 		conf.AuthSessionMinutes = 15
 	}
@@ -339,11 +248,7 @@ func NormalizeAuthSessionConfig(conf *Config) {
 	}
 }
 
-func NormalizeMCPConfig(conf *Config, loggerArgs ...*slog.Logger) {
-	logger := slog.Default()
-	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
-		logger = loggerArgs[0]
-	}
+func NormalizeMCPConfig(conf *Config, logger *slog.Logger) {
 	conf.MCPPath = strings.TrimSpace(conf.MCPPath)
 	if conf.MCPPath == "" || conf.MCPPath == "/" {
 		conf.MCPPath = "/mcp"
@@ -368,7 +273,7 @@ func NormalizeMCPConfig(conf *Config, loggerArgs ...*slog.Logger) {
 	conf.MCPDocsURL = docsURL
 }
 
-func NormalizeCustomTrackingConfig(conf *Config) {
+func normalizeCustomTrackingConfig(conf *Config) {
 	mode := strings.ToLower(strings.TrimSpace(conf.CustomTrackingTLSMode))
 	switch mode {
 	case "caddy-on-demand":
@@ -376,6 +281,14 @@ func NormalizeCustomTrackingConfig(conf *Config) {
 	default:
 		conf.CustomTrackingTLSMode = "external"
 	}
+}
+
+// SpamFilterCachePath returns the configured spam filter cache or its data-path default.
+func (c *Config) SpamFilterCachePath() string {
+	if c.SpamFilterPath != "" {
+		return c.SpamFilterPath
+	}
+	return c.DataPath + "/spam-filter.json"
 }
 
 func (c *Config) CustomTrackingDNSTargetValue() string {
@@ -409,11 +322,7 @@ func publicURLHost(value string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(parsed.Hostname())), ".")
 }
 
-func parseTrustedProxies(cidrs string, loggerArgs ...*slog.Logger) []netip.Prefix {
-	logger := slog.Default()
-	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
-		logger = loggerArgs[0]
-	}
+func parseTrustedProxies(cidrs string, logger *slog.Logger) []netip.Prefix {
 	if cidrs == "" {
 		return nil
 	}
@@ -425,7 +334,7 @@ func parseTrustedProxies(cidrs string, loggerArgs ...*slog.Logger) []netip.Prefi
 			continue
 		}
 		if cidr == "*" {
-			return trustAllProxyNetworks(logger)
+			return []netip.Prefix{netip.PrefixFrom(netip.IPv4Unspecified(), 0), netip.PrefixFrom(netip.IPv6Unspecified(), 0)}
 		}
 		network, err := netip.ParsePrefix(cidr)
 		if err != nil {
@@ -435,20 +344,6 @@ func parseTrustedProxies(cidrs string, loggerArgs ...*slog.Logger) []netip.Prefi
 		networks = append(networks, network.Masked())
 	}
 	return networks
-}
-
-func trustAllProxyNetworks(loggerArgs ...*slog.Logger) []netip.Prefix {
-	logger := slog.Default()
-	if len(loggerArgs) > 0 && loggerArgs[0] != nil {
-		logger = loggerArgs[0]
-	}
-	allV4, errV4 := netip.ParsePrefix("0.0.0.0/0")
-	allV6, errV6 := netip.ParsePrefix("::/0")
-	if errV4 != nil || errV6 != nil {
-		logger.Warn("Failed to parse trust-all proxy CIDRs", "ipv4_error", errV4, "ipv6_error", errV6)
-		return nil
-	}
-	return []netip.Prefix{allV4.Masked(), allV6.Masked()}
 }
 
 func maskKey(s string) string {

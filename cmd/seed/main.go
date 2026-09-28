@@ -20,12 +20,12 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 
+	"hitkeep/api"
 	"hitkeep/assetstore"
+	"hitkeep/auth"
+	"hitkeep/database"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/auth"
-	"hitkeep/internal/database"
-	"hitkeep/internal/worker"
+	"hitkeep/worker"
 )
 
 func hashPassword(password string) (string, error) {

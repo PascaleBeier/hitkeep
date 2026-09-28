@@ -35,14 +35,14 @@ mkdir -p "$cache_root" "$bootstrap_mod_cache" "$bootstrap_build_cache"
 if command -v shasum >/dev/null 2>&1; then
   key=$(
     cd "$root"
-    find cmd/hk devtool internal/devtool -type f \( \( -name '*.go' ! -name '*_test.go' \) -o -name '*.json' \) -exec shasum -a 256 {} \;
+    find cmd/hk devtool -type f \( \( -name '*.go' ! -name '*_test.go' \) -o -name '*.json' \) -exec shasum -a 256 {} \;
     shasum -a 256 go.mod go.sum
   )
   key=$(printf '%s\n' "$key" | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')
 else
   key=$(
     cd "$root"
-    find cmd/hk devtool internal/devtool -type f \( \( -name '*.go' ! -name '*_test.go' \) -o -name '*.json' \) -exec sha256sum {} \;
+    find cmd/hk devtool -type f \( \( -name '*.go' ! -name '*_test.go' \) -o -name '*.json' \) -exec sha256sum {} \;
     sha256sum go.mod go.sum
   )
   key=$(printf '%s\n' "$key" | LC_ALL=C sort | sha256sum | awk '{print $1}')

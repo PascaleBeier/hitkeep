@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 
-	"hitkeep/internal/listrefresh"
+	"hitkeep/listrefresh"
 )
 
 func UpdateAIAgentLists(ctx context.Context, outputPath string, out, errOut io.Writer, logger *slog.Logger) error {

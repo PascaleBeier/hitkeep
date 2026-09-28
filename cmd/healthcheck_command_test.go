@@ -21,7 +21,7 @@ func TestHealthcheckCommandSubprocessParity(t *testing.T) {
 			}
 		}
 		root := newRootCommand(rootActions{
-			run: func([]string, string) error {
+			run: func(context.Context, []string, string) error {
 				if os.Getenv("HITKEEP_HEALTHCHECK_SUBPROCESS_SUCCESS") == "1" {
 					return nil
 				}
@@ -133,7 +133,7 @@ func TestRootCommandCompatibilityContract(t *testing.T) {
 			var gotArgs []string
 			var gotConfig string
 			root := newRootCommand(rootActions{
-				run: func(args []string, configFile string) error {
+				run: func(_ context.Context, args []string, configFile string) error {
 					called = true
 					gotArgs = args
 					gotConfig = configFile
@@ -171,7 +171,7 @@ func TestRootCommandCompatibilityContract(t *testing.T) {
 func TestRootCommandNoSubcommandUsesLegacyRuntime(t *testing.T) {
 	called := false
 	root := newRootCommand(rootActions{
-		run: func(args []string, configFile string) error {
+		run: func(_ context.Context, args []string, configFile string) error {
 			called = true
 			if len(args) != 0 {
 				t.Errorf("root args = %q, want empty", args)
@@ -197,7 +197,7 @@ func TestHealthcheckCommandHonorsCanceledContext(t *testing.T) {
 	cancel()
 	called := false
 	root := newRootCommand(rootActions{
-		run: func([]string, string) error {
+		run: func(context.Context, []string, string) error {
 			called = true
 			return nil
 		},
@@ -219,7 +219,7 @@ func TestHealthcheckCommandPassesCommandContext(t *testing.T) {
 	ctx := context.WithValue(t.Context(), key, "present")
 	called := false
 	root := newRootCommand(rootActions{
-		runContext: func(got context.Context, args []string, configFile string) error {
+		run: func(got context.Context, args []string, configFile string) error {
 			called = true
 			if got.Value(key) != "present" {
 				t.Errorf("healthcheck context value = %v, want present", got.Value(key))
@@ -286,7 +286,7 @@ func TestHealthcheckCommandPreservesRootBootstrapGrammar(t *testing.T) {
 			var gotArgs []string
 			var gotConfig string
 			root := newRootCommand(rootActions{
-				run: func(args []string, configFile string) error {
+				run: func(_ context.Context, args []string, configFile string) error {
 					gotArgs = args
 					gotConfig = configFile
 					return nil

@@ -1,0 +1,82 @@
+package admin
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"hitkeep/api"
+	"hitkeep/database"
+	"hitkeep/server/shared"
+)
+
+func (h *handler) handleGetActivation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		limit := parseActivationInt(query.Get("limit"), 50)
+		offset := parseActivationInt(query.Get("offset"), 0)
+		lastSeenFrom, err := parseActivationTime(query.Get("last_seen_from"))
+		if err != nil {
+			http.Error(w, "Invalid last_seen_from", http.StatusBadRequest)
+			return
+		}
+		lastSeenTo, err := parseActivationTime(query.Get("last_seen_to"))
+		if err != nil {
+			http.Error(w, "Invalid last_seen_to", http.StatusBadRequest)
+			return
+		}
+
+		activationQuery := database.ActivationQuery{
+			Status:       strings.TrimSpace(query.Get("status")),
+			Team:         strings.TrimSpace(query.Get("team")),
+			Domain:       strings.TrimSpace(query.Get("domain")),
+			LastSeenFrom: lastSeenFrom,
+			LastSeenTo:   lastSeenTo,
+			Limit:        limit,
+			Offset:       offset,
+			Now:          time.Now().UTC(),
+		}
+		var resp *api.SystemActivationResponse
+		if h.ctx.TenantStores != nil {
+			resp, err = h.ctx.TenantStores.ListSystemActivation(r.Context(), activationQuery)
+		} else {
+			resp, err = h.ctx.Store.ListSystemActivation(r.Context(), activationQuery)
+		}
+		if err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to load activation view", "error", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		for i := range resp.Rows {
+			resp.Rows[i].CloudRegion = h.ctx.Config.CloudRegion
+		}
+
+		writeJSON(r.Context(), w, http.StatusOK, resp)
+	}
+}
+
+func parseActivationInt(raw string, fallback int) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return value
+}
+
+func parseActivationTime(raw string) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil, err
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
+}
