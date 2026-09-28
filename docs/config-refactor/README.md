@@ -31,6 +31,7 @@ The simplification removed a net 3,068 lines across 55 files.
 ## Current proof
 
 - Both the HitKeep and private docs branches contained the latest `origin/main` on 2026-09-28.
+- The simplified candidate passed full QA run `20260928T154321-d4039c31`, 28 of 29 gates including the new `actionlint` and `helm-lint`. The 29th gate, `self-hosted-image`, built the image but stopped because `HITKEEP_PREVIOUS_IMAGE` was not set. It then passed the v2.12 upgrade, recreation, and rollback smoke in rerun `20260928T161517-01459908`, using the supported floor image from `tests/fixtures/release-fixtures.json`.
 - The layout-complete candidate `fc8e390f` passed full QA `20260928T125939-0a6d4b2e` (26 gates); `frontend-e2e` passed all 76 tests in rerun `20260928T133019-600118d0`. The v2.12 upgrade/recreation gate and both image variants passed.
 - The draft post is `src/content/blog/hitkeep-2-14-0.mdx` in the private docs branch, with `draft: true`.
 
