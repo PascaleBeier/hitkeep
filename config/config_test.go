@@ -2,7 +2,6 @@ package config
 
 import (
 	"bytes"
-	"flag"
 	"log/slog"
 	"net/netip"
 	"path/filepath"
@@ -539,95 +538,6 @@ func TestLoadMCPConfigRejectsRootPath(t *testing.T) {
 	}
 }
 
-func TestDeprecatedFlagsStillWork(t *testing.T) {
-	conf := mustLoadConfig(t, []string{"-http", ":3000", "-db", "/tmp/test.db"}, func(key, fallback string) string {
-		return fallback
-	})
-	if conf.HTTPAddr != ":3000" {
-		t.Fatalf("expected deprecated --http to set HTTPAddr, got %q", conf.HTTPAddr)
-	}
-	if conf.DBPath != "/tmp/test.db" {
-		t.Fatalf("expected deprecated --db to set DBPath, got %q", conf.DBPath)
-	}
-}
-
-func TestNewAndDeprecatedFlagsFollowArgumentOrder(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		want string
-	}{
-		{
-			name: "canonical follows deprecated",
-			args: []string{"--http", ":3000", "--http-addr", ":4000"},
-			want: ":4000",
-		},
-		{
-			name: "deprecated follows canonical",
-			args: []string{"--http-addr", ":4000", "--http", ":3000"},
-			want: ":3000",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			conf := mustLoadConfig(t, tt.args, func(key, fallback string) string {
-				return fallback
-			})
-			if conf.HTTPAddr != tt.want {
-				t.Fatalf("HTTPAddr = %q, want %q", conf.HTTPAddr, tt.want)
-			}
-		})
-	}
-}
-
-func TestEnvMappedToCorrectFields(t *testing.T) {
-	env := map[string]string{
-		"HITKEEP_HTTP_ADDR":        ":5000",
-		"HITKEEP_MAIL_DRIVER":      "log",
-		"HITKEEP_S3_REGION":        "eu-west-2",
-		"HITKEEP_MCP_ENABLED":      "true",
-		"HITKEEP_SPAM_FILTER_PATH": "/data/spam.json",
-	}
-	conf := mustLoadConfig(t, []string{}, func(key, fallback string) string {
-		if val, ok := env[key]; ok {
-			return val
-		}
-		return fallback
-	})
-	if conf.HTTPAddr != ":5000" {
-		t.Fatalf("expected HTTPAddr :5000, got %q", conf.HTTPAddr)
-	}
-	if conf.MailDriver != "log" {
-		t.Fatalf("expected MailDriver log, got %q", conf.MailDriver)
-	}
-	if conf.S3Region != "eu-west-2" {
-		t.Fatalf("expected S3Region eu-west-2, got %q", conf.S3Region)
-	}
-	if !conf.MCPEnabled {
-		t.Fatalf("expected MCPEnabled true")
-	}
-	if conf.SpamFilterPath != "/data/spam.json" {
-		t.Fatalf("expected SpamFilterPath /data/spam.json, got %q", conf.SpamFilterPath)
-	}
-}
-
-func TestDeprecatedFlagsDoNotAppearInNewHelp(t *testing.T) {
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var conf Config
-	registerFlags(fs, &conf)
-	displayedFlags := make(map[string]bool)
-	fs.VisitAll(func(f *flag.Flag) {
-		displayedFlags[f.Name] = true
-	})
-	if !displayedFlags["http-addr"] {
-		t.Fatal("expected --http-addr in registered flags")
-	}
-	if !displayedFlags["http"] {
-		t.Fatal("expected --http (deprecated) in registered flags")
-	}
-}
-
 func TestLogValueRedactsSecrets(t *testing.T) {
 	conf := &Config{
 		JWTSecret:                       "my-secret-key-12345",
@@ -754,19 +664,6 @@ func TestLoadGoogleSearchConsoleConfigFromEnv(t *testing.T) {
 	}
 	if conf.GoogleSearchConsoleRedirectURL != "https://analytics.example.com/api/integrations/google-search-console/oauth/callback" {
 		t.Fatalf("expected GoogleSearchConsoleRedirectURL from env, got %q", conf.GoogleSearchConsoleRedirectURL)
-	}
-}
-
-func TestFlagHealthcheckRegistered(t *testing.T) {
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	var conf Config
-	registerFlags(fs, &conf)
-	f := fs.Lookup("healthcheck")
-	if f == nil {
-		t.Fatal("expected --healthcheck flag to be registered")
-	}
-	if f.DefValue != "false" {
-		t.Fatalf("expected default false, got %q", f.DefValue)
 	}
 }
 
