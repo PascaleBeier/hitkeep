@@ -58,7 +58,7 @@ func Catalog() ConfigurationCatalog {
 		setting := ConfigurationSetting{
 			Field:          field.Name,
 			Category:       configurationCategory(field),
-			ConfigFileKey:  configFileKey(environment, flag),
+			ConfigFileKey:  flag,
 			Environment:    environment,
 			Flag:           flag,
 			Type:           configurationType(field.Type.Kind()),
@@ -145,7 +145,7 @@ func PublicationRequirements() []ConfigurationPublication {
 				"examples/compose.nginx-custom-tracking.yml",
 				"examples/compose.traefik-custom-tracking.yml",
 			},
-			ConfigurationPublicationCanonicalExample: {"config.example.yaml"},
+			ConfigurationPublicationCanonicalExample: {ConfigurationExampleFilename},
 		},
 		Defaults: map[ConfigurationPublicationSurface]string{
 			ConfigurationPublicationDocker:           "/var/lib/hitkeep/data",
@@ -170,25 +170,19 @@ const (
 )
 
 func configurationPublication(field reflect.StructField) ConfigurationPublicationClass {
+	if field.Tag.Get("cloud") == "true" {
+		return ConfigurationPublicationCloud
+	}
 	switch field.Name {
 	case "DataPath":
 		return ConfigurationPublicationPersistent
 	case "Healthcheck":
 		return ConfigurationPublicationCommand
-	case "CloudHosted", "CloudSignupEnabled", "CloudJurisdiction", "CloudRegion", "CloudUpgradeURL", "CloudSupportURL", "CloudPlanCode", "CloudPlanName", "CloudMaxTeams", "CloudMaxSitesPerTeam", "CloudMaxRetentionDays", "CloudMaxTeamMembers", "CloudAllowSSO", "CloudAllowCustomBranding", "StripeSecretKey", "StripePublishableKey", "StripeWebhookSecret", "StripePortalConfigurationID", "StripePriceProMonthly", "StripePriceBusinessMonthly", "StripePriceProAnnual", "StripePriceBusinessAnnual", "CloudCheckoutSuccessURL", "CloudCheckoutCancelURL":
-		return ConfigurationPublicationCloud
 	case "HTTPAddr", "DBPath", "BindAddr", "JoinAddr", "IngestRateLimit", "ApiRateLimit", "AuthRateLimit", "WebhookRateLimit", "DataRetentionDays", "NodeName", "DuckDBMemoryLimit", "DuckDBThreads", "DBCompactOnStart", "DBAutoRecover", "DBAutoRecoverWAL", "DBCheckpointIntervalMinutes", "DBRecoveryPath", "ArchivePath", "PublicURL", "LogLevel", "JWTSecret", "TrustedProxies", "NSQTCPAddress", "NSQHTTPAddress", "ApiBurst", "AuthBurst", "IngestBurst", "WebhookBurst", "AuthRememberMeDays", "AuthSessionMinutes", "AuthSessionWarningSeconds", "SocialGoogleClientID", "SocialGoogleClientSecret", "SocialGitHubClientID", "SocialGitHubClientSecret", "SocialMicrosoftClientID", "SocialMicrosoftClientSecret", "SocialMicrosoftTenant", "SocialSignupEnabled", "MailDriver", "MailEncryption", "MailInsecureSkipVerify", "MailHost", "MailPort", "MailUsername", "MailPassword", "MailFromAddress", "MailFromName", "SpamFilterAutoUpdate", "SpamFilterPath", "SpamFilterUpdateIntervalMin", "ImportMaxStageBytes", "ImportStageRetentionDays", "ImportAPIURL", "ImportAPIToken", "WebhookAllowDevelopmentTargets", "WebhookDeliveryTimeoutSeconds", "WebhookDeliveryConcurrency", "WebhookPerEndpointConcurrency", "WebhookMaxAttempts", "WebhookRetryBaseSeconds", "WebhookRetryMaxSeconds", "WebhookRetentionDays", "WebhookSweepSeconds", "GoogleSearchConsoleClientID", "GoogleSearchConsoleClientSecret", "GoogleSearchConsoleRedirectURL", "BackupPath", "BackupIntervalMinutes", "BackupRetentionCount", "S3AccessKeyID", "S3SecretAccessKey", "S3SessionToken", "S3Region", "S3Endpoint", "S3URLStyle", "S3UseSSL", "MCPEnabled", "MCPPath", "MCPMaxRangeDays", "MCPDocsEnabled", "MCPDocsURL", "MCPDocsCacheMinutes", "CustomTrackingDNSTarget", "CustomTrackingTLSMode", "CaddyTLSAskToken", "AIEnabled", "AskAIEnabled", "AIProvider", "AIModel", "AIBaseURL", "AIRegion", "AIAPIKey", "AITimeoutSeconds", "AIRequestLimit", "AITokenLimit", "AIBudgetWindowMinutes":
 		return ConfigurationPublicationOperator
 	default:
 		return ConfigurationPublicationUnclassified
 	}
-}
-
-func configFileKey(environment, flag string) string {
-	if environment == "" {
-		return flag
-	}
-	return strings.ReplaceAll(strings.ToLower(strings.TrimPrefix(environment, "HITKEEP_")), "_", "-")
 }
 
 func configurationCategories() []ConfigurationCategory {
@@ -257,12 +251,11 @@ func configurationCategory(field reflect.StructField) string {
 }
 
 func configurationCategoryIndex(category string) int {
-	for index, candidate := range configurationCategories() {
-		if candidate.ID == category {
-			return index
-		}
+	categories := configurationCategories()
+	if index := slices.IndexFunc(categories, func(candidate ConfigurationCategory) bool { return candidate.ID == category }); index >= 0 {
+		return index
 	}
-	return len(configurationCategories())
+	return len(categories)
 }
 
 func configurationType(kind reflect.Kind) string {

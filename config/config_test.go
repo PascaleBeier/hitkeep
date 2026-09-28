@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
@@ -32,11 +34,29 @@ func TestConfigValidationLogsDoNotIncludeRawValues(t *testing.T) {
 
 func mustLoadConfig(t *testing.T, args []string, getEnv func(string, string) string, loggerArgs ...*slog.Logger) *Config {
 	t.Helper()
-	conf, err := loadViper(args, getEnv, nil, "", loggerArgs...)
+	conf, err := loadWithEnv(t, args, getEnv, afero.NewMemMapFs(), "", loggerArgs...)
 	if err != nil {
 		t.Fatalf("load configuration: %v", err)
 	}
 	return conf
+}
+
+// loadWithEnv replaces every catalog environment variable with getEnv's value,
+// because Viper reads the process environment.
+func loadWithEnv(t *testing.T, args []string, getEnv func(string, string) string, fs afero.Fs, configFile string, loggerArgs ...*slog.Logger) (*Config, error) {
+	t.Helper()
+	for _, setting := range Catalog().Settings {
+		for _, name := range append([]string{setting.Environment}, setting.DeprecatedEnvironments...) {
+			if name != "" {
+				t.Setenv(name, getEnv(name, ""))
+			}
+		}
+	}
+	var logger *slog.Logger
+	if len(loggerArgs) > 0 {
+		logger = loggerArgs[0]
+	}
+	return load(args, fs, configFile, logger)
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -163,7 +183,7 @@ func TestJWTSecretGeneratedWhenMissing(t *testing.T) {
 
 func TestNormalizeAuthSessionConfig(t *testing.T) {
 	conf := &Config{AuthSessionMinutes: -1, AuthRememberMeDays: -2, AuthSessionWarningSeconds: 5}
-	NormalizeAuthSessionConfig(conf)
+	normalizeAuthSessionConfig(conf)
 	if conf.AuthSessionMinutes != 15 {
 		t.Fatalf("expected default session minutes, got %d", conf.AuthSessionMinutes)
 	}
@@ -175,7 +195,7 @@ func TestNormalizeAuthSessionConfig(t *testing.T) {
 	}
 
 	conf = &Config{AuthSessionMinutes: 10, AuthSessionWarningSeconds: 900}
-	NormalizeAuthSessionConfig(conf)
+	normalizeAuthSessionConfig(conf)
 	if conf.AuthSessionWarningSeconds != 300 {
 		t.Fatalf("expected warning to stay before expiry, got %d", conf.AuthSessionWarningSeconds)
 	}
@@ -270,7 +290,7 @@ func TestTrustedProxiesDefaultIsWildcard(t *testing.T) {
 }
 
 func TestParseTrustedProxiesWildcard(t *testing.T) {
-	networks := parseTrustedProxies("*")
+	networks := parseTrustedProxies("*", slog.Default())
 	if len(networks) == 0 {
 		t.Fatalf("expected wildcard to parse into trust-all proxy networks")
 	}

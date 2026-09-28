@@ -2,6 +2,7 @@ package hitkeepcmd
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -11,9 +12,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,17 +28,11 @@ import (
 	"hitkeep/worker"
 )
 
-// RecoveryError signals a recovery command that has already written its
-// operator-facing failure to the command's error stream.
-type RecoveryError struct{ Code int }
-
-func (*RecoveryError) Error() string { return "recovery command failed" }
-
 func recoveryExit(code int) error {
 	if code == 0 {
 		return nil
 	}
-	return &RecoveryError{Code: code}
+	return &ExitError{Code: code}
 }
 
 func recoveryFlagExit(err error) error {
@@ -44,6 +40,18 @@ func recoveryFlagExit(err error) error {
 		return nil
 	}
 	return recoveryExit(2)
+}
+
+// confirm reads the operator's answer and reports whether it was "yes".
+func (r recoveryCommand) confirm(prompt string) bool {
+	fmt.Fprint(r.out, prompt)
+	scanner := bufio.NewScanner(r.in)
+	scanner.Scan()
+	if strings.TrimSpace(scanner.Text()) != "yes" {
+		fmt.Fprintln(r.out, "Aborted.")
+		return false
+	}
+	return true
 }
 
 type recoveryCommand struct {
@@ -59,9 +67,6 @@ type recoveryCommand struct {
 // These are offline recovery operations that require HitKeep to be stopped
 // (DuckDB allows only one writer at a time).
 func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger, configFile string) error {
-	if logger == nil {
-		panic("hitkeepcmd: logger is required")
-	}
 	if len(args) == 0 {
 		fmt.Fprintln(errOut, recoverUsage)
 		return recoveryExit(1)
@@ -266,12 +271,7 @@ func (r recoveryCommand) recoverDisable2FA(args []string) error {
 
 	// ---- Confirm -------------------------------------------------------
 	if !*yes {
-		fmt.Fprint(r.out, `Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(r.in)
-		scanner.Scan()
-		answer := strings.TrimSpace(scanner.Text())
-		if answer != "yes" {
-			fmt.Fprintln(r.out, "Aborted.")
+		if !r.confirm(`Type "yes" to confirm: `) {
 			return nil
 		}
 		fmt.Fprintln(r.out)
@@ -339,11 +339,7 @@ func (r recoveryCommand) recoverRestoreDatabaseBundle(args []string) error {
 	fmt.Fprintln(r.out, "It may intentionally restore the original DuckDB failure for rollback or forensic work.")
 	fmt.Fprintln(r.out)
 	if !*yes {
-		fmt.Fprint(r.out, `Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(r.in)
-		scanner.Scan()
-		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Fprintln(r.out, "Aborted.")
+		if !r.confirm(`Type "yes" to confirm: `) {
 			return nil
 		}
 	}
@@ -602,12 +598,7 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 
 	// Confirm.
 	if !*yes {
-		fmt.Fprint(r.out, `Type "yes" to confirm restore: `)
-		scanner := bufio.NewScanner(r.in)
-		scanner.Scan()
-		answer := strings.TrimSpace(scanner.Text())
-		if answer != "yes" {
-			fmt.Fprintln(r.out, "Aborted.")
+		if !r.confirm(`Type "yes" to confirm restore: `) {
 			return nil
 		}
 		fmt.Fprintln(r.out)
@@ -634,7 +625,7 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 	// Restore shared DB.
 	sharedSource := joinRestorePath(*from, "shared", snapshotName)
 	sharedRestored := false
-	if err := restoreDatabase(ctx, r.out, r.logger, *dbPath, sharedSource, isS3Source, s3Conf); err != nil {
+	if err := restoreDatabase(ctx, r.out, r.logger, *dbPath, sharedSource, s3Conf); err != nil {
 		fmt.Fprintf(r.errOut, "Error restoring shared database: %v\n", err)
 		exitCode = 1
 	} else {
@@ -664,7 +655,7 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 
 		tenantDBPath := filepath.Join(tenantDir, "hitkeep.db")
 		tenantSource := joinRestorePath(*from, "tenants", tenantID, snapshotName)
-		if err := restoreDatabase(ctx, r.out, r.logger, tenantDBPath, tenantSource, isS3Source, s3Conf); err != nil {
+		if err := restoreDatabase(ctx, r.out, r.logger, tenantDBPath, tenantSource, s3Conf); err != nil {
 			fmt.Fprintf(r.errOut, "Error restoring tenant %s: %v\n", tenantID, err)
 			exitCode = 1
 		} else {
@@ -682,7 +673,7 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 
 // restoreDatabase imports a backup snapshot into a fresh DuckDB at targetPath.
 // If targetPath already exists, it is renamed as a safety net.
-func restoreDatabase(ctx context.Context, out io.Writer, logger *slog.Logger, targetPath, sourcePath string, isS3 bool, s3Conf *worker.S3Config) error {
+func restoreDatabase(ctx context.Context, out io.Writer, logger *slog.Logger, targetPath, sourcePath string, s3Conf *worker.S3Config) error {
 	targetDir := filepath.Dir(targetPath)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("create target directory %s: %w", targetDir, err)
@@ -705,7 +696,7 @@ func restoreDatabase(ctx context.Context, out io.Writer, logger *slog.Logger, ta
 
 	db := store.DB()
 	if err := database.WithDuckDBSession(ctx, db, database.DuckDBSessionOptions{
-		S3: s3ConfigForRestore(isS3, s3Conf),
+		S3: s3Conf,
 	}, func(conn *sql.Conn) error {
 		safePath := strings.ReplaceAll(sourcePath, "'", "''")
 		query := fmt.Sprintf("IMPORT DATABASE '%s';", safePath)
@@ -734,13 +725,6 @@ func restoreDatabase(ctx context.Context, out io.Writer, logger *slog.Logger, ta
 	return activateRestoredDatabase(tempPath, tempWalPath, targetPath, backupPath)
 }
 
-func s3ConfigForRestore(enabled bool, cfg *worker.S3Config) *database.S3SecretConfig {
-	if !enabled {
-		return nil
-	}
-	return cfg
-}
-
 type restoreS3Options struct {
 	accessKeyID     string
 	secretAccessKey string
@@ -753,36 +737,17 @@ type restoreS3Options struct {
 }
 
 func resolveRestoreS3Config(conf *config.Config, opts restoreS3Options) *worker.S3Config {
-	if opts.accessKeyID == "" {
-		opts.accessKeyID = conf.S3AccessKeyID
+	s3 := s3Config(conf)
+	s3.AccessKeyID = cmp.Or(opts.accessKeyID, s3.AccessKeyID)
+	s3.SecretAccessKey = cmp.Or(opts.secretAccessKey, s3.SecretAccessKey)
+	s3.SessionToken = cmp.Or(opts.sessionToken, s3.SessionToken)
+	s3.Region = cmp.Or(opts.region, s3.Region)
+	s3.Endpoint = cmp.Or(opts.endpoint, s3.Endpoint)
+	s3.URLStyle = cmp.Or(opts.urlStyle, s3.URLStyle)
+	if opts.useSSLSet {
+		s3.UseSSL = opts.useSSL
 	}
-	if opts.secretAccessKey == "" {
-		opts.secretAccessKey = conf.S3SecretAccessKey
-	}
-	if opts.sessionToken == "" {
-		opts.sessionToken = conf.S3SessionToken
-	}
-	if opts.region == "" {
-		opts.region = conf.S3Region
-	}
-	if opts.endpoint == "" {
-		opts.endpoint = conf.S3Endpoint
-	}
-	if opts.urlStyle == "" {
-		opts.urlStyle = conf.S3URLStyle
-	}
-	if !opts.useSSLSet {
-		opts.useSSL = conf.S3UseSSL
-	}
-	return &worker.S3Config{
-		AccessKeyID:     opts.accessKeyID,
-		SecretAccessKey: opts.secretAccessKey,
-		SessionToken:    opts.sessionToken,
-		Region:          opts.region,
-		Endpoint:        opts.endpoint,
-		URLStyle:        opts.urlStyle,
-		UseSSL:          opts.useSSL,
-	}
+	return s3
 }
 
 func finalizeRestoredDatabase(dbPath string, store *database.Store) error {
@@ -866,8 +831,7 @@ func findLatestLocalSnapshot(dir string) (string, error) {
 		return "", fmt.Errorf("no snapshots found in %s", dir)
 	}
 
-	sort.Strings(dirs)
-	return dirs[len(dirs)-1], nil
+	return slices.Max(dirs), nil
 }
 
 // discoverLocalTenantBackups returns tenant ID directory names that have a
@@ -991,11 +955,7 @@ func (r recoveryCommand) recoverRebuildDefaultTenant(args []string) error {
 	fmt.Fprintln(r.out)
 
 	if !*yes {
-		fmt.Fprint(r.out, `Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(r.in)
-		scanner.Scan()
-		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Fprintln(r.out, "Aborted.")
+		if !r.confirm(`Type "yes" to confirm: `) {
 			return nil
 		}
 		fmt.Fprintln(r.out)
@@ -1089,11 +1049,7 @@ func (r recoveryCommand) recoverImportArchives(args []string) error {
 	fmt.Fprintln(r.out)
 
 	if !*yes {
-		fmt.Fprint(r.out, `Type "yes" to confirm: `)
-		scanner := bufio.NewScanner(r.in)
-		scanner.Scan()
-		if strings.TrimSpace(scanner.Text()) != "yes" {
-			fmt.Fprintln(r.out, "Aborted.")
+		if !r.confirm(`Type "yes" to confirm: `) {
 			return nil
 		}
 		fmt.Fprintln(r.out)
@@ -1108,13 +1064,8 @@ func (r recoveryCommand) recoverImportArchives(args []string) error {
 		return recoveryExit(1)
 	}
 
-	tables := make([]string, 0, len(summary.Imported))
-	for table := range summary.Imported {
-		tables = append(tables, table)
-	}
-	sort.Strings(tables)
 	fmt.Fprintf(r.out, "✓ Imported %d archive file(s)\n", summary.Files)
-	for _, table := range tables {
+	for _, table := range slices.Sorted(maps.Keys(summary.Imported)) {
 		if summary.Imported[table] == 0 && summary.Skipped[table] == 0 {
 			continue
 		}

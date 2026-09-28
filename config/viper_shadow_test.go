@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -32,7 +33,7 @@ func TestLoadArgsUsesViperWithLegacyParity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("HITKEEP_HEALTHCHECK", tt.healthcheckEnv)
 			args := []string{"--healthcheck"}
-			got, err := LoadArgs(args, "")
+			got, err := LoadArgs(args, "", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -45,7 +46,7 @@ func TestLoadArgsUsesViperWithLegacyParity(t *testing.T) {
 	t.Run("HTTP address CLI flag overrides environment", func(t *testing.T) {
 		t.Setenv("HITKEEP_HTTP_ADDR", ":8181")
 		args := []string{"--http-addr=:9191"}
-		got, err := LoadArgs(args, "")
+		got, err := LoadArgs(args, "", nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +69,7 @@ func TestLoadArgsReadsExplicitOSFile(t *testing.T) {
 	t.Setenv("HITKEEP_MAIL_PORT", "3030")
 	t.Setenv("HITKEEP_MCP_DOCS_URL", "")
 
-	conf, err := LoadArgs([]string{"--http-addr=:9090"}, configFile)
+	conf, err := LoadArgs([]string{"--http-addr=:9090"}, configFile, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,6 +108,18 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 			name: "canonical then deprecated",
 			args: []string{"--healthcheck", "--http-addr=:9191", "--http=:8181"},
 		},
+		{name: "single dash flags", args: []string{"-healthcheck", "-http-addr", ":9191", "-mail-port=3535", "-db", "single.db"}},
+		{name: "unknown flag stops parsing", args: []string{"-healthcheck", "-http-addr", ":9191", "--nope", "-mail-port=3535"}},
+		{name: "positional stops parsing", args: []string{"-healthcheck", "extra", "-http-addr", ":9191"}},
+		{name: "terminator stops parsing", args: []string{"-healthcheck", "--", "-http-addr", ":9191"}},
+		{name: "help stops parsing", args: []string{"-healthcheck", "-h", "-http-addr", ":9191"}},
+		{name: "long help stops parsing", args: []string{"-healthcheck", "-help", "-http-addr", ":9191"}},
+		{name: "flag-like value", args: []string{"-healthcheck", "-join-addr", "-db", "-http-addr=:9191"}},
+		{name: "base prefixed integer flag", args: []string{"-healthcheck", "-mail-port", "0x1f", "--api-burst=0o17"}},
+		{name: "explicit false bool flag", args: []string{"-healthcheck", "-s3-use-ssl=false", "--mcp-enabled=1"}},
+		{name: "bool does not consume next value", args: []string{"-healthcheck", "-mcp-enabled", "false", "-http-addr", ":9191"}},
+		{name: "missing flag value", args: []string{"-healthcheck", "-http-addr=:9191", "-db"}},
+		{name: "triple dash", args: []string{"-healthcheck", "---http-addr=:9191"}},
 		{
 			name: "invalid environment",
 			args: []string{"--healthcheck"},
@@ -140,14 +153,14 @@ func TestViperShadowMatchesLegacyLoader(t *testing.T) {
 				return attr
 			}}
 			legacy := loadLegacy(tt.args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
-			shadow, err := loadViper(tt.args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
+			shadow, err := loadWithEnv(t, tt.args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(shadow, legacy) {
 				t.Fatalf("shadow config differs from legacy\nshadow: %#v\nlegacy: %#v", shadow, legacy)
 			}
-			if shadowLog.String() != legacyLog.String() {
+			if !sameLogLines(shadowLog.String(), legacyLog.String()) {
 				t.Fatalf("shadow logs differ from legacy\nshadow: %q\nlegacy: %q", shadowLog.String(), legacyLog.String())
 			}
 		})
@@ -262,7 +275,7 @@ func TestViperShadowRedactsInvalidMCPDocsURL(t *testing.T) {
 func TestViperShadowExplicitFilePrecedence(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "config.yaml", "http-addr: ':7070'\nmail-port: 2020\napi-rate-limit: 7.5\nhealthcheck: true\n")
-	conf, err := loadViper(
+	conf, err := loadWithEnv(t,
 		[]string{"--http-addr=:9090"},
 		mapEnv(map[string]string{"HITKEEP_MAIL_PORT": "3030"}),
 		fs,
@@ -289,7 +302,7 @@ func TestViperShadowRejectsInvalidExplicitFilesWithoutValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			writeShadowConfig(t, fs, "config.yaml", tt.content)
-			_, err := loadViper(nil, mapEnv(nil), fs, "config.yaml")
+			_, err := loadWithEnv(t, nil, mapEnv(nil), fs, "config.yaml")
 			if err == nil {
 				t.Fatal("expected configuration error")
 			}
@@ -307,7 +320,7 @@ func TestViperShadowRejectsNonCanonicalTopLevelKeys(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			fs := afero.NewMemMapFs()
 			writeShadowConfig(t, fs, "config.yaml", key+": 2525\n")
-			_, err := loadViper(nil, mapEnv(nil), fs, "config.yaml")
+			_, err := loadWithEnv(t, nil, mapEnv(nil), fs, "config.yaml")
 			if err == nil || !strings.Contains(err.Error(), `unknown configuration key "`+key+`"`) {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -318,7 +331,7 @@ func TestViperShadowRejectsNonCanonicalTopLevelKeys(t *testing.T) {
 func TestViperShadowDoesNotDiscoverFilesImplicitly(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "hitkeep.yaml", "http-addr: ':6060'\nhealthcheck: true\n")
-	conf, err := loadViper([]string{"--healthcheck"}, mapEnv(nil), fs, "")
+	conf, err := loadWithEnv(t, []string{"--healthcheck"}, mapEnv(nil), fs, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +365,7 @@ func TestViperShadowLoadsEveryCatalogType(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	writeShadowConfig(t, fs, "all.yaml", contents.String())
-	conf, err := loadViper(nil, mapEnv(nil), fs, "all.yaml")
+	conf, err := loadWithEnv(t, nil, mapEnv(nil), fs, "all.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +420,7 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string, g
 		return attr
 	}}
 	legacy := loadLegacy(args, getEnv, slog.New(slog.NewTextHandler(&legacyLog, logOptions)))
-	shadow, err := loadViper(args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
+	shadow, err := loadWithEnv(t, args, getEnv, afero.NewMemMapFs(), "", slog.New(slog.NewTextHandler(&shadowLog, logOptions)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +429,7 @@ func loadViperShadowParity(t *testing.T, args []string, env map[string]string, g
 	if !reflect.DeepEqual(&shadowComparable, &legacyComparable) {
 		t.Fatalf("shadow config differs from legacy\nshadow: %#v\nlegacy: %#v", shadow, legacy)
 	}
-	if shadowLog.String() != legacyLog.String() {
+	if !sameLogLines(shadowLog.String(), legacyLog.String()) {
 		t.Fatalf("shadow logs differ from legacy\nshadow: %q\nlegacy: %q", shadowLog.String(), legacyLog.String())
 	}
 	return shadow, shadowLog.String()
@@ -588,4 +601,12 @@ func writeShadowConfig(t *testing.T, fs afero.Fs, name, contents string) {
 	if err := afero.WriteFile(fs, name, []byte(contents), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+}
+
+// sameLogLines ignores line order: the loader warns in catalog order.
+func sameLogLines(got, want string) bool {
+	gotLines, wantLines := strings.Split(got, "\n"), strings.Split(want, "\n")
+	slices.Sort(gotLines)
+	slices.Sort(wantLines)
+	return slices.Equal(gotLines, wantLines)
 }

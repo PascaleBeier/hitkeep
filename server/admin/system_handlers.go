@@ -433,11 +433,7 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 			shared.LoggerFromContext(ctx).Debug("Failed to read DuckDB memory stats", "error", err)
 		}
 
-		spamCachePath := cfg.SpamFilterPath
-		if spamCachePath == "" {
-			spamCachePath = cfg.DataPath + "/spam-filter.json"
-		}
-		storage.SpamCachePath = spamCachePath
+		storage.SpamCachePath = cfg.SpamFilterCachePath()
 
 		diskPath := strings.TrimSpace(cfg.DataPath)
 		if diskPath == "" && strings.TrimSpace(cfg.DBPath) != "" {
@@ -556,11 +552,7 @@ func (h *handler) handleGetSpamFilter() http.HandlerFunc {
 			AutoUpdate: h.ctx.Config.SpamFilterAutoUpdate,
 		}
 
-		spamPath := h.ctx.Config.SpamFilterPath
-		if spamPath == "" {
-			spamPath = h.ctx.Config.DataPath + "/spam-filter.json"
-		}
-		status.DBPath = spamPath
+		status.DBPath = h.ctx.Config.SpamFilterCachePath()
 
 		if h.ctx.SpamFilter != nil {
 			status.RuleCount = h.ctx.SpamFilter.RuleCount()

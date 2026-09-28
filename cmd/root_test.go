@@ -44,19 +44,13 @@ func TestRootCommandPreservesFirstArgumentRouting(t *testing.T) {
 				return nil
 			}
 			root := newRootCommand(rootActions{
-				run: func(args []string, configFile string) error {
+				run: func(_ context.Context, args []string, configFile string) error {
 					called = "run"
 					gotArgs = append([]string(nil), args...)
 					gotConfig = configFile
 					return nil
 				},
 				recover: recordRecover,
-				importData: func(_ context.Context, args []string, _ io.Reader, _, _ io.Writer, configFile string) error {
-					called = "import"
-					gotArgs = append([]string(nil), args...)
-					gotConfig = configFile
-					return nil
-				},
 			})
 			root.SetOut(io.Discard)
 			root.SetErr(io.Discard)

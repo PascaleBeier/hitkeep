@@ -28,8 +28,6 @@ func execute(ctx context.Context, root *cobra.Command, logger *slog.Logger) int 
 	if err := hitkeepcmd.ExecuteRoot(ctx, root, os.Args[1:]); err != nil {
 		if exitErr, ok := errors.AsType[*hitkeepcmd.ExitError](err); ok {
 			return exitErr.Code
-		} else if recoveryErr, ok := errors.AsType[*hitkeepcmd.RecoveryError](err); ok {
-			return recoveryErr.Code
 		} else if healthcheckErr, ok := errors.AsType[*hitkeepcmd.HealthcheckError](err); ok {
 			_, _ = fmt.Fprintln(root.ErrOrStderr(), healthcheckErr)
 		} else {

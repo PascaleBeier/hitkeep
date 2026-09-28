@@ -423,7 +423,7 @@ func validateConfigurationDocumentation(root string) error {
 
 	requirements := runtimeconfig.PublicationRequirements()
 	if err := validateRequiredConfigurationPublications(requirements, func(path string) string {
-		if path == "config.example.yaml" {
+		if path == runtimeconfig.ConfigurationExampleFilename {
 			return string(runtimeconfig.RenderExampleYAML())
 		}
 		raw, readErr := os.ReadFile(filepath.Join(root, path))
@@ -546,7 +546,7 @@ func configurationPublicationSurface(path string) runtimeconfig.ConfigurationPub
 		return runtimeconfig.ConfigurationPublicationCompose
 	case path == "charts/hitkeep/templates/statefulset.yaml":
 		return runtimeconfig.ConfigurationPublicationHelm
-	case base == "config.example.yaml":
+	case base == runtimeconfig.ConfigurationExampleFilename:
 		return runtimeconfig.ConfigurationPublicationCanonicalExample
 	default:
 		return ""

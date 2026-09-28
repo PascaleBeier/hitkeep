@@ -32,6 +32,27 @@ func loadLegacy(args []string, getEnv func(string, string) string, loggerArgs ..
 	return &conf
 }
 
+func setDefault(fv reflect.Value, def string) {
+	_ = setField(fv, def)
+}
+
+func setEnvValue(fv reflect.Value, val string) bool {
+	return setField(fv, val)
+}
+
+func registerFlagVar(fs *flag.FlagSet, fv reflect.Value, name, desc string) {
+	switch fv.Kind() { //nolint:exhaustive // only handling config-relevant kinds
+	case reflect.String:
+		fs.StringVar(fv.Addr().Interface().(*string), name, fv.String(), desc)
+	case reflect.Int:
+		fs.IntVar(fv.Addr().Interface().(*int), name, int(fv.Int()), desc)
+	case reflect.Bool:
+		fs.BoolVar(fv.Addr().Interface().(*bool), name, fv.Bool(), desc)
+	case reflect.Float64:
+		fs.Float64Var(fv.Addr().Interface().(*float64), name, fv.Float(), desc)
+	}
+}
+
 func registerFlags(fs *flag.FlagSet, conf *Config) {
 	v := reflect.ValueOf(conf).Elem()
 	t := v.Type()

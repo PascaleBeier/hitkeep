@@ -125,9 +125,9 @@ func TestRecoverRestoreBackupHonorsCanceledContext(t *testing.T) {
 		"-data-path", t.TempDir(),
 	}, strings.NewReader("yes\n"), &stdout, &stderr, logger, "")
 
-	recoveryErr, ok := errors.AsType[*RecoveryError](err)
+	recoveryErr, ok := errors.AsType[*ExitError](err)
 	if !ok || recoveryErr.Code != 1 {
-		t.Fatalf("Recover() error = %v, want RecoveryError code 1", err)
+		t.Fatalf("Recover() error = %v, want ExitError code 1", err)
 	}
 	if !strings.Contains(stderr.String(), "Error restoring shared database:") || !strings.Contains(stderr.String(), context.Canceled.Error()) {
 		t.Fatalf("stderr = %q, want canceled restore failure", stderr.String())

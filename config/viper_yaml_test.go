@@ -28,9 +28,9 @@ func TestViperRejectsAmbiguousYAMLShapes(t *testing.T) {
 			if err := afero.WriteFile(fs, "/config.yaml", []byte(test.content), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			_, err := loadViper(nil, func(_ string, fallback string) string { return fallback }, fs, "/config.yaml")
+			_, err := loadWithEnv(t, nil, func(_ string, fallback string) string { return fallback }, fs, "/config.yaml")
 			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("loadViper() error = %v, want substring %q", err, test.want)
+				t.Fatalf("loadWithEnv(t, ) error = %v, want substring %q", err, test.want)
 			}
 		})
 	}

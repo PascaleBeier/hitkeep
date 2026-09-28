@@ -28,7 +28,7 @@ func TestImportClientConfigurationUsesCatalogViperPrecedence(t *testing.T) {
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
-			conf, err := LoadArgs(nil, path)
+			conf, err := LoadArgs(nil, path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

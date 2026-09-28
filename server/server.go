@@ -112,11 +112,7 @@ func New(conf *config.Config, publicFS fs.FS, store *database.Store, tenantStore
 		ipFilterStop = cancel
 	}
 
-	spamFilterPath := conf.SpamFilterPath
-	if spamFilterPath == "" {
-		spamFilterPath = conf.DataPath + "/spam-filter.json"
-	}
-
+	spamFilterPath := conf.SpamFilterCachePath()
 	spamFilter := blocking.NewSpamFilter(spamFilterPath, logger)
 	if err := spamFilter.RefreshFromDisk(); err != nil {
 		logger.Warn("Failed to load cached spam filter data; embedded defaults will be used", "error", err, "path", spamFilterPath)

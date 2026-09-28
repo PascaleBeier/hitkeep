@@ -229,7 +229,7 @@ func publicationTestContents(path string) (string, string) {
 		return "ENV HITKEEP_DATA_PATH=\"/var/lib/hitkeep/data\"", "ENV HITKEEP_DATA_PATH=\"/tmp/hitkeep\""
 	case "charts/hitkeep/templates/statefulset.yaml":
 		return "- name: HITKEEP_DATA_PATH\n  value: {{ .Values.persistence.mountPath | quote }}" + helmPublicationValuesSeparator + "cache:\n  mountPath: /var/lib/hitkeep/data\npersistence:\n  mountPath: /var/lib/hitkeep/data", "- name: HITKEEP_DATA_PATH\n  value: {{ .Values.persistence.mountPath | quote }}" + helmPublicationValuesSeparator + "cache:\n  mountPath: /var/lib/hitkeep/data\npersistence:\n  mountPath: /tmp/hitkeep"
-	case "config.example.yaml":
+	case runtimeconfig.ConfigurationExampleFilename:
 		return "data-path: data", "data-path: /tmp/hitkeep"
 	default:
 		return "HITKEEP_DATA_PATH: /var/lib/hitkeep/data", "HITKEEP_DATA_PATH: /tmp/hitkeep"
