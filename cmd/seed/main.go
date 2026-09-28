@@ -22,10 +22,10 @@ import (
 
 	"hitkeep/assetstore"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/auth"
-	"hitkeep/internal/database"
-	"hitkeep/internal/worker"
+	"hitkeep/api"
+	"hitkeep/auth"
+	"hitkeep/database"
+	"hitkeep/worker"
 )
 
 func hashPassword(password string) (string, error) {

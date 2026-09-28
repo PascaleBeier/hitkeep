@@ -1,6 +1,6 @@
 package mailables
 
-import "hitkeep/internal/mailer"
+import "hitkeep/mailer"
 
 // PasswordReset implements the mailer.Mailable interface
 type PasswordReset struct {

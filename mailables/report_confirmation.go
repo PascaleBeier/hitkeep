@@ -3,8 +3,8 @@ package mailables
 import (
 	"strings"
 
-	"hitkeep/internal/api"
-	"hitkeep/internal/mailer"
+	"hitkeep/api"
+	"hitkeep/mailer"
 )
 
 type ReportRecipientConfirmation struct {

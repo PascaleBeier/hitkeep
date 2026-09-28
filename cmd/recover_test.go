@@ -17,9 +17,9 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/config"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
-	"hitkeep/internal/worker"
+	"hitkeep/api"
+	"hitkeep/database"
+	"hitkeep/worker"
 )
 
 func TestRestoreDatabaseRecoveryBundleRestoresExactDatabaseAndWal(t *testing.T) {

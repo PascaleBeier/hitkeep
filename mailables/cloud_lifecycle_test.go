@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/internal/mailer"
+	"hitkeep/mailer"
 )
 
 type cloudLifecycleMailDriver struct {

@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	runtimeconfig "hitkeep/config"
-	"hitkeep/internal/api"
+	"hitkeep/api"
 	json "hitkeep/jsonapi"
 )
 

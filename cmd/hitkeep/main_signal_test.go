@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"hitkeep/internal/database"
+	"hitkeep/database"
 )
 
 func TestProductionMainSignalCancelsRunningApplication(t *testing.T) {

@@ -134,4 +134,4 @@ recreated without network access. No `HOME` override or separate extension
 installation is needed for binary, Homebrew, or container deployments.
 
 Contributor instructions for DuckDB upgrades are in
-[the extension bundle documentation](internal/duckdbextensions/README.md).
+[the extension bundle documentation](duckdbextensions/README.md).

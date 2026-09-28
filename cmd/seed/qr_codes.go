@@ -14,8 +14,8 @@ import (
 
 	"hitkeep/assetstore"
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/api"
+	"hitkeep/database"
 )
 
 type qrCampaignSeedFixture struct {

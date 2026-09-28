@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"hitkeep/internal/api"
-	"hitkeep/internal/mailer"
-	opportunitysvc "hitkeep/internal/opportunities"
+	"hitkeep/api"
+	"hitkeep/mailer"
+	opportunitysvc "hitkeep/opportunities"
 )
 
 // ReportStats holds the aggregated KPIs for one analytics period.

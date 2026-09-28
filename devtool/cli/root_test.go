@@ -13,7 +13,7 @@ import (
 	"time"
 
 	runtimeconfig "hitkeep/config"
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 	json "hitkeep/jsonapi"
 )
 

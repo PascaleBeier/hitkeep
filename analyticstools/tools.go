@@ -10,8 +10,8 @@ import (
 	goaisdk "github.com/zendev-sh/goai"
 
 	"hitkeep/analyticscatalog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/api"
+	"hitkeep/database"
 	json "hitkeep/jsonapi"
 )
 

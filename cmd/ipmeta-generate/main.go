@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"hitkeep/internal/ipmeta/refresh"
+	"hitkeep/ipmeta/refresh"
 )
 
 func main() {

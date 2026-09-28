@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/api"
+	"hitkeep/api"
 )
 
 func TestValidateScheduleRequiresQuarterHourAndAnchors(t *testing.T) {

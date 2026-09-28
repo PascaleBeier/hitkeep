@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/api"
+	"hitkeep/database"
 )
 
 func TestEnsureUserResetsExistingUserPassword(t *testing.T) {

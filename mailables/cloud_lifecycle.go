@@ -2,7 +2,7 @@
 
 package mailables
 
-import "hitkeep/internal/mailer"
+import "hitkeep/mailer"
 
 type CloudLifecycleLinks struct {
 	DashboardURL string

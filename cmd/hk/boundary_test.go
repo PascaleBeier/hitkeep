@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 )
 
 func TestProductionBuildsExcludeDeveloperPlatform(t *testing.T) {
@@ -28,7 +28,7 @@ func TestProductionBuildsExcludeDeveloperPlatform(t *testing.T) {
 	}
 	dependencies := "\n" + string(output)
 	for _, expected := range []string{
-		"hitkeep/internal/devtool",
+		"hitkeep/devtool",
 		"hitkeep/devtool/devmcp",
 		"hitkeep/devtool/cli",
 	} {

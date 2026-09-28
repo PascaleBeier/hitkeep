@@ -1,0 +1,1190 @@
+package ingest
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httputil"
+	"net/netip"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/rs/cors"
+
+	"hitkeep/api"
+	authcore "hitkeep/auth"
+	"hitkeep/blocking"
+	"hitkeep/database"
+	"hitkeep/ipmeta"
+	"hitkeep/server/shared"
+	json "hitkeep/jsonapi"
+)
+
+type handler struct {
+	ctx *shared.Context
+}
+
+var (
+	forwardedHostPattern   = regexp.MustCompile(`^(?i:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*)$`)
+	leaderForwardTransport = newProxyTransport(5 * time.Second)
+)
+
+func Register(mux *http.ServeMux, ctx *shared.Context) {
+	h := &handler{ctx: ctx}
+	mux.HandleFunc("POST /api/ingest/server/pageview", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.IngestLimiter,
+	}, h.handleServerPageviewIngest()))
+	mux.HandleFunc("POST /api/ingest/server/event", ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.IngestLimiter,
+	}, h.handleServerEventIngest()))
+
+	ingestRoutes := http.NewServeMux()
+	ingestRoutes.HandleFunc("POST /ingest", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.IngestLimiter,
+	}, h.handleIngest())))
+	ingestRoutes.HandleFunc("POST /ingest/event", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.IngestLimiter,
+	}, h.handleIngestEvent())))
+	ingestRoutes.HandleFunc("POST /ingest/web-vitals", dropSpeculativeBrowserIngest(ctx.Handler(shared.HandlerConfig{
+		RateLimiter: ctx.IngestLimiter,
+	}, h.handleIngestWebVitals())))
+
+	corsHandler := newIngestCORS().Handler(ingestRoutes)
+	mux.Handle("/ingest", corsHandler)
+	mux.Handle("/ingest/event", corsHandler)
+	mux.Handle("/ingest/web-vitals", corsHandler)
+}
+
+func dropSpeculativeBrowserIngest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if hasSpeculativePurpose(r.Header.Get("Sec-Purpose")) || hasSpeculativePurpose(r.Header.Get("Purpose")) {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func hasSpeculativePurpose(value string) bool {
+	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ';' || r == ','
+	}) {
+		switch strings.ToLower(strings.TrimSpace(token)) {
+		case "prefetch", "prerender":
+			return true
+		}
+	}
+	return false
+}
+
+func newIngestCORS() *cors.Cors {
+	return cors.New(cors.Options{
+		AllowOriginVaryRequestFunc: func(_ *http.Request, origin string) (bool, []string) {
+			return strings.TrimSpace(origin) != "", nil
+		},
+		AllowedMethods:   []string{http.MethodPost, http.MethodOptions},
+		AllowedHeaders:   []string{"Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           86400,
+	})
+}
+
+type serverIngestContext struct {
+	site      *api.Site
+	domain    string
+	path      string
+	timestamp time.Time
+	visitorIP string
+	userAgent string
+	utm       url.Values
+}
+
+type browserIngestPayload struct {
+	Path           string     `json:"path"`
+	Referrer       *string    `json:"referrer"`
+	UserAgent      *string    `json:"ua"`
+	VPWidth        *int       `json:"vp_w"`
+	VPHeight       *int       `json:"vp_h"`
+	SCWidth        *int       `json:"sc_w"`
+	SCHeight       *int       `json:"sc_h"`
+	Language       *string    `json:"lang"`
+	UTMSource      *string    `json:"u_src"`
+	UTMMedium      *string    `json:"u_med"`
+	UTMCamp        *string    `json:"u_cmp"`
+	UTMTerm        *string    `json:"u_trm"`
+	UTMCont        *string    `json:"u_cnt"`
+	QRCodeID       *uuid.UUID `json:"qr"`
+	TrackerSource  string     `json:"tsrc"`
+	TrackerVersion string     `json:"tv"`
+	IsUnique       bool       `json:"unique"`
+	SessionID      uuid.UUID  `json:"session_id"`
+	PageID         uuid.UUID  `json:"page_id"`
+}
+
+type webVitalPayload struct {
+	Name           string    `json:"n"`
+	Value          float64   `json:"v"`
+	Path           string    `json:"p"`
+	NavigationType string    `json:"nt"`
+	MetricID       string    `json:"mid"`
+	SessionID      uuid.UUID `json:"sid"`
+	PageID         uuid.UUID `json:"pid"`
+	UserAgent      *string   `json:"ua"`
+	TrackerSource  string    `json:"tsrc"`
+	TrackerVersion string    `json:"tv"`
+}
+
+func (h *handler) handleServerPageviewIngest() http.HandlerFunc {
+	leaderHandler := h.ctx.RequireAPIClientAuth(h.handleServerPageviewIngestLeader())
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.isLeader() {
+			h.forwardToLeader(w, r, "/api/ingest/server/pageview")
+			return
+		}
+		leaderHandler(w, r)
+	}
+}
+
+func (h *handler) handleServerPageviewIngestLeader() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		var payload api.ServerPageviewIngestRequest
+		if err := json.UnmarshalRead(r.Body, &payload); err != nil {
+			h.recordRejection()
+			http.Error(w, "Bad request body", http.StatusBadRequest)
+			return
+		}
+
+		ingestCtx, ok := h.resolveServerIngestContext(w, r, payload.URL, payload.Timestamp, payload.VisitorIP, payload.UserAgent)
+		if !ok {
+			return
+		}
+
+		if payload.DNT {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+
+		countryCodePtr, metadata := geoNetworkFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks(), ipmeta.Lookup)
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(ingestCtx.site.ID, blocking.TrafficExclusionContext{
+			IP:          ingestCtx.visitorIP,
+			CountryCode: stringValue(countryCodePtr),
+			UserAgent:   ingestCtx.userAgent,
+			Path:        ingestCtx.path,
+		}).Blocked {
+			h.recordRejection()
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		if h.ctx.SpamFilter != nil {
+			decision := h.ctx.SpamFilter.Evaluate(ingestCtx.site.Domain, ingestCtx.visitorIP, payload.Referrer)
+			if decision.Blocked {
+				shared.LoggerFromContext(r.Context()).Debug("Dropped spam server-side hit", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
+				h.recordSpamDrop()
+				w.WriteHeader(http.StatusAccepted)
+				return
+			}
+		}
+
+		sessionID := payload.SessionID
+		if sessionID == uuid.Nil {
+			sessionID = uuid.New()
+		}
+		pageID := payload.PageID
+		if pageID == uuid.Nil {
+			pageID = uuid.New()
+		}
+
+		userAgent := ingestCtx.userAgent
+		hit := api.Hit{
+			SiteID:         ingestCtx.site.ID,
+			SessionID:      sessionID,
+			PageID:         pageID,
+			Timestamp:      ingestCtx.timestamp.UTC(),
+			Path:           ingestCtx.path,
+			Hostname:       &ingestCtx.domain,
+			Referrer:       payload.Referrer,
+			UserAgent:      &userAgent,
+			ViewportWidth:  payload.VPWidth,
+			ViewportHeight: payload.VPHeight,
+			ScreenWidth:    payload.SCWidth,
+			ScreenHeight:   payload.SCHeight,
+			Language:       payload.Language,
+			CountryCode:    countryCodePtr,
+			Region:         stringPtrIfNotEmpty(metadata.Region),
+			City:           stringPtrIfNotEmpty(metadata.City),
+			Provider:       stringPtrIfNotEmpty(metadata.Provider),
+			ASN:            intPtrIfPositive(metadata.ASN),
+			ASNOrg:         stringPtrIfNotEmpty(metadata.ASNOrg),
+			UTMSource:      queryValuePtr(ingestCtx.utm, "utm_source"),
+			UTMMedium:      queryValuePtr(ingestCtx.utm, "utm_medium"),
+			UTMCampaign:    queryValuePtr(ingestCtx.utm, "utm_campaign"),
+			UTMTerm:        queryValuePtr(ingestCtx.utm, "utm_term"),
+			UTMContent:     queryValuePtr(ingestCtx.utm, "utm_content"),
+			QRCodeID:       queryUUIDPtr(ingestCtx.utm, "hk_qr"),
+		}
+		if err := h.publishJSON("hits", hit); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to publish server-side hit to NSQ", "error", err, "site_id", ingestCtx.site.ID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+func (h *handler) handleServerEventIngest() http.HandlerFunc {
+	leaderHandler := h.ctx.RequireAPIClientAuth(h.handleServerEventIngestLeader())
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.isLeader() {
+			h.forwardToLeader(w, r, "/api/ingest/server/event")
+			return
+		}
+		leaderHandler(w, r)
+	}
+}
+
+func (h *handler) handleServerEventIngestLeader() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		var payload api.ServerEventIngestRequest
+		if err := json.UnmarshalRead(r.Body, &payload); err != nil {
+			h.recordRejection()
+			http.Error(w, "Bad request body", http.StatusBadRequest)
+			return
+		}
+
+		ingestCtx, ok := h.resolveServerIngestContext(w, r, payload.URL, payload.Timestamp, payload.VisitorIP, payload.UserAgent)
+		if !ok {
+			return
+		}
+
+		name := strings.TrimSpace(payload.Name)
+		if name == "" {
+			h.recordRejection()
+			http.Error(w, "name is required", http.StatusBadRequest)
+			return
+		}
+
+		if payload.DNT {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+
+		countryCode := countryCodeFromVisitorIP(ingestCtx.visitorIP, h.ctx.Config.GetTrustedProxyNetworks())
+		if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(ingestCtx.site.ID, blocking.TrafficExclusionContext{
+			IP:          ingestCtx.visitorIP,
+			CountryCode: countryCode,
+			UserAgent:   ingestCtx.userAgent,
+			Path:        ingestCtx.path,
+		}).Blocked {
+			h.recordRejection()
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		if h.ctx.SpamFilter != nil {
+			decision := h.ctx.SpamFilter.Evaluate(ingestCtx.site.Domain, ingestCtx.visitorIP, payload.Referrer)
+			if decision.Blocked {
+				shared.LoggerFromContext(r.Context()).Debug("Dropped spam server-side event", "site_id", ingestCtx.site.ID, "reason", decision.Reason)
+				h.recordSpamDrop()
+				w.WriteHeader(http.StatusAccepted)
+				return
+			}
+		}
+
+		sessionID := payload.SessionID
+		if sessionID == uuid.Nil {
+			sessionID = uuid.New()
+		}
+		if payload.Properties == nil {
+			payload.Properties = map[string]any{}
+		}
+
+		event := api.Event{
+			SiteID:     ingestCtx.site.ID,
+			SessionID:  sessionID,
+			Name:       name,
+			Properties: payload.Properties,
+			Timestamp:  ingestCtx.timestamp.UTC(),
+		}
+		if err := h.publishJSON("events", event); err != nil {
+			shared.LoggerFromContext(r.Context()).Error("Failed to publish server-side event to NSQ", "error", err, "site_id", ingestCtx.site.ID)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+func (h *handler) handleIngest() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.isLeader() {
+			h.handleIngestLeader(w, r)
+		} else {
+			h.handleIngestFollower(w, r)
+		}
+	}
+}
+
+func (h *handler) isLeader() bool {
+	return h.ctx.Cluster == nil || h.ctx.Cluster.IsLeader()
+}
+
+func parseServerIngestURL(rawURL string) (*url.URL, string, string, bool) {
+	parsedURL, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsedURL == nil {
+		return nil, "", "", false
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return nil, "", "", false
+	}
+	domain := normalizeOriginHostname(parsedURL.Hostname())
+	if domain == "" {
+		return nil, "", "", false
+	}
+
+	path := parsedURL.EscapedPath()
+	if path == "" {
+		path = "/"
+	}
+	if parsedURL.RawQuery != "" {
+		path += "?" + parsedURL.RawQuery
+	}
+	return parsedURL, domain, path, true
+}
+
+func (h *handler) resolveServerIngestContext(w http.ResponseWriter, r *http.Request, rawURL, rawTimestamp, rawVisitorIP, rawUserAgent string) (serverIngestContext, bool) {
+	apiClientAuth, _ := r.Context().Value(shared.APIClientAuthKey).(*database.APIClientAuth)
+	if apiClientAuth == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return serverIngestContext{}, false
+	}
+
+	if h.ctx.Store == nil || h.ctx.Producer == nil {
+		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
+		return serverIngestContext{}, false
+	}
+
+	parsedURL, domain, path, ok := parseServerIngestURL(rawURL)
+	if !ok {
+		h.recordRejection()
+		http.Error(w, "url must be an absolute http or https URL", http.StatusBadRequest)
+		return serverIngestContext{}, false
+	}
+
+	timestamp, err := time.Parse(time.RFC3339, strings.TrimSpace(rawTimestamp))
+	if err != nil {
+		h.recordRejection()
+		http.Error(w, "timestamp must be RFC3339", http.StatusBadRequest)
+		return serverIngestContext{}, false
+	}
+
+	visitorIP := strings.TrimSpace(rawVisitorIP)
+	if parsedIP, err := netip.ParseAddr(visitorIP); err != nil || !parsedIP.IsValid() {
+		h.recordRejection()
+		http.Error(w, "visitor_ip must be a valid IP address", http.StatusBadRequest)
+		return serverIngestContext{}, false
+	}
+
+	userAgent := strings.TrimSpace(rawUserAgent)
+	if userAgent == "" {
+		h.recordRejection()
+		http.Error(w, "user_agent is required", http.StatusBadRequest)
+		return serverIngestContext{}, false
+	}
+
+	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return serverIngestContext{}, false
+	}
+	if site == nil {
+		h.recordRejection()
+		http.Error(w, "Site not found", http.StatusNotFound)
+		return serverIngestContext{}, false
+	}
+
+	if !apiClientCanManageSiteData(apiClientAuth, site.ID) {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return serverIngestContext{}, false
+	}
+
+	return serverIngestContext{
+		site:      site,
+		domain:    domain,
+		path:      path,
+		timestamp: timestamp,
+		visitorIP: visitorIP,
+		userAgent: userAgent,
+		utm:       parsedURL.Query(),
+	}, true
+}
+
+func queryValuePtr(values url.Values, key string) *string {
+	value := strings.TrimSpace(values.Get(key))
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func queryUUIDPtr(values url.Values, key string) *uuid.UUID {
+	value := strings.TrimSpace(values.Get(key))
+	if value == "" {
+		return nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+// publishJSON publishes synchronously on purpose: the 202 response must not
+// be sent before nsqd has accepted the message, and against the embedded
+// loopback nsqd the round-trip costs microseconds.
+func (h *handler) publishJSON(topic string, value any) error {
+	body, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("marshal %s payload: %w", topic, err)
+	}
+	if h.ctx.Producer == nil {
+		return fmt.Errorf("producer unavailable")
+	}
+	if err := h.ctx.Producer.Publish(topic, body); err != nil {
+		return fmt.Errorf("publish %s payload: %w", topic, err)
+	}
+	return nil
+}
+
+func apiClientCanManageSiteData(apiClientAuth *database.APIClientAuth, siteID uuid.UUID) bool {
+	if apiClientAuth == nil {
+		return false
+	}
+	siteRole, ok := apiClientAuth.SiteRoles[siteID]
+	return ok && siteRole.HasPermission(authcore.PermSiteManageData)
+}
+
+func countryCodeFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix) string {
+	req := &http.Request{
+		Header:     http.Header{},
+		RemoteAddr: net.JoinHostPort(visitorIP, "0"),
+	}
+	return shared.CountryCodeFromRequest(req, trustedProxyNets)
+}
+
+func countryCodeFromRequestWithFallback(r *http.Request, trustedProxyNets []netip.Prefix, fallback string) string {
+	return shared.CountryCodeFromRequestWithResolver(r, trustedProxyNets, func(netip.Addr) string {
+		return fallback
+	})
+}
+
+func geoNetworkFromVisitorIP(visitorIP string, trustedProxyNets []netip.Prefix, lookup func(netip.Addr) ipmeta.Metadata) (*string, ipmeta.Metadata) {
+	metadata := metadataFromVisitorIP(visitorIP, lookup)
+	req := &http.Request{
+		Header:     http.Header{},
+		RemoteAddr: net.JoinHostPort(visitorIP, "0"),
+	}
+	countryCode := countryCodeFromRequestWithFallback(req, trustedProxyNets, metadata.CountryCode)
+	return stringPtrIfNotEmpty(countryCode), metadata
+}
+
+func metadataFromVisitorIP(visitorIP string, lookup func(netip.Addr) ipmeta.Metadata) ipmeta.Metadata {
+	addr, ok := shared.ParseAddr(visitorIP)
+	if !ok {
+		return ipmeta.Metadata{}
+	}
+	if lookup == nil {
+		lookup = ipmeta.Lookup
+	}
+	return lookup(addr)
+}
+
+func metadataFromVisitorIPWithCountry(visitorIP, countryCode string, lookup func(netip.Addr, string) ipmeta.Metadata) ipmeta.Metadata {
+	addr, ok := shared.ParseAddr(visitorIP)
+	if !ok {
+		return ipmeta.Metadata{}
+	}
+	if lookup == nil {
+		lookup = ipmeta.LookupWithCountry
+	}
+	return lookup(addr, countryCode)
+}
+
+func stringPtrIfNotEmpty(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func intPtrIfPositive(value int) *int {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func (h *handler) handleIngestLeader(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		h.recordRejection()
+		http.Error(w, "Origin header is required", http.StatusBadRequest)
+		return
+	}
+
+	parsedURL, err := url.Parse(origin)
+	if err != nil {
+		h.recordRejection()
+		http.Error(w, "Invalid Origin header", http.StatusBadRequest)
+		return
+	}
+	domain := normalizeOriginHostname(parsedURL.Hostname())
+
+	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if site == nil {
+		shared.LoggerFromContext(r.Context()).Warn("Dropped hit for unknown site")
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	var payload browserIngestPayload
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
+		h.recordRejection()
+		http.Error(w, "Bad request body", http.StatusBadRequest)
+		return
+	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	if h.ctx.SpamFilter != nil {
+		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, payload.Referrer)
+		if decision.Blocked {
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam hit", "site_id", site.ID, "reason", decision.Reason)
+			h.recordSpamDrop()
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+	}
+
+	metadata := metadataFromVisitorIPWithCountry(userIP, countryCode, ipmeta.LookupWithCountry)
+	if countryCode == "" {
+		countryCode = metadata.CountryCode
+	}
+	countryCodePtr := stringPtrIfNotEmpty(countryCode)
+
+	hit := api.Hit{
+		SiteID:         site.ID,
+		SessionID:      payload.SessionID,
+		PageID:         payload.PageID,
+		Timestamp:      time.Now().UTC(),
+		Path:           payload.Path,
+		Hostname:       &domain,
+		Referrer:       payload.Referrer,
+		UserAgent:      payload.UserAgent,
+		ViewportWidth:  payload.VPWidth,
+		ViewportHeight: payload.VPHeight,
+		ScreenWidth:    payload.SCWidth,
+		ScreenHeight:   payload.SCHeight,
+		Language:       payload.Language,
+		CountryCode:    countryCodePtr,
+		Region:         stringPtrIfNotEmpty(metadata.Region),
+		City:           stringPtrIfNotEmpty(metadata.City),
+		Provider:       stringPtrIfNotEmpty(metadata.Provider),
+		ASN:            intPtrIfPositive(metadata.ASN),
+		ASNOrg:         stringPtrIfNotEmpty(metadata.ASNOrg),
+		UTMSource:      payload.UTMSource,
+		UTMMedium:      payload.UTMMedium,
+		UTMCampaign:    payload.UTMCamp,
+		UTMTerm:        payload.UTMTerm,
+		UTMContent:     payload.UTMCont,
+		QRCodeID:       payload.QRCodeID,
+		IsUnique:       &payload.IsUnique,
+		TrackerSource:  payload.TrackerSource,
+		TrackerVersion: payload.TrackerVersion,
+	}
+
+	body, err := json.Marshal(hit)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode hit for NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.ctx.Producer.Publish("hits", body); err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish hit to NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *handler) forwardToLeader(w http.ResponseWriter, r *http.Request, targetPath string) {
+	forwardURL, err := buildForwardURL(h.ctx.Cluster.GetLeaderAddr(), h.ctx.Config.HTTPAddr, targetPath)
+	if err != nil {
+		http.Error(w, "No leader available", http.StatusServiceUnavailable)
+		return
+	}
+
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(proxyReq *httputil.ProxyRequest) {
+			proxyReq.SetURL(forwardURL)
+			proxyReq.Out.URL.Path = targetPath
+			proxyReq.Out.URL.RawPath = ""
+			proxyReq.Out.Header.Set("Content-Type", "application/json")
+			if forwardedFor, ok := proxyReq.In.Header["X-Forwarded-For"]; ok {
+				proxyReq.Out.Header["X-Forwarded-For"] = append([]string(nil), forwardedFor...)
+			}
+			proxyReq.SetXForwarded()
+			proxyReq.Out.Host = proxyReq.In.Host
+			proxyReq.Out.Header.Set("X-Forwarded-Host", proxyReq.In.Host)
+		},
+		Transport: leaderForwardTransport,
+		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, proxyErr error) {
+			shared.LoggerFromContext(r.Context()).Error("Follower failed to forward request", "error_kind", leaderForwardErrorKind(proxyErr), "target_path", targetPath)
+			http.Error(rw, "Failed to forward request", http.StatusBadGateway)
+		},
+	}
+
+	proxy.ServeHTTP(w, r)
+}
+
+func leaderForwardErrorKind(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "leader_request_failed"
+	}
+}
+
+func (h *handler) handleIngestFollower(w http.ResponseWriter, r *http.Request) {
+	h.forwardToLeader(w, r, "/ingest")
+}
+
+func (h *handler) handleIngestWebVitals() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.isLeader() {
+			h.handleIngestWebVitalsLeader(w, r)
+		} else {
+			h.forwardToLeader(w, r, "/ingest/web-vitals")
+		}
+	}
+}
+
+func (h *handler) handleIngestWebVitalsLeader(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		h.recordRejection()
+		http.Error(w, "Origin header is required", http.StatusBadRequest)
+		return
+	}
+
+	parsedURL, err := url.Parse(origin)
+	if err != nil {
+		h.recordRejection()
+		http.Error(w, "Invalid Origin header", http.StatusBadRequest)
+		return
+	}
+	domain := normalizeOriginHostname(parsedURL.Hostname())
+
+	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if site == nil {
+		shared.LoggerFromContext(r.Context()).Warn("Dropped web vital for unknown site")
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if h.ctx.SpamFilter != nil {
+		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, nil)
+		if decision.Blocked {
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam web vital", "site_id", site.ID, "reason", decision.Reason)
+			h.recordSpamDrop()
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+	}
+
+	var payload webVitalPayload
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
+		h.recordRejection()
+		http.Error(w, "Bad request body", http.StatusBadRequest)
+		return
+	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	vital, validationMessage, ok := webVitalFromPayload(site.ID, payload, time.Now().UTC())
+	if !ok {
+		h.recordRejection()
+		http.Error(w, validationMessage, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.publishJSON("web_vitals", vital); err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish web vital to NSQ", "error", err, "site_id", site.ID)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func webVitalFromPayload(siteID uuid.UUID, payload webVitalPayload, timestamp time.Time) (api.WebVital, string, bool) {
+	metric := api.WebVitalMetric(strings.TrimSpace(payload.Name))
+	if _, err := database.WebVitalRatingForValue(metric, payload.Value); err != nil {
+		return api.WebVital{}, "Invalid web vital metric or value", false
+	}
+	path := sanitizeBrowserPath(payload.Path)
+	if path == "" {
+		return api.WebVital{}, "path is required", false
+	}
+	if payload.SessionID == uuid.Nil || payload.PageID == uuid.Nil {
+		return api.WebVital{}, "session and page identifiers are required", false
+	}
+
+	return api.WebVital{
+		SiteID:         siteID,
+		SessionID:      payload.SessionID,
+		PageID:         payload.PageID,
+		Metric:         metric,
+		MetricID:       trimWebVitalMetricID(payload.MetricID),
+		Value:          payload.Value,
+		Path:           path,
+		NavigationType: normalizeWebVitalNavigationType(payload.NavigationType),
+		Timestamp:      timestamp,
+		TrackerSource:  trimTrackerField(payload.TrackerSource),
+		TrackerVersion: trimTrackerField(payload.TrackerVersion),
+	}, "", true
+}
+
+func trimWebVitalMetricID(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 128 {
+		return value[:128]
+	}
+	return value
+}
+
+func normalizeWebVitalNavigationType(value string) *string {
+	value = trimTrackerField(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func trimTrackerField(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 64 {
+		return value[:64]
+	}
+	return value
+}
+
+func sanitizeBrowserPath(rawPath string) string {
+	rawPath = strings.TrimSpace(rawPath)
+	if rawPath == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawPath)
+	if err != nil {
+		return ""
+	}
+	path := parsed.EscapedPath()
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		return ""
+	}
+	return path
+}
+
+func (h *handler) handleIngestEvent() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h.isLeader() {
+			h.handleIngestEventLeader(w, r)
+		} else {
+			h.handleIngestEventFollower(w, r)
+		}
+	}
+}
+
+func (h *handler) handleIngestEventLeader(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		h.recordRejection()
+		http.Error(w, "Origin header is required", http.StatusBadRequest)
+		return
+	}
+
+	parsedURL, err := url.Parse(origin)
+	if err != nil {
+		h.recordRejection()
+		http.Error(w, "Invalid Origin header", http.StatusBadRequest)
+		return
+	}
+	domain := normalizeOriginHostname(parsedURL.Hostname())
+
+	site, err := h.ctx.Store.FindSiteByDomain(r.Context(), domain)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to find site", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	if site == nil {
+		shared.LoggerFromContext(r.Context()).Warn("Dropped event for unknown site")
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+	if !h.allowCustomTrackingHostForSite(r, site.ID) {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	trustedProxyNets := h.ctx.Config.GetTrustedProxyNetworks()
+	userIP := shared.GetRealIP(r, trustedProxyNets)
+	countryCode := shared.CountryCodeFromRequest(r, trustedProxyNets)
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.Evaluate(site.ID, userIP, countryCode).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	type eventPayload struct {
+		Name           string         `json:"n"`
+		Properties     map[string]any `json:"p"`
+		Referrer       *string        `json:"r"`
+		SessionID      uuid.UUID      `json:"sid"`
+		Path           string         `json:"path"`
+		UserAgent      *string        `json:"ua"`
+		TrackerSource  string         `json:"tsrc"`
+		TrackerVersion string         `json:"tv"`
+	}
+
+	var payload eventPayload
+	if err := json.UnmarshalRead(r.Body, &payload); err != nil {
+		h.recordRejection()
+		http.Error(w, "Bad request body", http.StatusBadRequest)
+		return
+	}
+	if h.ctx.IPFilter != nil && h.ctx.IPFilter.EvaluateTraffic(site.ID, blocking.TrafficExclusionContext{
+		IP:          userIP,
+		CountryCode: countryCode,
+		UserAgent:   trafficUserAgent(payload.UserAgent, r.UserAgent()),
+		Path:        payload.Path,
+	}).Blocked {
+		h.recordRejection()
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	if h.ctx.SpamFilter != nil {
+		decision := h.ctx.SpamFilter.Evaluate(site.Domain, userIP, payload.Referrer)
+		if decision.Blocked {
+			shared.LoggerFromContext(r.Context()).Debug("Dropped spam event", "site_id", site.ID, "reason", decision.Reason)
+			h.recordSpamDrop()
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+	}
+
+	event := api.Event{
+		SiteID:         site.ID,
+		SessionID:      payload.SessionID,
+		Name:           payload.Name,
+		Properties:     payload.Properties,
+		Timestamp:      time.Now().UTC(),
+		TrackerSource:  payload.TrackerSource,
+		TrackerVersion: payload.TrackerVersion,
+	}
+
+	body, err := json.Marshal(event)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to encode event for NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.ctx.Producer.Publish("events", body); err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to publish event to NSQ", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func trafficUserAgent(payloadUserAgent *string, fallback string) string {
+	if payloadUserAgent != nil {
+		if userAgent := strings.TrimSpace(*payloadUserAgent); userAgent != "" {
+			return userAgent
+		}
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func (h *handler) handleIngestEventFollower(w http.ResponseWriter, r *http.Request) {
+	h.forwardToLeader(w, r, "/ingest/event")
+}
+
+func normalizeLeaderHost(addr string) string {
+	if addr == "" {
+		return ""
+	}
+
+	host, _, err := net.SplitHostPort(addr)
+	if err == nil {
+		return host
+	}
+
+	return addr
+}
+
+func (h *handler) recordSpamDrop() {
+	if h.ctx.SystemCounters != nil {
+		h.ctx.SystemCounters.Spam.Add(1)
+	}
+}
+
+func (h *handler) recordRejection() {
+	if h.ctx.SystemCounters != nil {
+		h.ctx.SystemCounters.Rejections.Add(1)
+	}
+}
+
+func buildForwardURL(leaderAddr, httpAddr, targetPath string) (*url.URL, error) {
+	switch targetPath {
+	case "/ingest", "/ingest/event", "/ingest/web-vitals", "/api/ingest/server/pageview", "/api/ingest/server/event":
+	default:
+		return nil, fmt.Errorf("invalid forward target")
+	}
+
+	leaderHost := normalizeLeaderHost(leaderAddr)
+	if !isValidForwardHost(leaderHost) {
+		return nil, fmt.Errorf("invalid leader address")
+	}
+
+	_, port, err := net.SplitHostPort(httpAddr)
+	if err != nil || port == "" {
+		port = "8080"
+	}
+
+	return &url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(leaderHost, port),
+		Path:   targetPath,
+	}, nil
+}
+
+func isValidForwardHost(host string) bool {
+	trimmed := strings.TrimSpace(host)
+	if trimmed == "" {
+		return false
+	}
+	if strings.ContainsAny(trimmed, `/\?#`) {
+		return false
+	}
+	if _, err := netip.ParseAddr(trimmed); err == nil {
+		return true
+	}
+	return forwardedHostPattern.MatchString(trimmed)
+}
+
+func newProxyTransport(timeout time.Duration) http.RoundTripper {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = timeout
+	return transport
+}
+
+func (h *handler) allowCustomTrackingHostForSite(r *http.Request, siteID uuid.UUID) bool {
+	if h.ctx.Store == nil {
+		return true
+	}
+	trustedProxyNets := []netip.Prefix(nil)
+	if h.ctx.Config != nil {
+		trustedProxyNets = h.ctx.Config.GetTrustedProxyNetworks()
+	}
+	hostname := trackingRequestHostname(r, trustedProxyNets)
+	if hostname == "" {
+		return true
+	}
+
+	domain, err := h.ctx.Store.FindCustomTrackingDomainByHostname(r.Context(), hostname)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve custom tracking ingest host", "error", err, "hostname", hostname, "site_id", siteID)
+		return false
+	}
+	if domain == nil {
+		return true
+	}
+	if !database.CustomTrackingDomainIsActive(*domain) {
+		shared.LoggerFromContext(r.Context()).Warn("Dropped ingest through inactive custom tracking domain", "hostname", hostname, "site_id", siteID)
+		return false
+	}
+
+	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)
+	if err != nil {
+		shared.LoggerFromContext(r.Context()).Error("Failed to resolve ingest site team for custom tracking host guard", "error", err, "hostname", hostname, "site_id", siteID)
+		return false
+	}
+	if domain.TeamID != teamID {
+		shared.LoggerFromContext(r.Context()).Warn("Dropped cross-team custom tracking domain ingest", "hostname", hostname, "site_id", siteID, "site_team_id", teamID, "domain_team_id", domain.TeamID)
+		return false
+	}
+	return true
+}
+
+func trackingRequestHostname(r *http.Request, trustedProxies []netip.Prefix) string {
+	if r == nil {
+		return ""
+	}
+	if isTrustedTrackingProxyRequest(r, trustedProxies) && !trustsAllTrackingProxies(trustedProxies) {
+		if host := forwardedTrackingHost(r.Header); host != "" {
+			return normalizeTrackingRequestHost(host)
+		}
+	}
+	return normalizeTrackingRequestHost(r.Host)
+}
+
+func normalizeTrackingRequestHost(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
+		host = parsedHost
+	}
+	host = strings.Trim(host, "[]")
+	return database.NormalizeCustomTrackingHostname(host)
+}
+
+func isTrustedTrackingProxyRequest(r *http.Request, trustedProxies []netip.Prefix) bool {
+	directIP := shared.RemoteIPFromAddr(r.RemoteAddr)
+	parsedDirectIP, ok := shared.ParseAddr(directIP)
+	return ok && shared.IsTrustedProxy(parsedDirectIP, trustedProxies)
+}
+
+func trustsAllTrackingProxies(trustedProxies []netip.Prefix) bool {
+	for _, prefix := range trustedProxies {
+		if prefix.Bits() == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func forwardedTrackingHost(header http.Header) string {
+	if host := firstTrackingHeaderToken(header.Values("X-Forwarded-Host")); host != "" {
+		return host
+	}
+
+	for _, entry := range trackingHeaderTokens(header.Values("Forwarded")) {
+		for part := range strings.SplitSeq(entry, ";") {
+			key, value, ok := strings.Cut(part, "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "host") {
+				continue
+			}
+			return strings.Trim(strings.TrimSpace(value), `"`)
+		}
+	}
+	return ""
+}
+
+func firstTrackingHeaderToken(values []string) string {
+	tokens := trackingHeaderTokens(values)
+	if len(tokens) == 0 {
+		return ""
+	}
+	return tokens[0]
+}
+
+func trackingHeaderTokens(values []string) []string {
+	tokens := make([]string, 0, len(values))
+	for _, value := range values {
+		for token := range strings.SplitSeq(value, ",") {
+			token = strings.TrimSpace(token)
+			if token != "" {
+				tokens = append(tokens, token)
+			}
+		}
+	}
+	return tokens
+}
+
+func normalizeOriginHostname(host string) string {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(host)), "www.")
+}

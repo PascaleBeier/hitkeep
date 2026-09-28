@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"time"
 
-	"hitkeep/internal/aianalytics"
-	"hitkeep/internal/blocking/spamfeed"
+	"hitkeep/aianalytics"
+	"hitkeep/blocking/spamfeed"
 )
 
 func RunAI(ctx context.Context, outputPath string, logger *slog.Logger) (aianalytics.AIAgentData, bool, error) {

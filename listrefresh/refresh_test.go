@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"hitkeep/internal/aianalytics"
-	"hitkeep/internal/blocking/spamfeed"
+	"hitkeep/aianalytics"
+	"hitkeep/blocking/spamfeed"
 )
 
 func TestAIUnchangedTimestampPreservesFileAndMetadataChangeWrites(t *testing.T) {
@@ -58,7 +58,7 @@ func TestAIUnchangedTimestampPreservesFileAndMetadataChangeWrites(t *testing.T) 
 }
 
 func TestSpamUnchangedTimestampPreservesFileAndEntryChangeWrites(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "internal", "blocking", "default_spam_filter.json"))
+	raw, err := os.ReadFile(filepath.Join("..", "blocking", "default_spam_filter.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

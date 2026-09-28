@@ -17,7 +17,7 @@ import (
 
 	runtimeconfig "hitkeep/config"
 	"hitkeep/devtool/devmcp"
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 	json "hitkeep/jsonapi"
 )
 

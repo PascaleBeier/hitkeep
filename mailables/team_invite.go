@@ -1,7 +1,7 @@
 package mailables
 
 import (
-	"hitkeep/internal/mailer"
+	"hitkeep/mailer"
 )
 
 // TeamInvite implements the mailer.Mailable interface for team membership invites.

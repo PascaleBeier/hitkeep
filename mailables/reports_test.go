@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/config"
-	"hitkeep/internal/api"
-	"hitkeep/internal/mailer"
-	opportunitysvc "hitkeep/internal/opportunities"
+	"hitkeep/api"
+	"hitkeep/mailer"
+	opportunitysvc "hitkeep/opportunities"
 )
 
 type renderedReportDriver struct {

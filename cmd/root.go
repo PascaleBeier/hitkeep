@@ -160,7 +160,7 @@ func newUpdateAIAgentListsCommand(logger *slog.Logger) *cobra.Command {
 	return newUpdateListCommand(logger, updateListCommandSpec{
 		use:               "update-ai-agent-lists",
 		short:             "Update AI agent lists",
-		outputDefault:     "internal/aianalytics/default_ai_agents.json",
+		outputDefault:     "aianalytics/default_ai_agents.json",
 		outputDescription: "Output path for the assembled AI agent master list",
 		run: func(ctx context.Context, outputPath string, _ *runtimeconfig.Config, out, errOut io.Writer, logger *slog.Logger) error {
 			return UpdateAIAgentLists(ctx, outputPath, out, errOut, logger)

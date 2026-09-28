@@ -14,7 +14,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"hitkeep/internal/devtool"
+	"hitkeep/devtool"
 )
 
 const (

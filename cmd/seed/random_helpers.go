@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/internal/api"
+	"hitkeep/api"
 )
 
 func hasAPIClientNamed(clients []api.APIClient, name string) bool {

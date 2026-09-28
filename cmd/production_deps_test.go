@@ -21,7 +21,7 @@ func TestProductionCommandDoesNotDependOnGenerators(t *testing.T) {
 	}
 	for _, unwanted := range []string{
 		"hitkeep/cmd/ipmeta-generate",
-		"hitkeep/internal/ipmeta/ipmetagen",
+		"hitkeep/ipmeta/ipmetagen",
 		"github.com/DataDog/zstd",
 		"github.com/ip2location/ip2location-go/v9",
 		"lukechampine.com/uint128",
@@ -33,12 +33,12 @@ func TestProductionCommandDoesNotDependOnGenerators(t *testing.T) {
 }
 
 func TestSpamFeedPackageDoesNotDependOnDatabase(t *testing.T) {
-	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", "hitkeep/internal/blocking/spamfeed").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", "hitkeep/blocking/spamfeed").CombinedOutput()
 	if err != nil {
 		t.Fatalf("go list spam feed deps: %v\n%s", err, out)
 	}
 	for dep := range strings.FieldsSeq(string(out)) {
-		if dep == "hitkeep/internal/database" || strings.Contains(dep, "duckdb") {
+		if dep == "hitkeep/database" || strings.Contains(dep, "duckdb") {
 			t.Fatalf("spam feed package must not depend on %s", dep)
 		}
 	}
@@ -49,8 +49,8 @@ func TestMaintenanceDependencyBoundaries(t *testing.T) {
 		path      string
 		forbidden []string
 	}{
-		{path: "hitkeep/cmd/data-refresh", forbidden: []string{"hitkeep/cmd", "hitkeep/internal/server", "hitkeep/internal/database", "github.com/duckdb/duckdb-go/v2"}},
-		{path: "hitkeep/internal/duckdbextensions/update", forbidden: []string{"hitkeep/internal/ipmeta/ipmetagen", "github.com/DataDog/zstd", "github.com/ip2location/ip2location-go/v9"}},
+		{path: "hitkeep/cmd/data-refresh", forbidden: []string{"hitkeep/cmd", "hitkeep/server", "hitkeep/database", "github.com/duckdb/duckdb-go/v2"}},
+		{path: "hitkeep/duckdbextensions/update", forbidden: []string{"hitkeep/ipmeta/ipmetagen", "github.com/DataDog/zstd", "github.com/ip2location/ip2location-go/v9"}},
 	} {
 		out, err := exec.CommandContext(t.Context(), "go", "list", "-deps", tc.path).CombinedOutput()
 		if err != nil {
@@ -111,7 +111,7 @@ func TestDataRefreshWorkflowContracts(t *testing.T) {
 		"run: go run ./cmd/data-refresh ipmeta",
 		"IP2LOCATION_DOWNLOAD_TOKEN: ${{ secrets.IP2LOCATION_DOWNLOAD_TOKEN }}",
 		"run: go run ./cmd/data-refresh duckdb",
-		"run: go run ./internal/duckdbextensions/update -check",
+		"run: go run ./duckdbextensions/update -check",
 		"GH_TOKEN: ${{ secrets.GHT }}",
 		"git status --porcelain=v1 -z --untracked-files=all",
 		"--force-with-lease=refs/heads/$BRANCH:",
@@ -123,7 +123,7 @@ func TestDataRefreshWorkflowContracts(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"-ip2location-token",
-		"git add internal/ipmeta",
+		"git add ipmeta",
 		"git push --force origin",
 	} {
 		if strings.Contains(contents, forbidden) {

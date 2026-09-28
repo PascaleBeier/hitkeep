@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
+	"hitkeep/api"
+	"hitkeep/database"
 )
 
 func seedAdditionalUsers(ctx context.Context, store *database.Store) {

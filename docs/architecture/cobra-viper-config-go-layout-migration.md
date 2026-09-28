@@ -1,3 +1,5 @@
+> Status (2026-09-28): the remaining Go package trees have moved from `internal/` to the module root as one mechanical path change. The dependency-ordered move procedure below describes the earlier plan; final source-bound QA and release gates are still required.
+
 # HitKeep 2.x Cobra, Viper, Configuration, Filesystem, and Go Layout Migration
 
 Status: implementation in progress

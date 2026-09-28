@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/hklog"
-	"hitkeep/internal/api"
-	"hitkeep/internal/database"
-	"hitkeep/internal/opportunities"
+	"hitkeep/api"
+	"hitkeep/database"
+	"hitkeep/opportunities"
 )
 
 func seedOpportunities(ctx context.Context, sharedStore, analyticsStore *database.Store, site api.Site, actorID uuid.UUID, from, to time.Time) (int, error) {

@@ -21,8 +21,8 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"hitkeep/config"
-	"hitkeep/internal/database"
-	"hitkeep/internal/worker"
+	"hitkeep/database"
+	"hitkeep/worker"
 	json "hitkeep/jsonapi"
 )
 

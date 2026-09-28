@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"hitkeep/internal/database"
+	"hitkeep/database"
 )
 
 type fixture struct {

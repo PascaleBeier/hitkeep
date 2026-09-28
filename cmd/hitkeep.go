@@ -19,15 +19,15 @@ import (
 	"hitkeep/cluster"
 	"hitkeep/config"
 	"hitkeep/hklog"
-	"hitkeep/internal/database"
-	"hitkeep/internal/duckdbextensions"
-	"hitkeep/internal/entitlements"
-	"hitkeep/internal/ingest"
-	"hitkeep/internal/mailer"
-	"hitkeep/internal/searchconsole"
-	"hitkeep/internal/server"
-	"hitkeep/internal/webhookdispatcher"
-	"hitkeep/internal/worker"
+	"hitkeep/database"
+	"hitkeep/duckdbextensions"
+	"hitkeep/entitlements"
+	"hitkeep/ingest"
+	"hitkeep/mailer"
+	"hitkeep/searchconsole"
+	"hitkeep/server"
+	"hitkeep/webhookdispatcher"
+	"hitkeep/worker"
 	"hitkeep/public"
 	"hitkeep/realtime"
 )
@@ -151,7 +151,7 @@ func runContext(ctx context.Context, logger *slog.Logger, args []string, configF
 		go cloudLifecycleWorker.Start(gCtx)
 
 		// Start cloud retention sync worker (daily reconciliation safety net
-		// for the webhook-triggered sync in internal/server/cloud). No-op in
+		// for the webhook-triggered sync in server/cloud). No-op in
 		// non-billing builds.
 		cloudRetentionSyncWorker := worker.NewCloudRetentionSyncWorker(tenantMgr, entitlements.NewService(store, ent, conf), conf)
 		go cloudRetentionSyncWorker.Start(gCtx)

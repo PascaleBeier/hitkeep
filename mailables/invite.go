@@ -1,6 +1,6 @@
 package mailables
 
-import "hitkeep/internal/mailer"
+import "hitkeep/mailer"
 
 // UserInvite implements the mailer.Mailable interface
 type UserInvite struct {
