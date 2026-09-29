@@ -137,7 +137,7 @@ describe('WebhooksPage', () => {
         fixture.componentInstance['webhooks'].set([webhook]);
         await fixture.whenStable();
 
-        const table = fixture.nativeElement.querySelector('.hk-crud-table') as HTMLElement | null;
+        const table = fixture.nativeElement.querySelector('app-table') as HTMLElement | null;
         const row = table?.querySelector('tbody tr') as HTMLElement | null;
 
         expect(table).not.toBeNull();
@@ -245,7 +245,7 @@ describe('WebhooksPage', () => {
         await fixture.whenStable();
 
         const dialog = document.body.querySelector('.p-dialog') as HTMLElement | null;
-        const table = dialog?.querySelector('.hk-crud-table') as HTMLElement | null;
+        const table = dialog?.querySelector('app-table') as HTMLElement | null;
 
         expect(table).not.toBeNull();
         expect(table?.querySelectorAll('th.p-datatable-sortable-column').length).toBe(5);

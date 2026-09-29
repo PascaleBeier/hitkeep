@@ -45,7 +45,7 @@ export class TableRowActions {
             TableRowActions.activeComponent?.isOpen.set(false);
         }
 
-        this.openMenuItems.set(this.items().map((item) => this.toMenuItem(item)));
+        this.openMenuItems.set(this.items().map((item) => this.toMenuItem(item, menu)));
         menu.show(event);
         this.isOpen.set(true);
         TableRowActions.activeMenu = menu;
@@ -61,12 +61,20 @@ export class TableRowActions {
         this.openMenuItems.set([]);
     }
 
-    private toMenuItem(item: TableRowActionItem): MenuItem {
+    private toMenuItem(item: TableRowActionItem, menu: Menu): MenuItem {
         const styleClass = [item['styleClass'], item.danger ? 'table-row-actions-menu__item--danger' : ''].filter(Boolean).join(' ');
+        const command = item['command'] as MenuItem['command'];
         return {
             ...item,
             styleClass,
-            items: item.items?.map((child) => this.toMenuItem(child))
+            // Running a command closes the popup without a reliable onHide, so reset here too.
+            command: command
+                ? (event) => {
+                      this.clearActiveMenu(menu);
+                      command(event);
+                  }
+                : undefined,
+            items: item.items?.map((child) => this.toMenuItem(child, menu))
         };
     }
 }

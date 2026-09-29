@@ -5,15 +5,12 @@ import { firstValueFrom } from 'rxjs';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
 import { FileUpload, FileUploadHandlerEvent, FileUploadModule, FileRemoveEvent, FileSelectEvent } from '@openng/optimus-ui/fileupload';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { ProgressBarModule } from '@openng/optimus-ui/progressbar';
 import { TagModule } from '@openng/optimus-ui/tag';
-import { TableModule } from '@openng/optimus-ui/table';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { PageState } from '@components/page-state/page-state';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { SiteService } from '@features/sites/services/site.service';
 import { AccessService } from '@services/access.service';
 import { ImportJob, ImportManifest, ImportProviderDescriptor, ImportsService } from '@services/imports.service';
@@ -82,7 +79,7 @@ function safeList<T>(value: readonly T[] | null | undefined): T[] {
 
 @Component({
     selector: 'app-imports',
-    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, ProgressBarModule, TagModule, TableModule, PageState],
+    imports: [DatePipe, DecimalPipe, TranslocoPipe, ButtonModule, CardModule, FileUploadModule, MessageModule, ProgressBarModule, TagModule, PageState, AppTable, AppTableCell, AppTableSlot],
     templateUrl: './import.html',
     styleUrl: './import.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -138,6 +135,18 @@ export class ImportPage {
     protected readonly availableEventDimensionsPreview = computed(() => previewList(this.manifest()?.event_dimension_coverage.available, 10));
     protected readonly unavailableEventDimensionsPreview = computed(() => previewList(this.manifest()?.event_dimension_coverage.unavailable, 10));
     protected readonly showDatasetEventsColumn = computed(() => importManifestHasDatasetEvents(this.manifest()));
+    protected readonly datasetColumns = computed<AppTableColumn[]>(() => [
+        { field: 'name', headerKey: 'imports.datasets.dataset', frozen: true },
+        { field: 'rows_accepted', headerKey: 'imports.datasets.rows', type: 'number', align: 'end', total: true },
+        { field: 'pageviews', headerKey: 'imports.datasets.pageviews', type: 'number', align: 'end', total: true },
+        ...(this.showDatasetEventsColumn() ? [{ field: 'events', headerKey: 'imports.datasets.events', type: 'number', align: 'end', total: true } satisfies AppTableColumn] : [])
+    ]);
+    protected readonly historyColumns: AppTableColumn<ImportJob>[] = [
+        { field: 'provider', headerKey: 'imports.history.importer', frozen: true },
+        { field: 'status', headerKey: 'imports.history.status', type: 'enum', groupable: true, labelKeyPrefix: 'imports.status.' },
+        { field: 'rows_imported', headerKey: 'imports.history.rows', type: 'number', align: 'end' },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' }
+    ];
     protected readonly showEventCoverage = computed(() => importManifestHasEventCoverage(this.manifest()));
     protected readonly showEventProperties = computed(() => importManifestHasEventProperties(this.manifest()));
     protected readonly showEventDimensions = computed(() => importManifestHasEventDimensions(this.manifest()));

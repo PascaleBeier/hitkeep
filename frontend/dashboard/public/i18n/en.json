@@ -3990,5 +3990,23 @@
     "invalid": { "title": "This confirmation link is unavailable", "description": "It may be invalid, expired, already used, or replaced by a newer invitation. Ask the report manager to resend it." },
     "confirmed": { "title": "Report delivery confirmed", "description": "You will receive future scheduled reports. Reports sent before confirmation are not resent." },
     "declined": { "title": "Report delivery declined", "description": "You will not receive this report unless you accept a fresh confirmation later." }
+  },
+  "table": {
+    "pageReport": "{first}–{last} of {totalRecords}",
+    "searchChip": "Search: {{value}}",
+    "groupBy": "Group by",
+    "columns": "Columns",
+    "resetView": "Reset view",
+    "expand": "Expand",
+    "expandRow": "Show details",
+    "collapseRow": "Hide details",
+    "groupCount": "{{count}} rows",
+    "noValue": "No value",
+    "any": "Any",
+    "dateRange": "Date range",
+    "noResults": "No rows match the current filters.",
+    "clearFilters": "Clear filters",
+    "empty": "Nothing here yet.",
+    "total": "Total"
   }
 }

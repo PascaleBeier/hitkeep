@@ -43,7 +43,7 @@ async function expectBreakdownRow(page, tabName, valuePattern) {
     await page.getByRole("tab", { name: tabName }).click();
     const panel = page.getByRole("tabpanel", { name: tabName });
     await expect(panel).toBeVisible();
-    await expect(panel.locator(".web-vitals-table tbody tr").filter({ hasText: valuePattern }).first()).toBeVisible();
+    await expect(panel.locator("app-table tbody tr.app-table__row").filter({ hasText: valuePattern }).first()).toBeVisible();
 }
 
 test("web vitals dashboard renders seeded data and filters", async ({ page }) => {
@@ -58,7 +58,7 @@ test("web vitals dashboard renders seeded data and filters", async ({ page }) =>
     await expect(page.getByRole("heading", { name: "LCP p75 trend" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Rating mix" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Page breakdown" })).toBeVisible();
-    await expect(page.locator(".web-vitals-table tbody tr").filter({ hasText: "/" }).first()).toBeVisible();
+    await expect(page.locator("app-table tbody tr.app-table__row").filter({ hasText: "/" }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Inspect INP over time" }).click();
     await expect(page.getByRole("heading", { name: "INP p75 trend" })).toBeVisible();
@@ -66,15 +66,15 @@ test("web vitals dashboard renders seeded data and filters", async ({ page }) =>
     await page.getByRole("button", { name: /^Good\s+\d+/ }).click();
     await expect(page.getByText("Rating: Good")).toBeVisible();
 
-    await page.locator(".web-vitals-table tbody tr").filter({ hasText: "/pricing" }).first().click();
+    await page.locator("app-table tbody tr.app-table__row").filter({ hasText: "/pricing" }).first().click();
     await expect(page.getByText("Path: /pricing")).toBeVisible();
-    await expect(page.locator(".web-vitals-table tbody tr").filter({ hasText: "/pricing" }).first()).toBeVisible();
+    await expect(page.locator("app-table tbody tr.app-table__row").filter({ hasText: "/pricing" }).first()).toBeVisible();
     await page.getByRole("tab", { name: "Browsers" }).click();
     const browsersPanel = page.getByRole("tabpanel", { name: "Browsers" });
     await expect(browsersPanel).toBeVisible();
     await expect(
         browsersPanel
-            .locator(".web-vitals-table tbody tr")
+            .locator("app-table tbody tr.app-table__row")
             .filter({ hasText: /Chrome|Safari|Firefox|Edge/ })
             .first()
     ).toBeVisible();
@@ -96,7 +96,7 @@ test("shared dashboard exposes seeded Web Vitals", async ({ page }) => {
     await expect(page).toHaveURL(new RegExp(`/share/${E2E_SHARE_TOKEN}/web-vitals`));
     await expect(page.getByRole("button", { name: "Inspect LCP over time" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "LCP p75 trend" })).toBeVisible();
-    await expect(page.locator(".web-vitals-table tbody tr").filter({ hasText: "/" }).first()).toBeVisible();
+    await expect(page.locator("app-table tbody tr.app-table__row").filter({ hasText: "/" }).first()).toBeVisible();
     await expectBreakdownRow(page, "Cities", SEEDED_CITY_RE);
     await expectBreakdownRow(page, "Providers", SEEDED_PROVIDER_RE);
     await expectBreakdownRow(page, "ASNs", SEEDED_ASN_RE);

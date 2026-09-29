@@ -12,23 +12,6 @@
     margin-bottom: 1rem;
 }
 
-.report-list-toolbar {
-    justify-content: space-between;
-    border: 1px solid var(--p-content-border-color);
-    border-bottom: 0;
-    border-radius: 0.75rem 0.75rem 0 0;
-    background: var(--p-content-background);
-    padding: 0.65rem 0.75rem;
-}
-
-.report-list-toolbar .hk-crud-search {
-    width: min(24rem, 100%);
-}
-
-.report-mobile-view {
-    display: none;
-}
-
 .report-skeleton-list {
     overflow: hidden;
     border: 1px solid var(--p-content-border-color);
@@ -104,7 +87,6 @@
     color: var(--p-text-muted-color);
 }
 
-.report-outcome-heading,
 .report-outcome-cell {
     width: 8rem;
     text-align: center;
@@ -116,12 +98,6 @@
 
 .report-row--focused > td:first-child {
     box-shadow: inset 3px 0 0 var(--p-primary-color);
-}
-
-.report-table-empty {
-    padding: 2.5rem 1rem;
-    color: var(--p-text-muted-color);
-    text-align: center;
 }
 
 .editor-flow {
@@ -300,33 +276,6 @@
     text-align: center;
 }
 
-@media (min-width: 768px) {
-    .report-desktop-table {
-        border-radius: 0 0 0.75rem 0.75rem;
-    }
-
-    :host ::ng-deep .report-desktop-table .report-sticky-identity {
-        position: sticky;
-        left: 0;
-        z-index: 2;
-        background: var(--p-content-background);
-        box-shadow: 1px 0 0 var(--p-content-border-color);
-    }
-
-    :host ::ng-deep .report-desktop-table th.report-sticky-identity,
-    :host ::ng-deep .report-desktop-table th.report-sticky-actions {
-        z-index: 3;
-    }
-
-    :host ::ng-deep .report-desktop-table .report-sticky-actions {
-        position: sticky;
-        right: 0;
-        z-index: 2;
-        background: var(--p-content-background);
-        box-shadow: -1px 0 0 var(--p-content-border-color);
-    }
-}
-
 @media (max-width: 767px) {
     .reporting-content {
         padding-inline: 0.75rem;
@@ -341,45 +290,15 @@
         width: 100%;
     }
 
-    .report-desktop-table {
-        display: none;
-    }
-
-    .report-mobile-view {
-        display: block;
-        border: 1px solid var(--p-content-border-color);
-        border-radius: 0 0 0.75rem 0.75rem;
-        background: var(--p-content-background);
-    }
-
-    .report-list-toolbar {
-        border-radius: 0.75rem 0.75rem 0 0;
-    }
-
-    .report-mobile-sort {
-        display: grid;
-        gap: 0.4rem;
-        border-bottom: 1px solid var(--p-content-border-color);
-        padding: 0.75rem;
-    }
-
-    .report-mobile-sort > label,
     .report-mobile-row dt {
         color: var(--p-text-muted-color);
         font-size: 0.75rem;
         font-weight: 600;
     }
 
-    .report-mobile-sort > div {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 0.5rem;
-    }
-
     .report-mobile-row {
         min-width: 0;
-        border-bottom: 1px solid var(--p-content-border-color);
-        padding: 1rem 0.75rem;
+        padding: 0.25rem 0;
     }
 
     .report-mobile-row > header {
@@ -436,10 +355,6 @@
     .report-mobile-recipients > span > span {
         min-width: 0;
         overflow-wrap: anywhere;
-    }
-
-    :host ::ng-deep .report-mobile-view .p-paginator {
-        border-top: 1px solid var(--p-content-border-color);
     }
 
     .schedule-grid,

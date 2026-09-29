@@ -2,36 +2,6 @@
     display: block;
 }
 
-.ecommerce-filter-row {
-    cursor: pointer;
-}
-
-.ecommerce-filter-row:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--p-primary-color) 48%, transparent);
-    outline-offset: -2px;
-}
-
-.ecommerce-filter-row--active > td {
-    background: color-mix(in srgb, var(--p-primary-color) 9%, var(--p-content-background));
-    box-shadow:
-        inset 0 1px 0 var(--p-primary-color),
-        inset 0 -1px 0 var(--p-primary-color);
-}
-
-.ecommerce-filter-row--active > td:first-child {
-    box-shadow:
-        inset 1px 0 0 var(--p-primary-color),
-        inset 0 1px 0 var(--p-primary-color),
-        inset 0 -1px 0 var(--p-primary-color);
-}
-
-.ecommerce-filter-row--active > td:last-child {
-    box-shadow:
-        inset -1px 0 0 var(--p-primary-color),
-        inset 0 1px 0 var(--p-primary-color),
-        inset 0 -1px 0 var(--p-primary-color);
-}
-
 .ecommerce-source-cell {
     align-items: center;
     display: flex;
@@ -67,7 +37,7 @@
     width: 0;
 }
 
-.ecommerce-filter-row:hover .ecommerce-source-cell__link,
+:host ::ng-deep tr:hover .ecommerce-source-cell__link,
 .ecommerce-source-cell__link:focus-visible {
     margin-left: 0;
     opacity: 1;

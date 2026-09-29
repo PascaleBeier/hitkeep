@@ -10,27 +10,23 @@ import { ColorPickerModule } from '@openng/optimus-ui/colorpicker';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
 import { DrawerModule } from '@openng/optimus-ui/drawer';
 import { FileSelectEvent, FileUploadModule } from '@openng/optimus-ui/fileupload';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputNumberModule } from '@openng/optimus-ui/inputnumber';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { SplitButtonModule } from '@openng/optimus-ui/splitbutton';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { TextareaModule } from '@openng/optimus-ui/textarea';
 import { buildTakeoutExportMenuItems, TakeoutExportFormat } from '@core/export/export-formats';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { CopyControl } from '@components/copy-control/copy-control';
-import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { MetricCardGroup, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -72,24 +68,20 @@ const QR_CORNER_OPTIONS = ['square', 'dot', 'extra-rounded'] as const;
         ConfirmDialogModule,
         DrawerModule,
         FileUploadModule,
-        IconFieldModule,
-        InputIconModule,
         InputNumberModule,
         InputTextModule,
         SelectModule,
         SplitButtonModule,
-        TableModule,
         TagModule,
         TextareaModule,
         CopyControl,
-        CrudTableToolbar,
         DialogShell,
         PageBreadcrumb,
         PageHeader,
         PageHeaderLeft,
         PageState,
-        RelativeDateTime,
-        TableRowActions,
+        AppTable,
+        AppTableCell,
         ReportRangeToolbar,
         KpiCard,
         MetricCardGroup,
@@ -137,6 +129,20 @@ export class QRCodesPage {
     protected readonly shareCreating = signal(false);
     protected readonly deletingShareID = signal<string | null>(null);
     protected readonly archivingQRID = signal<string | null>(null);
+    protected readonly qrColumns: AppTableColumn<QRCode>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        { field: 'destination_url', headerKey: 'qrCodes.fields.destinationUrl' },
+        { field: 'utm_campaign', headerKey: 'utmBuilder.form.campaignLabel', type: 'enum', groupable: true },
+        { field: 'has_asset', headerKey: 'qrCodes.fields.asset', type: 'boolean' },
+        { field: 'updated_at', headerKey: 'common.columns.updated', type: 'date' }
+    ];
+    protected readonly shareColumns: AppTableColumn<QRCodeShareLink>[] = [
+        { field: 'token_hint', headerKey: 'qrCodes.share.tokenHint', frozen: true },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
+        { field: 'url', headerKey: 'qrCodes.share.url' }
+    ];
+    protected readonly qrActionLoading = (qr: QRCode) => this.archivingQRID() === qr.id;
+    protected readonly shareActionLoading = (link: QRCodeShareLink) => this.deletingShareID() === link.id;
     protected readonly pageNotice = signal<ShareNotice | null>(null);
 
     private listRequestID = 0;
@@ -573,7 +579,7 @@ export class QRCodesPage {
         return token ? `/share/${token}${path}` : path;
     }
 
-    protected qrActions(qr: QRCode): TableRowActionItem[] {
+    protected readonly qrActions = (qr: QRCode): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [
             {
@@ -605,9 +611,9 @@ export class QRCodesPage {
             );
         }
         return actions;
-    }
+    };
 
-    protected shareLinkActions(link: QRCodeShareLink): TableRowActionItem[] {
+    protected readonly shareLinkActions = (link: QRCodeShareLink): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -625,7 +631,7 @@ export class QRCodesPage {
                 command: () => this.confirmDeleteShare(link)
             }
         ];
-    }
+    };
 
     protected copyShareLink(link: QRCodeShareLink): void {
         if (!link.url) return;

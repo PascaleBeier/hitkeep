@@ -5,10 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { finalize } from 'rxjs';
 import { ButtonModule } from '@openng/optimus-ui/button';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { TableModule } from '@openng/optimus-ui/table';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
@@ -17,8 +14,8 @@ import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { ShareLink, ShareService } from '@services/share.service';
 import { SiteService } from '@features/sites/services/site.service';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 
 interface ShareNotice {
     kind: 'success' | 'error';
@@ -27,7 +24,7 @@ interface ShareNotice {
 
 @Component({
     selector: 'app-share-dashboard-link',
-    imports: [ButtonModule, DialogShell, IconFieldModule, InputIconModule, InputTextModule, TableModule, ConfirmDialogModule, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [ButtonModule, DialogShell, InputTextModule, ConfirmDialogModule, AppTable, AppTableCell, TranslocoPipe],
     providers: [ConfirmationService],
     templateUrl: './share-dashboard-link.html',
     styleUrl: './share-dashboard-link.css',
@@ -48,6 +45,12 @@ export class ShareDashboardLink {
     protected linksLoading = signal(false);
     protected createLoading = signal(false);
     protected deletingShareId = signal<string | null>(null);
+    protected readonly shareLinkColumns: AppTableColumn<ShareLink>[] = [
+        { field: 'token_hint', headerKey: 'share.dialog.tokenHintLabel', frozen: true },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
+        { field: 'url', headerKey: 'share.dialog.shareUrlLabel' }
+    ];
+    protected readonly shareLinkActionLoading = (link: ShareLink) => this.deletingShareId() === link.id;
     protected notice = signal<ShareNotice | null>(null);
     private shareSiteId = signal<string | null>(null);
     protected readonly canManageShares = computed(() => {
@@ -128,7 +131,7 @@ export class ShareDashboardLink {
         });
     }
 
-    protected shareLinkActions(link: ShareLink): TableRowActionItem[] {
+    protected readonly shareLinkActions = (link: ShareLink): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -146,7 +149,7 @@ export class ShareDashboardLink {
                 command: () => this.confirmDeleteShareLink(link)
             }
         ];
-    }
+    };
 
     protected resetShareDialog() {
         this.showShareDialog.set(false);

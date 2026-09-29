@@ -7,17 +7,14 @@ import { finalize } from 'rxjs';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { CountryOption, countryDisplayName, countryOptions } from '@core/i18n/country-options';
 import { countryFlagUrl } from '@core/i18n/flag-utils';
@@ -49,16 +46,15 @@ type ExclusionRow = IPExclusion & {
         NgOptimizedImage,
         ButtonModule,
         ConfirmDialogModule,
-        IconFieldModule,
-        InputIconModule,
         InputTextModule,
         MessageModule,
         SelectModule,
-        TableModule,
         TagModule,
         CopyControl,
         CrudDialog,
-        RelativeDateTime,
+        AppTable,
+        AppTableCell,
+        AppTableSlot,
         SettingsCard,
         TableRowActions,
         TranslocoPipe
@@ -82,6 +78,13 @@ export class TeamExclusionsPage {
     protected readonly createError = signal<string | null>(null);
     protected readonly actionStatus = signal<ActionStatus | null>(null);
     protected readonly deletingRuleID = signal<string | null>(null);
+    protected readonly exclusionColumns: AppTableColumn<ExclusionRow>[] = [
+        { field: 'value_label', headerKey: 'admin.team.exclusions.columns.value', frozen: true },
+        { field: 'type_label', headerKey: 'admin.team.exclusions.columns.type', type: 'enum', groupable: true },
+        { field: 'description', headerKey: 'admin.team.exclusions.columns.description' },
+        { field: 'created_at', headerKey: 'admin.team.exclusions.columns.created', type: 'date' }
+    ];
+    protected readonly ruleActionLoading = (rule: IPExclusion) => this.deletingRuleID() === rule.id;
     protected readonly isAddDialogVisible = signal(false);
     protected readonly isCurrentIPLoading = signal(false);
     protected readonly currentIPCIDR = signal('');
@@ -198,7 +201,7 @@ export class TeamExclusionsPage {
         }
     }
 
-    protected ruleActions(rule: IPExclusion): TableRowActionItem[] {
+    protected readonly ruleActions = (rule: IPExclusion): TableRowActionItem[] => {
         if (rule.inherited) {
             return [];
         }
@@ -211,7 +214,7 @@ export class TeamExclusionsPage {
                 command: () => this.confirmDeleteRule(rule)
             }
         ];
-    }
+    };
 
     protected confirmDeleteRule(rule: IPExclusion): void {
         const team = this.activeTeam();

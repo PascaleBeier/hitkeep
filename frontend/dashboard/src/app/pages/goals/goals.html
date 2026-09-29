@@ -73,49 +73,26 @@
                 <h2 class="text-lg font-semibold">{{ 'goals.definitions.title' | transloco }}</h2>
                 <p class="text-sm text-muted-color mt-1">{{ 'goals.definitions.count' | transloco: { count: goals().length } }}</p>
             </div>
-            <input pInputText #search [placeholder]="'common.searchPlaceholder' | transloco" [attr.aria-label]="'common.searchPlaceholder' | transloco" (input)="goalsTable.filterGlobal(search.value, 'contains')" class="w-full sm:w-64" />
         </div>
-        <div class="hk-crud-table-wrap">
-            <p-table #goalsTable [value]="goals()" [loading]="goalsLoading()" [paginator]="goals().length > 10" [rows]="10" [globalFilterFields]="['name', 'type', 'value']" sortField="name" [sortOrder]="1" styleClass="hk-crud-table p-datatable-sm">
-                <ng-template pTemplate="header"
-                    ><tr>
-                        <th pSortableColumn="name">
-                            {{ 'common.columns.name' | transloco }}
-                            <p-sortIcon field="name" />
-                        </th>
-                        <th pSortableColumn="type">
-                            {{ 'common.columns.type' | transloco }}
-                            <p-sortIcon field="type" />
-                        </th>
-                        <th>{{ 'common.columns.value' | transloco }}</th>
-                        <th pSortableColumn="conversions">{{ 'goals.kpis.conversions' | transloco }}</th>
-                        <th>{{ 'common.kpis.conversionRate' | transloco }}</th>
-                        @if (canManage()) {
-                        <th class="hk-actions-column">{{ 'common.columns.actions' | transloco }}</th>
-                        }
-                    </tr></ng-template
-                >
-                <ng-template pTemplate="body" let-goal>
-                    <tr class="cursor-pointer" [class.bg-highlight]="selectedGoalId() === goal.id" (click)="selectGoal(goal.id)" tabindex="0" (keydown.enter)="selectGoal(goal.id)" (keydown.space)="$event.preventDefault(); selectGoal(goal.id)">
-                        <td class="font-medium">{{ goal.name }}</td>
-                        <td>{{ ('goals.types.' + goal.type) | transloco }}</td>
-                        <td class="font-mono text-sm">{{ goal.value }}</td>
-                        <td>{{ conversionStats(goal)?.conversions ?? 0 }}</td>
-                        <td>{{ (conversionStats(goal)?.conversion_rate ?? 0) | translocoDecimal: { maximumFractionDigits: 1 } }}%</td>
-                        @if (canManage()) {
-                        <td class="hk-actions-cell" (click)="$event.stopPropagation()">
-                            <app-table-row-actions [items]="goalActions(goal)" [loading]="deletingGoalId() === goal.id" />
-                        </td>
-                        }
-                    </tr>
-                </ng-template>
-                <ng-template pTemplate="emptymessage"
-                    ><tr>
-                        <td [attr.colspan]="canManage() ? 6 : 5" class="text-center py-8 text-muted-color">{{ 'goals.manager.empty' | transloco }}</td>
-                    </tr></ng-template
-                >
-            </p-table>
-        </div>
+        <app-table
+            [value]="goalRows()"
+            [columns]="goalColumns"
+            stateKey="goals"
+            [loading]="goalsLoading()"
+            [defaultSort]="{ field: 'name', order: 1 }"
+            [rowActions]="canManage() ? goalActions : undefined"
+            [rowActionsLoading]="goalActionLoading"
+            [selectable]="true"
+            [rowSelected]="isSelectedGoal"
+            (rowSelect)="selectGoal($event.id)"
+            ariaLabelKey="goals.definitions.title"
+            emptyTextKey="goals.manager.empty"
+            data-testid="goals-table"
+        >
+            <ng-template appTableCell="name" let-goal><span class="font-medium">{{ goal.name }}</span></ng-template>
+            <ng-template appTableCell="value" let-goal><span class="font-mono text-sm">{{ goal.value }}</span></ng-template>
+            <ng-template appTableCell="conversion_rate" let-goal>{{ goal.conversion_rate | translocoDecimal: { maximumFractionDigits: 1 } }}%</ng-template>
+        </app-table>
     </p-card>
     }
 

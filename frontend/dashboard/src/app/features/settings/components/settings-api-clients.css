@@ -84,10 +84,6 @@
     gap: 0.45rem;
 }
 
-.api-client-date-cell {
-    white-space: nowrap;
-}
-
 :host-context(.p-dark) .api-client-required-asterisk,
 :host-context(.p-dark) .api-client-field-error {
     color: var(--p-red-300);

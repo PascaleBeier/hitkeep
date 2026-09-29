@@ -1,0 +1,177 @@
+:host {
+    display: block;
+    min-width: 0;
+    /* Size to the container, never to the rows: wide tables scroll inside so frozen columns stay in view. */
+    contain: inline-size;
+}
+
+.app-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.app-table__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.app-table__search {
+    display: block;
+    flex: 1 1 14rem;
+    max-width: 22rem;
+}
+
+.app-table__search input {
+    width: 100%;
+}
+
+.app-table__tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-inline-start: auto;
+}
+
+:host ::ng-deep .app-table__group-select,
+:host ::ng-deep .app-table__columns-select {
+    min-width: 9rem;
+}
+
+.app-table__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+
+/* Filter trigger sits at the cell's far edge, clear of the label and sort icon. */
+.app-table__heading > p-columnfilter {
+    margin-inline-start: auto;
+}
+
+:host ::ng-deep .app-table__table {
+    border: 1px solid var(--p-surface-border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+:host ::ng-deep .app-table__table .p-datatable-thead > tr > th {
+    white-space: nowrap;
+}
+
+.app-table__row--selectable {
+    cursor: pointer;
+}
+
+.app-table__row--selected > td {
+    background: var(--p-highlight-background);
+    color: var(--p-highlight-color);
+}
+
+.app-table__end {
+    text-align: end;
+}
+
+.app-table__end .app-table__heading {
+    justify-content: flex-end;
+}
+
+.app-table__end .app-table__heading > p-columnfilter {
+    margin-inline-start: 0;
+}
+
+.app-table__actions,
+.app-table__expander {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.app-table__actions {
+    text-align: end;
+}
+
+/* Scroll shadow on the frozen actions column once rows scroll beneath it. */
+:host ::ng-deep .app-table__table .p-datatable-frozen-column.app-table__actions {
+    box-shadow: -8px 0 8px -8px color-mix(in srgb, var(--p-text-color) 25%, transparent);
+}
+
+.app-table__actions app-table-row-actions {
+    display: inline-flex;
+    justify-content: flex-end;
+}
+
+.app-table__group > td {
+    background: color-mix(in srgb, var(--p-text-color) 4%, transparent);
+    padding-block: 0.375rem;
+}
+
+.app-table__group-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+}
+
+.app-table__group-label {
+    font-weight: 600;
+}
+
+.app-table__group-count {
+    color: var(--p-text-muted-color);
+    font-size: 0.8125rem;
+}
+
+.app-table__expanded > td {
+    background: color-mix(in srgb, var(--p-text-color) 4%, transparent);
+}
+
+.app-table__total > td {
+    font-weight: 600;
+}
+
+.app-table__empty {
+    padding-block: 2rem;
+    text-align: center;
+    color: var(--p-text-muted-color);
+}
+
+.app-table__card {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .app-table__search {
+        flex-basis: 100%;
+        max-width: none;
+    }
+
+    .app-table__tools {
+        margin-inline-start: 0;
+    }
+
+    .app-table--cards ::ng-deep .p-datatable-thead,
+    .app-table--cards .app-table__row {
+        display: none;
+    }
+
+    .app-table--cards .app-table__card {
+        display: table-row;
+    }
+
+    :host ::ng-deep .p-button {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+}

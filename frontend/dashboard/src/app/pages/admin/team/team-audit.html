@@ -4,6 +4,7 @@
         <p-message severity="secondary">{{ "admin.team.audit.readOnly" | transloco }}</p-message>
         } @else {
         <app-audit-table
+            stateKey="team-audit"
             [rows]="rows()"
             [total]="total()"
             [loading]="isLoading()"

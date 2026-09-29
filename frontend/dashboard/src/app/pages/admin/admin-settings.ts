@@ -5,7 +5,6 @@ import { DecimalPipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { TableModule } from '@openng/optimus-ui/table';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { TabsModule } from '@openng/optimus-ui/tabs';
@@ -23,7 +22,8 @@ import { dialogCancelButton, dialogDangerButton, dialogWarnButton } from '@compo
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { INSTANCE_CAPABILITIES } from '@core/access/capabilities';
 import type { InstanceRole } from '@core/access/capabilities';
 import { formatDurationInterval } from '@core/i18n/duration-format';
@@ -121,7 +121,6 @@ interface StatusState {
         DecimalPipe,
         ReactiveFormsModule,
         ConfirmDialogModule,
-        TableModule,
         ButtonModule,
         SelectModule,
         TabsModule,
@@ -139,7 +138,8 @@ interface StatusState {
         SystemAudit,
         CopyControl,
         RelativeDateTime,
-        TableRowActions,
+        AppTable,
+        AppTableCell,
         TranslocoPipe
     ],
     templateUrl: './admin-settings.html',
@@ -328,6 +328,30 @@ export class AdminSettings implements OnInit {
         return !this.canRunMaintenance() || !cleanup?.enabled || cleanup.stale_files === 0;
     });
     protected readonly activationRows = computed(() => this.systemActivation()?.rows ?? []);
+    protected readonly cacheColumns: AppTableColumn[] = [
+        { field: 'name', headerKey: 'admin.system.caches.columns.cache', frozen: true },
+        { field: 'size', headerKey: 'admin.system.caches.columns.size', type: 'number', align: 'end' },
+        { field: 'maxSize', headerKey: 'admin.system.caches.columns.maxSize', type: 'number', align: 'end' },
+        { field: 'ttl', headerKey: 'admin.system.caches.columns.ttl' },
+        { field: 'pressure', headerKey: 'admin.system.console.pressure', type: 'number', align: 'end' }
+    ];
+    protected readonly activationColumns: AppTableColumn<SystemActivationRow>[] = [
+        { field: 'site_domain', headerKey: 'common.columns.domain', frozen: true },
+        { field: 'team_name', headerKey: 'admin.system.activation.columns.team', type: 'enum', groupable: true },
+        {
+            field: 'status',
+            headerKey: 'common.columns.status',
+            type: 'enum',
+            groupable: true,
+            options: (['waiting', 'live', 'dormant', 'domain_mismatch'] as const).map((status) => ({ value: status, labelKey: `admin.system.activation.status.${status}` }))
+        },
+        { field: 'last_hit_at', headerKey: 'admin.system.activation.columns.lastHit', type: 'date' },
+        { field: 'last_event_at', headerKey: 'admin.system.activation.columns.lastEvent', type: 'date' },
+        { field: 'hits_last_24h', headerKey: 'admin.system.activation.columns.hits24h', type: 'number', align: 'end', total: true },
+        { field: 'hits_last_7d', headerKey: 'admin.system.activation.columns.hits7d', type: 'number', align: 'end', total: true },
+        { field: 'events_last_7d', headerKey: 'admin.system.activation.columns.events7d', type: 'number', align: 'end', total: true }
+    ];
+    protected readonly activationActionLoading = (row: SystemActivationRow) => this.openingActivationTeamId() === row.team_id;
     protected readonly activationLiveSites = computed(() => this.activationRows().filter((row) => row.status === 'live').length);
     protected readonly activationStatusOptions = computed(() => {
         this.activeLanguage();
@@ -405,6 +429,34 @@ export class AdminSettings implements OnInit {
     protected users = signal<User[]>([]);
     protected sites = signal<Site[]>([]);
     protected teams = signal<AdminTeam[]>([]);
+    protected readonly siteRows = computed(() => this.sites().map((site) => ({ ...site, owner_email: this.siteOwnerEmail(site) })));
+    protected readonly teamRows = computed(() => this.teams().map((team) => ({ ...team, status: team.is_default ? 'default' : team.is_archived ? 'archived' : 'active' })));
+    protected readonly userColumns = computed<AppTableColumn<User>[]>(() => [
+        { field: 'email', headerKey: 'common.columns.email', frozen: true },
+        { field: 'instance_role', headerKey: 'common.columns.role', type: 'enum', groupable: true, options: this.roleOptions() },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' }
+    ]);
+    protected readonly siteColumns: AppTableColumn<Site>[] = [
+        { field: 'domain', headerKey: 'common.columns.domain', frozen: true },
+        { field: 'owner_email', headerKey: 'common.columns.owner', type: 'enum', groupable: true },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' }
+    ];
+    protected readonly teamColumns: AppTableColumn<AdminTeam & { status: string }>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        { field: 'member_count', headerKey: 'common.columns.members', type: 'number', align: 'end' },
+        { field: 'site_count', headerKey: 'common.columns.sites', type: 'number', align: 'end' },
+        {
+            field: 'status',
+            headerKey: 'common.columns.status',
+            type: 'enum',
+            groupable: true,
+            options: (['active', 'archived', 'default'] as const).map((status) => ({ value: status, labelKey: `admin.teams.status.${status}` }))
+        },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date', hidden: true }
+    ];
+    protected readonly userActionLoading = (user: User) => this.isDisablingUser(user) || this.isDeletingUser(user);
+    protected readonly siteActionLoading = (site: Site) => this.isDeletingSite(site);
+    protected readonly teamActionLoading = (team: AdminTeam) => this.isDeletingTeam(team);
     protected isLoading = signal(false);
     protected isLoadingSites = signal(false);
     protected isLoadingTeams = signal(false);
@@ -948,7 +1000,7 @@ export class AdminSettings implements OnInit {
             });
     }
 
-    protected userActions(user: User): TableRowActionItem[] {
+    protected readonly userActions = (user: User): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [];
         if (this.canDisableUserMfa()) {
@@ -970,9 +1022,9 @@ export class AdminSettings implements OnInit {
             command: () => this.confirmDeleteUser(user)
         });
         return actions;
-    }
+    };
 
-    protected siteActions(site: Site): TableRowActionItem[] {
+    protected readonly siteActions = (site: Site): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -983,9 +1035,9 @@ export class AdminSettings implements OnInit {
                 command: () => this.confirmDeleteSite(site)
             }
         ];
-    }
+    };
 
-    protected teamActions(team: AdminTeam): TableRowActionItem[] {
+    protected readonly teamActions = (team: AdminTeam): TableRowActionItem[] => {
         if (team.is_default) {
             return [];
         }
@@ -999,9 +1051,9 @@ export class AdminSettings implements OnInit {
                 command: () => this.confirmDeleteTeam(team)
             }
         ];
-    }
+    };
 
-    protected activationRowActions(row: SystemActivationRow): TableRowActionItem[] {
+    protected readonly activationRowActions = (row: SystemActivationRow): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -1021,7 +1073,7 @@ export class AdminSettings implements OnInit {
                 command: () => this.openActivationTeam(row)
             }
         ];
-    }
+    };
 
     private setActivationCopyStatus(status: 'success' | 'error') {
         this.activationCopyStatus.set(status);

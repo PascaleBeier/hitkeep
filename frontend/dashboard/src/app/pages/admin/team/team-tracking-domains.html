@@ -1,0 +1,152 @@
+<app-crud-dialog
+    [title]="'admin.team.settings.trackingDomains.addAction' | transloco"
+    [visible]="isAddDialogVisible()"
+    (visibleChange)="onAddDialogVisibleChange($event)"
+    [submitLabel]="'admin.team.settings.trackingDomains.addAction' | transloco"
+    [cancelLabel]="'common.actions.cancel' | transloco"
+    submitIcon="pi pi-plus"
+    [saving]="isAdding()"
+    (submitted)="submitAdd()"
+>
+    <form class="site-settings-dialog-form" [formGroup]="form" (ngSubmit)="submitAdd()">
+        <div class="site-settings-field">
+            <label for="team-tracking-domain-hostname">{{ 'admin.team.settings.trackingDomains.hostnameLabel' | transloco }}</label>
+            <input
+                id="team-tracking-domain-hostname"
+                type="text"
+                pInputText
+                class="w-full"
+                formControlName="hostname"
+                [placeholder]="'admin.team.settings.trackingDomains.hostnamePlaceholder' | transloco"
+                autocomplete="off"
+                autocapitalize="none"
+                spellcheck="false"
+            />
+            @if (hostnameControl.touched && hostnameControl.hasError('required')) {
+            <p-message severity="error" variant="simple" size="small">{{ 'admin.team.settings.trackingDomains.hostnameRequired' | transloco }}</p-message>
+            } @else if (hostnameControl.touched && hostnameControl.hasError('maxlength')) {
+            <p-message severity="error" variant="simple" size="small">{{ 'admin.team.settings.trackingDomains.hostnameTooLong' | transloco }}</p-message>
+            } @else if (hostnameControl.touched && hostnameControl.hasError('pattern')) {
+            <p-message severity="error" variant="simple" size="small">{{ 'admin.team.settings.trackingDomains.hostnameInvalid' | transloco }}</p-message>
+            }
+        </div>
+        @if (dialogErrorKey(); as key) {
+        <p-message severity="error">{{ key | transloco }}</p-message>
+        }
+    </form>
+</app-crud-dialog>
+
+<app-crud-dialog
+    [title]="'admin.team.settings.trackingDomains.setupAction' | transloco"
+    [visible]="isSetupDialogVisible()"
+    (visibleChange)="onSetupDialogVisibleChange($event)"
+    [submitLabel]="'admin.team.settings.saveAction' | transloco"
+    [cancelLabel]="'common.actions.cancel' | transloco"
+    [saving]="isSavingSetup()"
+    (submitted)="submitSetup()"
+>
+    @if (setupDomain(); as domain) {
+    <div class="site-settings-stack">
+        <div>
+            <h3 class="m-0 break-all text-base font-bold">{{ domain.hostname }}</h3>
+            <p class="mt-1 mb-0 text-sm text-muted-color">{{ 'admin.team.settings.trackingDomains.setupDescription' | transloco }}</p>
+        </div>
+
+        <div class="grid gap-2.5">
+            <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
+                <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.txtName' | transloco }}</span>
+                <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_txt_name }}</code>
+                <app-copy-control [value]="domain.dns_txt_name" [text]="true" size="small" />
+            </div>
+            <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
+                <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.txtValue' | transloco }}</span>
+                <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_txt_value }}</code>
+                <app-copy-control [value]="domain.dns_txt_value" [text]="true" size="small" />
+            </div>
+            <div class="grid items-center gap-2.5 sm:grid-cols-[minmax(7rem,10rem)_minmax(0,1fr)_auto]">
+                <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.dns.target' | transloco }}</span>
+                <code class="rounded-md border border-[var(--p-content-border-color)] bg-[var(--p-content-hover-background)] px-2 py-1 text-xs break-all">{{ domain.dns_target || '-' }}</code>
+                <app-copy-control [value]="domain.dns_target" [text]="true" size="small" />
+            </div>
+        </div>
+
+        <div class="site-settings-status-grid" [attr.aria-label]="'admin.team.settings.trackingDomains.checksLabel' | transloco">
+            <div>
+                <span>{{ 'admin.team.settings.trackingDomains.checks.ownership' | transloco }}</span>
+                <p-tag [severity]="statusSeverity(domain.verification_status)" [value]="statusKey(domain.verification_status) | transloco" />
+            </div>
+            <div>
+                <span>{{ 'admin.team.settings.trackingDomains.checks.target' | transloco }}</span>
+                <p-tag [severity]="statusSeverity(domain.target_status)" [value]="statusKey(domain.target_status) | transloco" />
+            </div>
+            <div>
+                <span>{{ 'admin.team.settings.trackingDomains.checks.tls' | transloco }}</span>
+                <p-tag [severity]="statusSeverity(domain.tls_status)" [value]="statusKey(domain.tls_status) | transloco" />
+            </div>
+        </div>
+
+        @if (domain.last_error) {
+        <p-message severity="error">{{ domain.last_error }}</p-message>
+        }
+
+        <label class="flex items-center justify-between gap-3" for="team-tracking-domain-enabled">
+            <span class="site-settings-field-label">{{ 'admin.team.settings.trackingDomains.enabled' | transloco }}</span>
+            <p-toggleswitch inputId="team-tracking-domain-enabled" [ngModel]="setupEnabled()" (ngModelChange)="setupEnabled.set($event)" />
+        </label>
+    </div>
+    }
+</app-crud-dialog>
+
+<app-settings-card [title]="'admin.team.settings.trackingDomains.title' | transloco" [subtitle]="'admin.team.settings.trackingDomains.description' | transloco" icon="pi pi-globe">
+    <div settings-card-header class="flex flex-wrap items-center gap-2">
+        <p-button [label]="'admin.team.settings.trackingDomains.addAction' | transloco" icon="pi pi-plus" [type]="'button'" (onClick)="openAddDialog()" />
+    </div>
+
+    <div settings-card-body class="flex flex-col gap-4">
+        @if (successKey(); as key) {
+        <p-message severity="success">{{ key | transloco }}</p-message>
+        } @if (errorKey(); as key) {
+        <p-message severity="error">{{ key | transloco }}</p-message>
+        } @if (domains().length === 0 && !isLoading()) {
+        <div class="hk-empty-state">
+            <p class="text-sm text-[var(--p-text-muted-color)]">{{ 'admin.team.settings.trackingDomains.empty' | transloco }}</p>
+            <p-button [label]="'admin.team.settings.trackingDomains.addAction' | transloco" icon="pi pi-plus" [outlined]="true" [type]="'button'" (onClick)="openAddDialog()" />
+        </div>
+        } @else {
+        <app-table
+            [value]="domains()"
+            [columns]="domainColumns"
+            stateKey="team-tracking-domains"
+            [loading]="isLoading()"
+            [defaultSort]="{ field: 'hostname', order: 1 }"
+            [rowActions]="domainActions"
+            [rowActionsLoading]="domainActionLoading"
+            emptyTextKey="admin.team.settings.trackingDomains.empty"
+            exportFilename="tracking-domains"
+            data-testid="tracking-domains-table"
+        >
+            <ng-template appTableSlot="toolbar">
+                <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'common.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="loadDomains()" />
+            </ng-template>
+            <ng-template appTableCell="hostname" let-domain>
+                <div class="flex flex-col gap-1">
+                    <span class="inline-flex min-w-0 items-center gap-2">
+                        <i [class]="domainStatusIcon(domain)" role="img" [attr.aria-label]="domainStatusLabelKey(domain) | transloco" [attr.title]="domainStatusLabelKey(domain) | transloco"></i>
+                        <span class="font-semibold break-all">{{ domain.hostname }}</span>
+                    </span>
+                    <span class="text-xs text-[var(--p-text-muted-color)]">{{ tlsModeKey(domain) | transloco }}</span>
+                </div>
+            </ng-template>
+            <ng-template appTableCell="verification_status" let-domain>
+                <i [class]="checkIcon(domain.verification_status)" role="img" [attr.aria-label]="statusKey(domain.verification_status) | transloco" [attr.title]="statusKey(domain.verification_status) | transloco"></i>
+            </ng-template>
+            <ng-template appTableCell="target_status" let-domain>
+                <i [class]="checkIcon(domain.target_status)" role="img" [attr.aria-label]="statusKey(domain.target_status) | transloco" [attr.title]="statusKey(domain.target_status) | transloco"></i>
+            </ng-template>
+            <ng-template appTableCell="tls_status" let-domain>
+                <i [class]="checkIcon(domain.tls_status)" role="img" [attr.aria-label]="statusKey(domain.tls_status) | transloco" [attr.title]="statusKey(domain.tls_status) | transloco"></i>
+            </ng-template>
+        </app-table>
+        }
+    </div>
+</app-settings-card>

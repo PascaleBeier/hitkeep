@@ -33,135 +33,76 @@
         } @else if (reports().length === 0) {
         <app-page-state titleKey="settings.reports.empty.title" messageKey="settings.reports.empty.description" icon="pi pi-send" actionLabelKey="settings.reports.empty.action" actionIcon="pi pi-plus" (actionClicked)="openCreate()" />
         } @else {
-        <app-crud-table-toolbar class="report-list-toolbar">
-            <p-iconfield class="hk-crud-search">
-                <p-inputicon class="pi pi-search" />
-                <input
-                    pInputText
-                    data-testid="report-search"
-                    [ngModel]="searchQuery()"
-                    (ngModelChange)="setSearch($event)"
-                    [placeholder]="'common.searchPlaceholder' | transloco"
-                    [attr.aria-label]="'common.searchPlaceholder' | transloco"
-                    class="w-full"
-                />
-            </p-iconfield>
-            <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" type="button" [ariaLabel]="'common.actions.refresh' | transloco" [loading]="isLoading()" [disabled]="isLoading()" (onClick)="refresh()" />
-        </app-crud-table-toolbar>
-
-        <div class="report-desktop-table hk-crud-table-wrap">
-            <p-table
-                data-testid="report-table"
-                [value]="filteredReportRows()"
-                [sortField]="'name'"
-                [sortOrder]="1"
-                [paginator]="true"
-                [rows]="10"
-                [rowsPerPageOptions]="[10, 25, 50]"
-                [rowHover]="true"
-                [loading]="isLoading()"
-                responsiveLayout="scroll"
-                styleClass="hk-crud-table p-datatable-sm"
-                [tableStyle]="{ 'min-width': '64rem' }"
-            >
-                <ng-template pTemplate="header">
-                    <tr>
-                        <th class="report-sticky-identity" pSortableColumn="name">{{ "common.columns.name" | transloco }} <p-sortIcon field="name" /></th>
-                        <th pSortableColumn="scope">{{ "settings.reports.scopeSites" | transloco }} <p-sortIcon field="scope" /></th>
-                        <th pSortableColumn="recipients">{{ "settings.reports.recipients.label" | transloco }} <p-sortIcon field="recipients" /></th>
-                        <th pSortableColumn="schedule">{{ "settings.reports.schedule.label" | transloco }} <p-sortIcon field="schedule" /></th>
-                        <th pSortableColumn="nextRun">{{ "settings.reports.nextRun" | transloco }} <p-sortIcon field="nextRun" /></th>
-                        <th class="report-outcome-heading" pSortableColumn="lastOutcome">{{ "settings.reports.lastOutcome" | transloco }} <p-sortIcon field="lastOutcome" /></th>
-                        <th class="hk-actions-column report-sticky-actions">{{ "common.columns.actions" | transloco }}</th>
-                    </tr>
-                </ng-template>
-
-                <ng-template pTemplate="body" let-row>
-                    <tr [attr.data-report-id]="row.report.id" [class.report-row--focused]="focusedReportID() === row.report.id">
-                        <td class="report-sticky-identity">
-                            <div class="report-name-cell">
-                                <span class="report-name-row">
-                                    <i
-                                        [class]="reportStatusIconClass(row.report.status)"
-                                        role="img"
-                                        data-testid="report-status-indicator"
-                                        [attr.aria-label]="('settings.reports.status.' + row.report.status) | transloco"
-                                        [attr.title]="('settings.reports.status.' + row.report.status) | transloco"
-                                    ></i>
-                                    <strong [title]="row.report.name">{{ row.report.name }}</strong>
-                                </span>
-                                <span>{{ presetLabel(row.report.preset) }}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="report-stacked-cell">
-                                <span>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</span>
-                                <app-site-scope-summary [items]="siteScopeSummaryItems(row.report)" [countLabel]="siteScopeCountLabel(row.report)" [popoverTitle]="'settings.reports.sites.label' | transloco" />
-                            </div>
-                        </td>
-                        <td>
-                            <div class="report-recipient-summary">
-                                @for (recipient of visibleRecipients(row.report); track recipient.id) {
-                                <div class="report-recipient">
-                                    <span [title]="recipient.email"><i class="pi" [class.pi-user]="recipient.kind === 'member'" [class.pi-envelope]="recipient.kind === 'external'" aria-hidden="true"></i>{{ recipient.email }}</span>
-                                    <i
-                                        [class]="recipientStateIconClass(recipient)"
-                                        role="img"
-                                        data-testid="report-recipient-status-indicator"
-                                        [attr.aria-label]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
-                                        [attr.title]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
-                                    ></i>
-                                </div>
-                                } @if (row.report.recipients.length > 2) {
-                                <span class="report-cell-secondary">+{{ row.report.recipients.length - 2 }}</span>
-                                }
-                            </div>
-                        </td>
-                        <td>
-                            <div class="report-stacked-cell"><span>{{ cadenceLabel(row.report) }} · {{ row.report.schedule.local_time }}</span><span>{{ row.report.schedule.timezone }}</span></div>
-                        </td>
-                        <td>{{ formatDate(row.report.next_run_at) }}</td>
-                        <td class="report-outcome-cell">
-                            <i
-                                [class]="lastOutcomeIconClass(row.report.last_outcome?.status)"
-                                role="img"
-                                data-testid="report-outcome-indicator"
-                                [attr.aria-label]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
-                                [attr.title]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
-                            ></i>
-                        </td>
-                        <td class="hk-actions-cell report-sticky-actions">
-                            <app-table-row-actions [items]="reportActions(row.report)" [loading]="reportActionID() === row.report.id" />
-                        </td>
-                    </tr>
-                </ng-template>
-
-                <ng-template pTemplate="emptymessage">
-                    <tr>
-                        <td colspan="7" class="report-table-empty">{{ "settings.reports.emptyFiltered" | transloco }}</td>
-                    </tr>
-                </ng-template>
-            </p-table>
-        </div>
-
-        <div class="report-mobile-view" data-testid="report-mobile-list">
-            <div class="report-mobile-sort">
-                <label for="report-mobile-sort">{{ "settings.reports.sort.label" | transloco }}</label>
-                <div>
-                    <p-select inputId="report-mobile-sort" [options]="mobileSortOptions()" optionLabel="label" optionValue="value" [ngModel]="mobileSortField()" (ngModelChange)="setMobileSortField($event)" appendTo="body" />
-                    <p-button
-                        [icon]="mobileSortOrder() === 1 ? 'pi pi-sort-amount-up-alt' : 'pi pi-sort-amount-down'"
-                        [outlined]="true"
-                        [ariaLabel]="(mobileSortOrder() === 1 ? 'settings.reports.sort.ascending' : 'settings.reports.sort.descending') | transloco"
-                        (onClick)="toggleMobileSortOrder()"
-                    />
+        <app-table
+            [value]="reportTableRows()"
+            [columns]="reportColumns"
+            stateKey="reports"
+            dataKey="report.id"
+            [loading]="isLoading()"
+            [defaultSort]="{ field: 'name', order: 1 }"
+            [rowActions]="reportRowActions"
+            [rowActionsLoading]="reportActionLoading"
+            [rowSelected]="isFocusedReport"
+            mobile="cards"
+            emptyTextKey="settings.reports.emptyFiltered"
+            data-testid="report-table"
+        >
+            <ng-template appTableSlot="toolbar">
+                <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" type="button" [ariaLabel]="'common.actions.refresh' | transloco" [loading]="isLoading()" [disabled]="isLoading()" (onClick)="refresh()" />
+            </ng-template>
+            <ng-template appTableCell="name" let-row>
+                <div class="report-name-cell">
+                    <span class="report-name-row">
+                        <i
+                            [class]="reportStatusIconClass(row.report.status)"
+                            role="img"
+                            data-testid="report-status-indicator"
+                            [attr.aria-label]="('settings.reports.status.' + row.report.status) | transloco"
+                            [attr.title]="('settings.reports.status.' + row.report.status) | transloco"
+                        ></i>
+                        <strong [title]="row.report.name">{{ row.report.name }}</strong>
+                    </span>
+                    <span>{{ presetLabel(row.report.preset) }}</span>
                 </div>
-            </div>
-            @if (mobileSortedRows().length === 0) {
-            <app-page-state titleKey="settings.reports.filteredEmpty.title" messageKey="settings.reports.emptyFiltered" icon="pi pi-search" />
-            } @else {
-            <div class="report-mobile-list">
-                @for (row of mobilePageRows(); track row.report.id) {
+            </ng-template>
+            <ng-template appTableCell="scope" let-row>
+                <div class="report-stacked-cell">
+                    <span>{{ ("settings.reports.scope." + row.report.scope) | transloco }}</span>
+                    <app-site-scope-summary [items]="siteScopeSummaryItems(row.report)" [countLabel]="siteScopeCountLabel(row.report)" [popoverTitle]="'settings.reports.sites.label' | transloco" />
+                </div>
+            </ng-template>
+            <ng-template appTableCell="recipients" let-row>
+                <div class="report-recipient-summary">
+                    @for (recipient of visibleRecipients(row.report); track recipient.id) {
+                    <div class="report-recipient">
+                        <span [title]="recipient.email"><i class="pi" [class.pi-user]="recipient.kind === 'member'" [class.pi-envelope]="recipient.kind === 'external'" aria-hidden="true"></i>{{ recipient.email }}</span>
+                        <i
+                            [class]="recipientStateIconClass(recipient)"
+                            role="img"
+                            data-testid="report-recipient-status-indicator"
+                            [attr.aria-label]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                            [attr.title]="('settings.reports.recipientStatus.' + recipientState(recipient)) | transloco"
+                        ></i>
+                    </div>
+                    } @if (row.report.recipients.length > 2) {
+                    <span class="report-cell-secondary">+{{ row.report.recipients.length - 2 }}</span>
+                    }
+                </div>
+            </ng-template>
+            <ng-template appTableCell="schedule" let-row>
+                <div class="report-stacked-cell"><span>{{ cadenceLabel(row.report) }} · {{ row.report.schedule.local_time }}</span><span>{{ row.report.schedule.timezone }}</span></div>
+            </ng-template>
+            <ng-template appTableCell="nextRun" let-row>{{ formatDate(row.report.next_run_at) }}</ng-template>
+            <ng-template appTableCell="lastOutcome" let-row>
+                <i
+                    [class]="lastOutcomeIconClass(row.report.last_outcome?.status)"
+                    role="img"
+                    data-testid="report-outcome-indicator"
+                    [attr.aria-label]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
+                    [attr.title]="(row.report.last_outcome ? 'settings.reports.runStatus.' + row.report.last_outcome.status : 'settings.reports.notAvailable') | transloco"
+                ></i>
+            </ng-template>
+            <ng-template appTableSlot="mobileRow" let-row>
                 <article class="report-mobile-row" data-testid="report-mobile-row" [attr.data-report-id]="row.report.id" [class.report-row--focused]="focusedReportID() === row.report.id">
                     <header>
                         <div class="report-name-cell">
@@ -212,11 +153,8 @@
                         </div>
                     </dl>
                 </article>
-                }
-            </div>
-            <p-paginator [first]="mobileFirst()" [rows]="mobileRows()" [totalRecords]="mobileSortedRows().length" [rowsPerPageOptions]="[10, 25, 50]" (onPageChange)="onMobilePage($event)" />
-            }
-        </div>
+            </ng-template>
+        </app-table>
         }
     </div>
 </app-page-frame>

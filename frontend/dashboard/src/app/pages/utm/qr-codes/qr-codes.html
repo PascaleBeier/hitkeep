@@ -58,86 +58,37 @@
             }
         </div>
         } @else {
-        <div class="hk-crud-table-wrap">
-            <p-table
-                #qrCodesTable
-                [value]="qrs()"
-                dataKey="id"
-                [globalFilterFields]="['name', 'destination_url', 'utm_source', 'utm_medium', 'utm_campaign', 'updated_at']"
-                [sortField]="'updated_at'"
-                [sortOrder]="-1"
-                [paginator]="true"
-                [rows]="10"
-                [rowsPerPageOptions]="[10, 25, 50]"
-                [rowHover]="true"
-                responsiveLayout="scroll"
-                styleClass="hk-crud-table p-datatable-sm"
-                [tableStyle]="{ 'min-width': '980px' }"
-            >
-                <ng-template pTemplate="caption">
-                    <app-crud-table-toolbar>
-                        <p-iconfield class="hk-crud-search">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #qrSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="qrCodesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                        </p-iconfield>
-                    </app-crud-table-toolbar>
-                </ng-template>
-                <ng-template pTemplate="header">
-                    <tr>
-                        <th pSortableColumn="name">
-                            {{ "common.columns.name" | transloco }}
-                            <p-sortIcon field="name" />
-                        </th>
-                        <th pSortableColumn="destination_url">
-                            {{ "qrCodes.fields.destinationUrl" | transloco }}
-                            <p-sortIcon field="destination_url" />
-                        </th>
-                        <th pSortableColumn="utm_campaign">
-                            {{ "utmBuilder.form.campaignLabel" | transloco }}
-                            <p-sortIcon field="utm_campaign" />
-                        </th>
-                        <th>{{ "qrCodes.fields.asset" | transloco }}</th>
-                        <th pSortableColumn="updated_at">
-                            {{ "common.columns.updated" | transloco }}
-                            <p-sortIcon field="updated_at" />
-                        </th>
-                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                    </tr>
-                </ng-template>
-                <ng-template pTemplate="body" let-qr>
-                    <tr>
-                        <td>
-                            <a class="qr-codes-link-button" [routerLink]="qrLink(qr)">{{ qr.name }}</a>
-                            <div class="qr-codes-row-subtext">{{ qr.redirect_url || ("qrCodes.editor.redirectAfterSave" | transloco) }}</div>
-                        </td>
-                        <td><span class="qr-codes-url-cell">{{ qr.destination_url }}</span></td>
-                        <td>
-                            @if (qr.utm_campaign) {
-                            <p-tag [value]="qr.utm_campaign" severity="success" />
-                            } @else {
-                            <span class="text-sm text-[var(--p-text-muted-color)]">-</span>
-                            }
-                        </td>
-                        <td>
-                            @if (qr.has_asset) {
-                            <p-tag icon="pi pi-image" [value]="'qrCodes.asset.present' | transloco" severity="info" />
-                            } @else {
-                            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "qrCodes.asset.none" | transloco }}</span>
-                            }
-                        </td>
-                        <td><app-relative-date-time [value]="qr.updated_at" /></td>
-                        <td class="hk-actions-cell">
-                            <app-table-row-actions [items]="qrActions(qr)" [loading]="archivingQRID() === qr.id" />
-                        </td>
-                    </tr>
-                </ng-template>
-                <ng-template pTemplate="emptymessage">
-                    <tr>
-                        <td colspan="6" class="text-center text-muted-color py-4">{{ "qrCodes.empty.title" | transloco }}</td>
-                    </tr>
-                </ng-template>
-            </p-table>
-        </div>
+        <app-table
+            [value]="qrs()"
+            [columns]="qrColumns"
+            stateKey="qr-codes"
+            [searchFields]="['redirect_url', 'utm_source', 'utm_medium']"
+            [defaultSort]="{ field: 'updated_at', order: -1 }"
+            [rowActions]="qrActions"
+            [rowActionsLoading]="qrActionLoading"
+            emptyTextKey="qrCodes.empty.title"
+            data-testid="qr-codes-table"
+        >
+            <ng-template appTableCell="name" let-qr>
+                <a class="qr-codes-link-button" [routerLink]="qrLink(qr)">{{ qr.name }}</a>
+                <div class="qr-codes-row-subtext">{{ qr.redirect_url || ("qrCodes.editor.redirectAfterSave" | transloco) }}</div>
+            </ng-template>
+            <ng-template appTableCell="destination_url" let-qr><span class="qr-codes-url-cell">{{ qr.destination_url }}</span></ng-template>
+            <ng-template appTableCell="utm_campaign" let-qr>
+                @if (qr.utm_campaign) {
+                <p-tag [value]="qr.utm_campaign" severity="success" />
+                } @else {
+                <span class="text-sm text-[var(--p-text-muted-color)]">—</span>
+                }
+            </ng-template>
+            <ng-template appTableCell="has_asset" let-qr>
+                @if (qr.has_asset) {
+                <p-tag icon="pi pi-image" [value]="'qrCodes.asset.present' | transloco" severity="info" />
+                } @else {
+                <span class="text-sm text-[var(--p-text-muted-color)]">{{ "qrCodes.asset.none" | transloco }}</span>
+                }
+            </ng-template>
+        </app-table>
         }
     </section>
     } @else if (selectedQR(); as qr) {
@@ -431,70 +382,27 @@
             </div>
             }
 
-            <app-crud-table-toolbar>
-                <p-iconfield class="hk-crud-search">
-                    <p-inputicon class="pi pi-search" />
-                    <input pInputText #qrShareSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="qrShareLinksTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                </p-iconfield>
-            </app-crud-table-toolbar>
-
-            <div class="hk-crud-table-wrap">
-                <p-table
-                    #qrShareLinksTable
-                    [value]="shares()"
-                    [loading]="sharesLoading()"
-                    dataKey="id"
-                    [globalFilterFields]="['token_hint', 'created_at', 'url']"
-                    [sortField]="'created_at'"
-                    [sortOrder]="-1"
-                    [paginator]="true"
-                    [rows]="10"
-                    [rowsPerPageOptions]="[10, 25, 50]"
-                    [rowHover]="true"
-                    responsiveLayout="scroll"
-                    styleClass="hk-crud-table p-datatable-sm"
-                    [tableStyle]="{ 'min-width': '760px' }"
-                >
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th pSortableColumn="token_hint">
-                                {{ "qrCodes.share.tokenHint" | transloco }}
-                                <p-sortIcon field="token_hint" />
-                            </th>
-                            <th pSortableColumn="created_at">
-                                {{ "common.columns.created" | transloco }}
-                                <p-sortIcon field="created_at" />
-                            </th>
-                            <th pSortableColumn="url">
-                                {{ "qrCodes.share.url" | transloco }}
-                                <p-sortIcon field="url" />
-                            </th>
-                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="body" let-link>
-                        <tr>
-                            <td><code class="qr-codes-token">{{ link.token_hint }}</code></td>
-                            <td><app-relative-date-time [value]="link.created_at" /></td>
-                            <td>
-                                @if (link.url) {
-                                <input pInputText readonly [value]="link.url" class="w-full qr-codes-share-url-input" />
-                                } @else {
-                                <span class="text-sm text-[var(--p-text-muted-color)]">{{ "qrCodes.share.urlUnavailable" | transloco }}</span>
-                                }
-                            </td>
-                            <td class="hk-actions-cell">
-                                <app-table-row-actions [items]="shareLinkActions(link)" [loading]="deletingShareID() === link.id" />
-                            </td>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="emptymessage">
-                        <tr>
-                            <td colspan="4" class="text-center text-muted-color py-4">{{ "qrCodes.share.empty" | transloco }}</td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-            </div>
+            <app-table
+                [value]="shares()"
+                [columns]="shareColumns"
+                stateKey="qr-share-links"
+                [loading]="sharesLoading()"
+                [defaultSort]="{ field: 'created_at', order: -1 }"
+                [rowActions]="shareLinkActions"
+                [rowActionsLoading]="shareActionLoading"
+                [exportable]="false"
+                emptyTextKey="qrCodes.share.empty"
+                data-testid="qr-share-links-table"
+            >
+                <ng-template appTableCell="token_hint" let-link><code class="qr-codes-token">{{ link.token_hint }}</code></ng-template>
+                <ng-template appTableCell="url" let-link>
+                    @if (link.url) {
+                    <input pInputText readonly [value]="link.url" class="w-full qr-codes-share-url-input" [attr.aria-label]="'qrCodes.share.url' | transloco" />
+                    } @else {
+                    <span class="text-sm text-[var(--p-text-muted-color)]">{{ "qrCodes.share.urlUnavailable" | transloco }}</span>
+                    }
+                </ng-template>
+            </app-table>
         </div>
     </app-dialog-shell>
     }

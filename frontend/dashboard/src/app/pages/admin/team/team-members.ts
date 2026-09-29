@@ -7,7 +7,7 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { SettingsCard } from '@features/settings/components/settings-card';
@@ -18,12 +18,9 @@ import { TeamService } from '@services/team.service';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { finalize, forkJoin } from 'rxjs';
 
@@ -34,7 +31,7 @@ interface TeamRoleOption {
 
 @Component({
     selector: 'app-team-members',
-    imports: [ReactiveFormsModule, ButtonModule, ConfirmDialogModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, SelectModule, TableModule, TagModule, SettingsCard, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [ReactiveFormsModule, ButtonModule, ConfirmDialogModule, InputTextModule, MessageModule, SelectModule, TagModule, SettingsCard, CrudDialog, AppTable, AppTableCell, AppTableSlot, TableRowActions, TranslocoPipe],
     templateUrl: './team-members.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [ConfirmationService]
@@ -53,6 +50,19 @@ export class TeamMembersPage {
     protected readonly team = this.teamService.activeTeam;
     protected readonly members = signal<TeamMember[]>([]);
     protected readonly pendingInvites = signal<TeamInvite[]>([]);
+    private readonly roleColumnOptions = (['owner', 'admin', 'member'] as const).map((role) => ({ value: role, labelKey: `teams.roles.${role}` }));
+    protected readonly memberColumns: AppTableColumn<TeamMember>[] = [
+        { field: 'email', headerKey: 'common.columns.email', frozen: true },
+        { field: 'role', headerKey: 'common.columns.role', type: 'enum', groupable: true, options: this.roleColumnOptions },
+        { field: 'added_at', headerKey: 'common.columns.added', type: 'date' }
+    ];
+    protected readonly inviteColumns: AppTableColumn<TeamInvite>[] = [
+        { field: 'email', headerKey: 'common.columns.email', frozen: true },
+        { field: 'role', headerKey: 'common.columns.role', type: 'enum', groupable: true, options: this.roleColumnOptions },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
+        { field: 'expires_at', headerKey: 'teams.management.expiresLabel', type: 'date' }
+    ];
+    protected readonly inviteActionLoading = (invite: TeamInvite) => this.isInviteActionLoading(invite);
     protected readonly isLoading = signal(false);
     protected readonly isInviting = signal(false);
     protected readonly isInviteDialogVisible = signal(false);
@@ -175,7 +185,7 @@ export class TeamMembersPage {
         this.inviteForm.role().control().reset('member');
     }
 
-    protected memberActions(member: TeamMember): TableRowActionItem[] {
+    protected readonly memberActions = (member: TeamMember): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [];
         if (this.canTransferMember(member)) {
@@ -199,7 +209,7 @@ export class TeamMembersPage {
             });
         }
         return actions;
-    }
+    };
 
     protected memberActionLoading(member: TeamMember): boolean {
         return this.removingUserID() === member.user_id || this.transferringUserID() === member.user_id;
@@ -302,7 +312,7 @@ export class TeamMembersPage {
         }
     }
 
-    protected inviteActions(invite: TeamInvite): TableRowActionItem[] {
+    protected readonly inviteActions = (invite: TeamInvite): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -320,7 +330,7 @@ export class TeamMembersPage {
                 command: () => this.confirmRevokeInvite(invite)
             }
         ];
-    }
+    };
 
     protected confirmResendInvite(invite: TeamInvite) {
         this.confirmationService.confirm({

@@ -3883,5 +3883,23 @@
     "invalid": { "title": "Ce lien de confirmation n’est pas disponible", "description": "Il peut être invalide, expiré, déjà utilisé ou remplacé. Demandez au gestionnaire du rapport de le renvoyer." },
     "confirmed": { "title": "Envoi du rapport confirmé", "description": "Vous recevrez les prochains rapports planifiés. Les rapports antérieurs à la confirmation ne sont pas renvoyés." },
     "declined": { "title": "Envoi du rapport refusé", "description": "Vous ne recevrez pas ce rapport, sauf si vous acceptez une nouvelle confirmation ultérieurement." }
+  },
+  "table": {
+    "pageReport": "{first}–{last} sur {totalRecords}",
+    "searchChip": "Recherche : {{value}}",
+    "groupBy": "Grouper par",
+    "columns": "Colonnes",
+    "resetView": "Réinitialiser la vue",
+    "expand": "Développer",
+    "expandRow": "Afficher les détails",
+    "collapseRow": "Masquer les détails",
+    "groupCount": "{{count}} lignes",
+    "noValue": "Aucune valeur",
+    "any": "Tous",
+    "dateRange": "Période",
+    "noResults": "Aucune ligne ne correspond aux filtres actuels.",
+    "clearFilters": "Effacer les filtres",
+    "empty": "Rien pour le moment.",
+    "total": "Total"
   }
 }

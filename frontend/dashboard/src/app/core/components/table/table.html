@@ -1,0 +1,296 @@
+<section class="app-table" [class.app-table--cards]="mobileRowTemplate() && mobile() === 'cards'" role="region" [attr.aria-label]="ariaLabelKey() ? (ariaLabelKey()! | transloco) : null">
+    <div class="app-table__toolbar">
+        @if (searchable()) {
+        <p-iconfield class="app-table__search">
+            <p-inputicon class="pi pi-search" />
+            <input
+                pInputText
+                type="search"
+                [value]="search()"
+                [placeholder]="'common.searchPlaceholder' | transloco"
+                [attr.aria-label]="'common.searchPlaceholder' | transloco"
+                (input)="applySearch($any($event.target).value)"
+                data-testid="table-search"
+            />
+        </p-iconfield>
+        }
+        <div class="app-table__tools">
+            @if (groupOptions().length > 0) {
+            <p-select
+                [options]="groupOptions()"
+                [ngModel]="groupBy()"
+                (ngModelChange)="setGroupBy($event)"
+                optionLabel="label"
+                optionValue="value"
+                [showClear]="true"
+                [placeholder]="'table.groupBy' | transloco"
+                [ariaLabel]="'table.groupBy' | transloco"
+                appendTo="body"
+                size="small"
+                styleClass="app-table__group-select"
+                data-testid="table-group-by"
+            />
+            } @if (toggleOptions().length > 0) {
+            <p-multiselect
+                [options]="toggleOptions()"
+                [ngModel]="shownToggleFields()"
+                (ngModelChange)="setShownColumns($event)"
+                optionLabel="label"
+                optionValue="value"
+                [placeholder]="'table.columns' | transloco"
+                [selectedItemsLabel]="'table.columns' | transloco"
+                [maxSelectedLabels]="0"
+                [ariaLabel]="'table.columns' | transloco"
+                [filter]="false"
+                appendTo="body"
+                size="small"
+                styleClass="app-table__columns-select"
+                data-testid="table-columns"
+            />
+            } @if (exportable()) {
+            <p-button
+                icon="pi pi-download"
+                [text]="true"
+                [rounded]="true"
+                severity="secondary"
+                [ariaLabel]="'common.actions.exportCsv' | transloco"
+                [pTooltip]="'common.actions.exportCsv' | transloco"
+                tooltipPosition="top"
+                (onClick)="exportCsv()"
+                data-testid="table-export"
+            />
+            }
+            <p-button
+                icon="pi pi-eraser"
+                [text]="true"
+                [rounded]="true"
+                severity="secondary"
+                [ariaLabel]="'table.resetView' | transloco"
+                [pTooltip]="'table.resetView' | transloco"
+                tooltipPosition="top"
+                (onClick)="resetView()"
+                data-testid="table-reset"
+            />
+            @if (toolbarTemplate(); as toolbar) {
+            <ng-container [ngTemplateOutlet]="toolbar" />
+            }
+        </div>
+    </div>
+
+    @if (chips().length > 0) {
+    <app-filter-chip-row class="app-table__chips" [chips]="chips()" (clearAll)="clearFilters()" />
+    }
+
+    <p-table
+        #table
+        [value]="tableValue()"
+        [dataKey]="dataKey()"
+        [rowTrackBy]="trackRow"
+        [loading]="loading()"
+        [showLoader]="!skeleton()"
+        [lazy]="lazy()"
+        [totalRecords]="totalRecords()"
+        [first]="first()"
+        (onLazyLoad)="lazyLoad.emit($event)"
+        [stateKey]="storageKey()"
+        stateStorage="local"
+        (onFilter)="onFilter()"
+        (onStateRestore)="onFilter()"
+        (onRowExpand)="rowExpansionChange.emit({ row: $event.data, expanded: true })"
+        (onRowCollapse)="rowExpansionChange.emit({ row: $event.data, expanded: false })"
+        [globalFilterFields]="globalFilterFields()"
+        [filterDelay]="250"
+        sortMode="multiple"
+        [multiSortMeta]="initialSort()"
+        [customSort]="true"
+        (sortFunction)="sortRows($event)"
+        [paginator]="true"
+        [alwaysShowPaginator]="false"
+        [rows]="rows()"
+        [rowsPerPageOptions]="rowsPerPageOptions()"
+        [showCurrentPageReport]="true"
+        [currentPageReportTemplate]="pageReport()"
+        paginatorDropdownAppendTo="body"
+        [scrollable]="true"
+        [resizableColumns]="true"
+        columnResizeMode="fit"
+        [rowHover]="true"
+        size="small"
+        styleClass="app-table__table"
+    >
+        <ng-template #header>
+            <tr>
+                @if (expandedTemplate()) {
+                <th class="app-table__expander" pFrozenColumn [frozen]="true"><span class="sr-only">{{ "table.expand" | transloco }}</span></th>
+                } @for (column of visibleColumns(); track column.field) {
+                <th pResizableColumn [pSortableColumn]="column.field" [pSortableColumnDisabled]="column.sortable === false" pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'" [attr.data-field]="column.field">
+                    <span class="app-table__heading">
+                        <span>{{ headerLabel(column) }}</span>
+                        @if (column.sortable !== false) {
+                        <p-sortIcon [field]="column.field" />
+                        } @if (column.filterable !== false && !lazy()) { @switch (column.type ?? 'text') { @case ('enum') {
+                        <p-columnFilter [field]="column.field" display="menu" matchMode="hkIn" [showMatchModes]="false" [showOperator]="false" [showAddButton]="false" [ariaLabel]="headerLabel(column)">
+                            <ng-template #filter let-value let-filter="filterCallback">
+                                <p-multiselect
+                                    [ngModel]="value"
+                                    [options]="enumOptions(column)"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    [placeholder]="'table.any' | transloco"
+                                    (ngModelChange)="filter($event)"
+                                    appendTo="body"
+                                    styleClass="app-table__filter-input"
+                                />
+                            </ng-template>
+                        </p-columnFilter>
+                        } @case ('date') {
+                        <p-columnFilter [field]="column.field" display="menu" matchMode="hkDateRange" [showMatchModes]="false" [showOperator]="false" [showAddButton]="false" [ariaLabel]="headerLabel(column)">
+                            <ng-template #filter let-value let-filter="filterCallback">
+                                <p-datepicker
+                                    [ngModel]="value"
+                                    selectionMode="range"
+                                    [readonlyInput]="true"
+                                    [showButtonBar]="true"
+                                    [placeholder]="'table.dateRange' | transloco"
+                                    (ngModelChange)="filter($event)"
+                                    appendTo="body"
+                                    styleClass="app-table__filter-input"
+                                />
+                            </ng-template>
+                        </p-columnFilter>
+                        } @case ('number') {
+                        <p-columnFilter type="numeric" [field]="column.field" display="menu" [showOperator]="false" [ariaLabel]="headerLabel(column)" />
+                        } @case ('boolean') {
+                        <p-columnFilter type="boolean" [field]="column.field" display="menu" [ariaLabel]="headerLabel(column)" />
+                        } @default {
+                        <p-columnFilter type="text" [field]="column.field" display="menu" [showOperator]="false" [showAddButton]="false" [ariaLabel]="headerLabel(column)" />
+                        } } }
+                    </span>
+                </th>
+                } @if (hasActions()) {
+                <th class="app-table__actions" pFrozenColumn [frozen]="true" alignFrozen="right">{{ "common.columns.actions" | transloco }}</th>
+                }
+            </tr>
+        </ng-template>
+
+        <ng-template #body let-row let-rowIndex="rowIndex" let-expanded="expanded">
+            @if (skeleton()) {
+            <tr class="app-table__skeleton">
+                @for (cell of skeletonCells(); track cell) {
+                <td><p-skeleton /></td>
+                }
+            </tr>
+            } @else { @if (groupStart(rowIndex); as key) {
+            <tr class="app-table__group">
+                <td [attr.colspan]="colspan()">
+                    <button type="button" class="app-table__group-toggle" [attr.aria-expanded]="!isKeyCollapsed(key)" (click)="toggleGroup(key)">
+                        <i class="pi" [class.pi-chevron-down]="!isKeyCollapsed(key)" [class.pi-chevron-right]="isKeyCollapsed(key)" aria-hidden="true"></i>
+                        <span class="app-table__group-label">{{ groupLabel(key) }}</span>
+                        <span class="app-table__group-count">{{ "table.groupCount" | transloco: { count: groupCounts().get(key) ?? 0 } }}</span>
+                    </button>
+                </td>
+            </tr>
+            } @if (!isGroupCollapsed(row)) {
+            <tr
+                class="app-table__row"
+                [attr.data-row-key]="resolve(row, dataKey())"
+                [class.app-table__row--selectable]="selectable()"
+                [class.app-table__row--selected]="isSelected(row)"
+                [attr.tabindex]="selectable() ? 0 : null"
+                [attr.aria-selected]="selectable() ? isSelected(row) : null"
+                (click)="selectRow(row)"
+                (keydown.enter)="selectRow(row, $event)"
+                (keydown.space)="selectRow(row, $event)"
+            >
+                @if (expandedTemplate()) {
+                <td class="app-table__expander" pFrozenColumn [frozen]="true">
+                    <p-button
+                        [pRowToggler]="row"
+                        [pRowTogglerDisabled]="!rowExpandable()(row)"
+                        [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        [rounded]="true"
+                        [text]="true"
+                        severity="secondary"
+                        size="small"
+                        [disabled]="!rowExpandable()(row)"
+                        [ariaLabel]="(expanded ? 'table.collapseRow' : 'table.expandRow') | transloco"
+                        [attr.aria-expanded]="expanded"
+                    />
+                </td>
+                } @for (column of visibleColumns(); track column.field) {
+                <td pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'">
+                    <ng-container [ngTemplateOutlet]="cellContent" [ngTemplateOutletContext]="{ $implicit: row, column }" />
+                </td>
+                } @if (hasActions()) {
+                <td class="app-table__actions" pFrozenColumn [frozen]="true" alignFrozen="right" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+                    @if (actionsTemplate(); as actions) {
+                    <ng-container [ngTemplateOutlet]="actions" [ngTemplateOutletContext]="{ $implicit: row }" />
+                    } @else {
+                    <app-table-row-actions [items]="rowActions()!(row)" [disabled]="actionsDisabled()" [loading]="rowActionsLoading()(row)" />
+                    }
+                </td>
+                }
+            </tr>
+            @if (mobileRowTemplate(); as card) {
+            <tr class="app-table__card">
+                <td [attr.colspan]="colspan()">
+                    <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: row }" />
+                </td>
+            </tr>
+            } } }
+        </ng-template>
+
+        <ng-template #expandedrow let-row>
+            @if (expandedTemplate(); as expanded) {
+            <tr class="app-table__expanded">
+                <td [attr.colspan]="colspan()">
+                    <ng-container [ngTemplateOutlet]="expanded" [ngTemplateOutletContext]="{ $implicit: row }" />
+                </td>
+            </tr>
+            }
+        </ng-template>
+
+        <ng-template #footer>
+            @if (totals(); as totals) {
+            <tr class="app-table__total">
+                @if (expandedTemplate()) {
+                <td pFrozenColumn [frozen]="true"></td>
+                } @for (column of visibleColumns(); track column.field; let first = $first) {
+                <td pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'">
+                    @if (column.total) {
+                    <ng-container [ngTemplateOutlet]="cellContent" [ngTemplateOutletContext]="{ $implicit: totals, column }" />
+                    } @else if (first) { {{ "table.total" | transloco }} }
+                </td>
+                } @if (hasActions()) {
+                <td class="app-table__actions" pFrozenColumn [frozen]="true" alignFrozen="right"></td>
+                }
+            </tr>
+            }
+        </ng-template>
+
+        <ng-template #emptymessage>
+            @if (chips().length > 0) {
+            <tr>
+                <td [attr.colspan]="colspan()" class="app-table__empty">
+                    <p>{{ "table.noResults" | transloco }}</p>
+                    <p-button [label]="'table.clearFilters' | transloco" icon="pi pi-filter-slash" [text]="true" size="small" (onClick)="clearFilters()" />
+                </td>
+            </tr>
+            } @else {
+            <tr>
+                <td [attr.colspan]="colspan()" class="app-table__empty">
+                    <p>{{ emptyTextKey() | transloco }}</p>
+                </td>
+            </tr>
+            }
+        </ng-template>
+    </p-table>
+</section>
+
+<ng-template #cellContent let-row let-column="column">
+    @if (cells().get(column.field); as cell) {
+    <ng-container [ngTemplateOutlet]="cell" [ngTemplateOutletContext]="{ $implicit: row }" />
+    } @else { @switch (column.type ?? 'text') { @case ('date') { @if (resolve(row, column.field); as date) {
+    <app-relative-date-time [value]="$any(date)" />
+    } @else { — } } @case ('number') { {{ formatNumber(resolve(row, column.field)) }} } @case ('text') { {{ resolve(row, column.field) ?? "—" }} } @default { {{ label(column, resolve(row, column.field)) }} } } }
+</ng-template>

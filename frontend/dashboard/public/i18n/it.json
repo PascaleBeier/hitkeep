@@ -3880,5 +3880,23 @@
     "invalid": { "title": "Questo link di conferma non è disponibile", "description": "Potrebbe essere non valido, scaduto, già usato o sostituito. Chiedi al responsabile del report di inviarlo di nuovo." },
     "confirmed": { "title": "Invio del report confermato", "description": "Riceverai i prossimi report programmati. I report precedenti alla conferma non vengono inviati di nuovo." },
     "declined": { "title": "Invio del report rifiutato", "description": "Non riceverai questo report finché non accetterai una nuova conferma." }
+  },
+  "table": {
+    "pageReport": "{first}–{last} di {totalRecords}",
+    "searchChip": "Ricerca: {{value}}",
+    "groupBy": "Raggruppa per",
+    "columns": "Colonne",
+    "resetView": "Ripristina vista",
+    "expand": "Espandi",
+    "expandRow": "Mostra dettagli",
+    "collapseRow": "Nascondi dettagli",
+    "groupCount": "{{count}} righe",
+    "noValue": "Nessun valore",
+    "any": "Qualsiasi",
+    "dateRange": "Intervallo di date",
+    "noResults": "Nessuna riga corrisponde ai filtri attuali.",
+    "clearFilters": "Cancella filtri",
+    "empty": "Ancora nulla qui.",
+    "total": "Totale"
   }
 }

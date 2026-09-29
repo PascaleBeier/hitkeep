@@ -7,8 +7,8 @@ import { compatForm } from '@angular/forms/signals/compat';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { Site } from '@models/analytics.types';
 import { AccessService } from '@services/access.service';
@@ -18,12 +18,9 @@ import { NavigationNoticeService } from '@services/navigation-notice.service';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
 
 interface SiteMember {
     id: string;
@@ -35,168 +32,10 @@ interface SiteMember {
 
 @Component({
     selector: 'app-site-team-settings',
-    imports: [ReactiveFormsModule, ConfirmDialogModule, TableModule, ButtonModule, SelectModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, CrudDialog, RelativeDateTime, TableRowActions, TranslocoPipe],
+    imports: [ReactiveFormsModule, ConfirmDialogModule, ButtonModule, SelectModule, InputTextModule, MessageModule, CrudDialog, AppTable, AppTableCell, AppTableSlot, TranslocoPipe],
     providers: [ConfirmationService],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `
-        <p-confirmdialog />
-        <app-crud-dialog
-            [title]="'sites.team.addMemberDialogTitle' | transloco"
-            [visible]="isAddMemberDialogVisible()"
-            (visibleChange)="onAddMemberDialogVisibleChange($event)"
-            [submitLabel]="'sites.team.addMemberAction' | transloco"
-            [cancelLabel]="'common.actions.cancel' | transloco"
-            submitIcon="pi pi-user-plus"
-            [saving]="isAdding()"
-            (submitted)="addMember()"
-        >
-            <form class="site-settings-dialog-form" (submit)="$event.preventDefault(); addMember()">
-                <div class="site-settings-field-grid site-settings-member-grid">
-                    <div class="site-settings-field">
-                        <label for="member-email">{{ 'common.emailAddress' | transloco }}</label>
-                        <input
-                            id="member-email"
-                            pInputText
-                            [formControl]="memberForm.email().control()"
-                            [placeholder]="'sites.team.emailPlaceholder' | transloco"
-                            [class.ng-invalid]="memberForm.email().touched() && memberForm.email().invalid()"
-                            [class.ng-dirty]="memberForm.email().dirty()"
-                            inputmode="email"
-                            autocapitalize="none"
-                            spellcheck="false"
-                            class="w-full"
-                        />
-                    </div>
-
-                    <div class="site-settings-field">
-                        <label for="member-role">{{ 'common.columns.role' | transloco }}</label>
-                        <p-select inputId="member-role" [options]="roleOptions()" [formControl]="memberForm.role().control()" optionLabel="label" optionValue="value" appendTo="body" class="w-full" />
-                    </div>
-                </div>
-                @if (memberErrorKey(); as key) {
-                    <p-message severity="error" [text]="key | transloco" />
-                }
-            </form>
-        </app-crud-dialog>
-        <div class="site-settings-stack">
-            @if (canManageTeam() && availableTransferTeams().length) {
-                <section class="site-settings-card">
-                    <header class="site-settings-card__header">
-                        <div class="site-settings-card__title-row">
-                            <span class="site-settings-card__icon"><i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i></span>
-                            <div>
-                                <h3>{{ 'sites.team.transfer.title' | transloco }}</h3>
-                                <p>{{ 'sites.team.transfer.description' | transloco }}</p>
-                            </div>
-                        </div>
-                    </header>
-                    <div class="site-settings-card__body">
-                        @if (transferSuccessKey(); as key) {
-                            <p-message severity="success" [text]="key | transloco" />
-                        }
-                        @if (transferErrorKey(); as key) {
-                            <p-message severity="error" [text]="key | transloco" />
-                        }
-                        <div class="site-settings-field">
-                            <label for="site-transfer-team">{{ 'sites.team.transfer.teamLabel' | transloco }}</label>
-                            <p-select
-                                inputId="site-transfer-team"
-                                [options]="availableTransferTeams()"
-                                [formControl]="transferForm.teamId().control()"
-                                optionLabel="label"
-                                optionValue="value"
-                                [placeholder]="'sites.team.transfer.teamPlaceholder' | transloco"
-                                class="w-full"
-                            />
-                        </div>
-                    </div>
-                    <footer class="site-settings-card__footer">
-                        <p-button
-                            styleClass="site-settings-action-btn"
-                            [label]="'sites.team.transfer.action' | transloco"
-                            icon="pi pi-arrow-right-arrow-left"
-                            [loading]="isTransferring()"
-                            [disabled]="isTransferring() || transferForm().invalid()"
-                            (onClick)="transferSite()"
-                        />
-                    </footer>
-                </section>
-            }
-
-            <section class="site-settings-card">
-                <header class="site-settings-card__header">
-                    <div class="site-settings-card__title-row">
-                        <span class="site-settings-card__icon"><i class="pi pi-users" aria-hidden="true"></i></span>
-                        <div>
-                            <h3>{{ 'sites.settings.tabs.access' | transloco }}</h3>
-                        </div>
-                    </div>
-                </header>
-                <div class="site-settings-card__body">
-                    @if (memberSuccessKey(); as key) {
-                        <p-message severity="success" [text]="key | transloco" />
-                    }
-                    @if (memberErrorKey() && !isAddMemberDialogVisible()) {
-                        <p-message severity="error" [text]="memberErrorKey() | transloco" />
-                    }
-                    <div class="site-settings-table-shell">
-                        <div class="site-settings-table-toolbar">
-                            <span class="site-settings-chip">{{ members().length }}</span>
-                            <div class="site-settings-table-actions">
-                                @if (canManageTeam()) {
-                                    <p-button styleClass="site-settings-action-btn" [label]="'sites.team.addMemberAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openAddMemberDialog()" />
-                                }
-                                <p-iconfield class="hk-crud-search">
-                                    <p-inputicon class="pi pi-search" />
-                                    <input pInputText #memberSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                                </p-iconfield>
-                            </div>
-                        </div>
-                        <div class="hk-crud-table-wrap">
-                            <p-table #membersTable [value]="members()" [loading]="isLoading()" [globalFilterFields]="['email', 'role', 'added_at']" [sortField]="'added_at'" [sortOrder]="-1" styleClass="hk-crud-table p-datatable-sm">
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th pSortableColumn="email">
-                                            {{ 'common.columns.email' | transloco }}
-                                            <p-sortIcon field="email" />
-                                        </th>
-                                        <th pSortableColumn="role">
-                                            {{ 'common.columns.role' | transloco }}
-                                            <p-sortIcon field="role" />
-                                        </th>
-                                        <th pSortableColumn="added_at">
-                                            {{ 'common.columns.added' | transloco }}
-                                            <p-sortIcon field="added_at" />
-                                        </th>
-                                        @if (canManageTeam()) {
-                                            <th>{{ 'common.columns.actions' | transloco }}</th>
-                                        }
-                                    </tr>
-                                </ng-template>
-
-                                <ng-template pTemplate="body" let-member>
-                                    <tr>
-                                        <td>{{ member.email }}</td>
-                                        <td>
-                                            <span [class]="getRoleBadgeClass(member.role)">
-                                                {{ getRoleLabel(member.role) }}
-                                            </span>
-                                        </td>
-                                        <td><app-relative-date-time [value]="member.added_at" /></td>
-                                        @if (canManageTeam()) {
-                                            <td>
-                                                <app-table-row-actions [items]="memberActions(member)" />
-                                            </td>
-                                        }
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-    `
+    templateUrl: './site-team-settings.html'
 })
 export class SiteTeamSettings {
     private http = inject(HttpClient);
@@ -240,6 +79,11 @@ export class SiteTeamSettings {
             { label: this.transloco.translate('roles.viewer'), value: 'viewer' }
         ];
     });
+    protected readonly memberColumns = computed<AppTableColumn<SiteMember>[]>(() => [
+        { field: 'email', headerKey: 'common.columns.email', frozen: true },
+        { field: 'role', headerKey: 'common.columns.role', type: 'enum', groupable: true, options: this.roleOptions() },
+        { field: 'added_at', headerKey: 'common.columns.added', type: 'date' }
+    ]);
     protected readonly availableTransferTeams = computed(() => {
         if (!this.canManageTeam()) return [];
         this.activeLanguage();
@@ -368,7 +212,7 @@ export class SiteTeamSettings {
             });
     }
 
-    memberActions(member: SiteMember): TableRowActionItem[] {
+    readonly memberActions = (member: SiteMember): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -378,7 +222,7 @@ export class SiteTeamSettings {
                 command: () => this.confirmRemoveMember(member)
             }
         ];
-    }
+    };
 
     confirmRemoveMember(member: SiteMember) {
         const siteId = this.site()?.id;
