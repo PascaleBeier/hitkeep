@@ -1,7 +1,7 @@
 Subject: Je hebt de limieten van het gratis abonnement bereikt
 
 Je team zit aan de limiet van het gratis abonnement
-===========================
+===================================================
 
 Acme Analytics heeft de capaciteit van het gratis abonnement bereikt (1 sites, 1 teamleden).
 

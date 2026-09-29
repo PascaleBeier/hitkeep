@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "cloud.welcome.heading" }}
-==================
+{{ rule "=" (t "cloud.welcome.heading") }}
 
 {{ tf "cloud.welcome.body" .TeamName .SiteDomain }}
 

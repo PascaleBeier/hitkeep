@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "signup.verify.heading" }}
-=================
+{{ rule "=" (t "signup.verify.heading") }}
 
 {{ tf "signup.verify.body" .TeamName }}
 

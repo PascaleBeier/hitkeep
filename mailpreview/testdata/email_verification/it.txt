@@ -1,7 +1,7 @@
 Subject: Verifica la tua email - HitKeep
 
 Verifica la tua email
-=================
+=====================
 
 Ti manca solo un passo per creare il tuo workspace Acme Analytics su HitKeep.
 

@@ -1,7 +1,7 @@
 Subject: Conservez plus de 60 jours de données HitKeep
 
 Votre offre Free conserve 60 jours de données
-===========================
+=============================================
 
 Acme Analytics reçoit du trafic de shop.example. Avec l'offre Free, les hits sont conservés pendant 60 jours.
 

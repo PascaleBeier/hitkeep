@@ -1,7 +1,7 @@
 Subject: Weekly executive summary: confirma los informes de Acme Analytics
 
 Confirmar informes programados
-==================
+==============================
 
 Acme Analytics quiere enviarte el informe programado «Weekly executive summary». Confirma antes de que se te envíen datos analíticos por correo.
 

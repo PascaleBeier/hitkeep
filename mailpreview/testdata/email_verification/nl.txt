@@ -1,7 +1,7 @@
 Subject: Verifieer je e-mail - HitKeep
 
 Verifieer je e-mail
-=================
+===================
 
 Je bent nog een stap verwijderd van het maken van je Acme Analytics-workspace op HitKeep.
 

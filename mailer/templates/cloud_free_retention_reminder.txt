@@ -1,6 +1,6 @@
 {{ define "content" -}}
-{{ t "cloud.retention.heading" }}
-===========================
+{{ tf "cloud.retention.heading" .RetentionDays }}
+{{ rule "=" (tf "cloud.retention.heading" .RetentionDays) }}
 
 {{ tf "cloud.retention.body" .TeamName .SiteDomain .RetentionDays }}
 

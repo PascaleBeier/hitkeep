@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "cloud.limit.heading" }}
-===========================
+{{ rule "=" (t "cloud.limit.heading") }}
 
 {{ tf "cloud.limit.body" .TeamName .SiteLimit .MemberLimit }}
 

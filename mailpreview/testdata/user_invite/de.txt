@@ -1,7 +1,7 @@
 Subject: Du wurdest eingeladen, shop.example auf HitKeep beizutreten
 
 Du wurdest eingeladen!
-====================
+======================
 
 Hallo,
 

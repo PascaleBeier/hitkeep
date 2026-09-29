@@ -4,7 +4,7 @@ Informe de analítica semanal
 shop.example · 22-28 sep 2026
 
 Métricas
--------
+--------
 Páginas vistas:    48.213 (+18%)
 Visitantes:     12.877 (−3%)
 Porcentaje de rebote:  41,3%
@@ -12,7 +12,7 @@ Duración media: 2 min 34 s
 
 
 Páginas principales
----------
+-------------------
 /: 12.040
 /pricing: 6.120
 /docs/getting-started: 3.302
@@ -22,7 +22,7 @@ Páginas principales
 
 
 Referencias principales
--------------
+-----------------------
 google.com: 5.120
 news.ycombinator.com: 2.230
 chatgpt.com: 812
@@ -32,7 +32,7 @@ duckduckgo.com: 301
 
 
 Objetivos completados
-----------------
+---------------------
 Signup: 312
 Checkout: 88
 

@@ -1,7 +1,7 @@
 Subject: Your oldest HitKeep data starts rolling off soon
 
 Your oldest data starts rolling off soon
-===========================
+========================================
 
 The Free plan keeps 60 days of data. Starting October 6, 2026, the oldest hits from shop.example will be removed.
 

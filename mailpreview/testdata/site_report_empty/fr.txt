@@ -4,7 +4,7 @@ Rapport d'analytique quotidien
 new.example · 22-28 sept. 2026
 
 Indicateurs
--------
+-----------
 Pages vues:    0 (—)
 Visiteurs:     0 (—)
 Taux de rebond:  0,0%

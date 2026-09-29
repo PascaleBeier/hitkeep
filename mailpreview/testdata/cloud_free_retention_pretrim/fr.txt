@@ -1,7 +1,7 @@
 Subject: Vos données HitKeep les plus anciennes seront bientôt supprimées
 
 Vos données les plus anciennes seront bientôt supprimées
-===========================
+========================================================
 
 L'offre Free conserve 60 jours de données. À partir du October 6, 2026, les hits les plus anciens de shop.example seront supprimés.
 

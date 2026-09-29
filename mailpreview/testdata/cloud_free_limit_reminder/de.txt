@@ -1,7 +1,7 @@
 Subject: Du hast die Limits des kostenlosen Tarifs erreicht
 
 Dein Team ist am Limit des kostenlosen Tarifs
-===========================
+=============================================
 
 Acme Analytics hat die Kapazität des kostenlosen Tarifs erreicht (1 Websites, 1 Team-Mitglieder).
 

@@ -1,7 +1,7 @@
 Subject: Mantenha mais de 60 dias de dados do HitKeep
 
 Seu plano Free mantém 60 dias de dados
-===========================
+======================================
 
 Acme Analytics está recebendo tráfego de shop.example. No plano Free, hits são mantidos por 60 dias.
 

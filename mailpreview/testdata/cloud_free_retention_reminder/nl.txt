@@ -1,7 +1,7 @@
 Subject: Bewaar meer dan 60 dagen HitKeep-data
 
 Je Free-abonnement bewaart 60 dagen data
-===========================
+========================================
 
 Acme Analytics ontvangt verkeer van shop.example. In het Free-abonnement worden hits 60 dagen bewaard.
 

@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "auth.magic_link.heading" }}
-==================
+{{ rule "=" (t "auth.magic_link.heading") }}
 
 {{ t "common.hello" }}
 

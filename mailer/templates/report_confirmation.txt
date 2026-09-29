@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "reports.confirmation.heading" }}
-==================
+{{ rule "=" (t "reports.confirmation.heading") }}
 
 {{ tf "reports.confirmation.body" .TeamName .ReportName }}
 

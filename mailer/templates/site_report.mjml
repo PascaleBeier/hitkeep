@@ -1,3 +1,4 @@
+{{ define "preheader" }}{{ .SiteDomain }} · {{ .PeriodLabel }} · {{ formatInt .Current.Pageviews }} {{ t "reports.pageviews" }} · {{ formatInt .Current.Visitors }} {{ t "reports.visitors" }}{{ end }}
 {{ define "content" }}
 <mj-text css-class="dark-text" font-size="20px" font-weight="600" color="#18181a" padding-bottom="4px">
   {{ tf "reports.title" .FreqLabel }}
@@ -10,9 +11,9 @@
 <mj-table css-class="dark-table">
   {{ range $i, $value := .DailyPageviews }}
   <tr>
-    <td style="padding: 2px 8px 2px 0; width: 2.5rem; color: #64748b; font-size: 11px; text-align: right;">{{ formatInt $value }}</td>
+    <td style="padding: 2px 8px 2px 0; width: 40px; color: #64748b; font-size: 11px; text-align: right;">{{ formatInt $value }}</td>
     <td style="padding: 2px 0;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="{{ trendBarWidth $.DailyPageviews $i }}%" height="5" style="height: 5px; line-height: 5px; border-radius: 3px; background: #33d399;">&nbsp;</td><td>&nbsp;</td></tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="{{ trendBarWidth $.DailyPageviews $i }}%" height="6" style="height: 6px; font-size: 1px; line-height: 6px; mso-line-height-rule: exactly; border-radius: 3px; background: #33d399;">&nbsp;</td><td style="font-size: 1px; line-height: 6px;">&nbsp;</td></tr></table>
     </td>
   </tr>
   {{ end }}
@@ -22,32 +23,32 @@
 <!-- KPI Grid -->
 <mj-table css-class="dark-table">
   <tr class="tbl-header" style="border-bottom: 1px solid #e2e8f0;">
-    <th style="padding: 8px 12px 8px 0; text-align: left; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "reports.metric" }}</th>
-    <th style="padding: 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "reports.this_period" }}</th>
-    <th style="padding: 8px 0 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">{{ t "reports.change" }}</th>
+    <th style="padding: 8px 12px 8px 0; text-align: left; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.metric" }}</th>
+    <th style="padding: 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.this_period" }}</th>
+    <th style="padding: 8px 0 8px 12px; text-align: right; color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.change" }}</th>
   </tr>
   <tr>
-    <td style="padding: 10px 12px 10px 0; font-weight: 600;">{{ t "reports.pageviews" }}</td>
-    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700;">{{ formatInt .Current.Pageviews }}</td>
+    <td class="kpi-label" style="padding: 10px 12px 10px 0; font-weight: 600; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.pageviews" }}</td>
+    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700; white-space: nowrap;" class="kpi-value">{{ formatInt .Current.Pageviews }}</td>
     <td class="{{ if gt .Current.Pageviews .Previous.Pageviews }}change-up{{ else if lt .Current.Pageviews .Previous.Pageviews }}change-down{{ else }}change-neutral{{ end }}" style="padding: 10px 0 10px 12px; text-align: right; color: {{ if gt .Current.Pageviews .Previous.Pageviews }}#22c55e{{ else if lt .Current.Pageviews .Previous.Pageviews }}#ef4444{{ else }}#64748b{{ end }};">
       {{ percentChange .Current.Pageviews .Previous.Pageviews }}
     </td>
   </tr>
   <tr class="alt-row" style="background-color: #f8fafc;">
-    <td style="padding: 10px 12px 10px 0; font-weight: 600;">{{ t "reports.visitors" }}</td>
-    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700;">{{ formatInt .Current.Visitors }}</td>
+    <td class="kpi-label" style="padding: 10px 12px 10px 0; font-weight: 600; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.visitors" }}</td>
+    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700; white-space: nowrap;" class="kpi-value">{{ formatInt .Current.Visitors }}</td>
     <td class="{{ if gt .Current.Visitors .Previous.Visitors }}change-up{{ else if lt .Current.Visitors .Previous.Visitors }}change-down{{ else }}change-neutral{{ end }}" style="padding: 10px 0 10px 12px; text-align: right; color: {{ if gt .Current.Visitors .Previous.Visitors }}#22c55e{{ else if lt .Current.Visitors .Previous.Visitors }}#ef4444{{ else }}#64748b{{ end }};">
       {{ percentChange .Current.Visitors .Previous.Visitors }}
     </td>
   </tr>
   <tr>
-    <td style="padding: 10px 12px 10px 0; font-weight: 600;">{{ t "reports.bounce_rate" }}</td>
-    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700;">{{ formatPercent .Current.BounceRate }}</td>
+    <td class="kpi-label" style="padding: 10px 12px 10px 0; font-weight: 600; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.bounce_rate" }}</td>
+    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700; white-space: nowrap;" class="kpi-value">{{ formatPercent .Current.BounceRate }}</td>
     <td class="change-neutral" style="padding: 10px 0 10px 12px; text-align: right; color: #64748b;">—</td>
   </tr>
   <tr class="alt-row" style="background-color: #f8fafc;">
-    <td style="padding: 10px 12px 10px 0; font-weight: 600;">{{ t "reports.avg_duration" }}</td>
-    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700;">{{ formatDuration .Current.AvgSessionDuration }}</td>
+    <td class="kpi-label" style="padding: 10px 12px 10px 0; font-weight: 600; -webkit-hyphens: auto; hyphens: auto;">{{ t "reports.avg_duration" }}</td>
+    <td style="padding: 10px 12px; text-align: right; font-size: 20px; font-weight: 700; white-space: nowrap;" class="kpi-value">{{ formatDuration .Current.AvgSessionDuration }}</td>
     <td class="change-neutral" style="padding: 10px 0 10px 12px; text-align: right; color: #64748b;">—</td>
   </tr>
 </mj-table>
@@ -60,8 +61,8 @@
 <mj-table css-class="dark-table">
   {{ range $i, $p := .Current.TopPages }}{{ if lt $i 5 }}
   <tr{{ if eq (mod2 $i) 0 }} class="alt-row" style="background-color: #f8fafc;"{{ end }}>
-    <td style="padding: 6px 12px 6px 0; font-size: 13px;">{{ $p.Name }}</td>
-    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600;">{{ formatInt $p.Value }}</td>
+    <td style="padding: 6px 12px 6px 0; font-size: 13px; overflow-wrap: anywhere;">{{ $p.Name }}</td>
+    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600; white-space: nowrap;">{{ formatInt $p.Value }}</td>
   </tr>
   {{ end }}{{ end }}
 </mj-table>
@@ -75,8 +76,8 @@
 <mj-table css-class="dark-table">
   {{ range $i, $r := .Current.TopReferrers }}{{ if lt $i 5 }}
   <tr{{ if eq (mod2 $i) 0 }} class="alt-row" style="background-color: #f8fafc;"{{ end }}>
-    <td style="padding: 6px 12px 6px 0; font-size: 13px;">{{ $r.Name }}</td>
-    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600;">{{ formatInt $r.Value }}</td>
+    <td style="padding: 6px 12px 6px 0; font-size: 13px; overflow-wrap: anywhere;">{{ $r.Name }}</td>
+    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600; white-space: nowrap;">{{ formatInt $r.Value }}</td>
   </tr>
   {{ end }}{{ end }}
 </mj-table>
@@ -90,8 +91,8 @@
 <mj-table css-class="dark-table">
   {{ range $i, $g := .Current.Goals }}
   <tr{{ if eq (mod2 $i) 0 }} class="alt-row" style="background-color: #f8fafc;"{{ end }}>
-    <td style="padding: 6px 12px 6px 0; font-size: 13px;">{{ $g.Name }}</td>
-    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600;">{{ formatInt $g.Conversions }}</td>
+    <td style="padding: 6px 12px 6px 0; font-size: 13px; overflow-wrap: anywhere;">{{ $g.Name }}</td>
+    <td style="padding: 6px 0 6px 12px; text-align: right; font-size: 13px; font-weight: 600; white-space: nowrap;">{{ formatInt $g.Conversions }}</td>
   </tr>
   {{ end }}
 </mj-table>
@@ -104,7 +105,7 @@
 <mj-divider padding-top="12px" padding-bottom="8px" />
 <mj-text css-class="info-text" font-size="11px" color="#94a3b8" align="center" padding-top="0">
   {{ t "reports.received_because" }}
-  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
-  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
+  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #047857; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
+  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #047857; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
 </mj-text>
 {{ end }}

@@ -15,11 +15,7 @@ var update = flag.Bool("update", false, "rewrite golden files in testdata")
 
 // knownViolations are lint rules current templates still break. Remove a rule
 // here once the templates are fixed; the list may only shrink.
-var knownViolations = map[string]bool{
-	"lang":              true, // layout.mjml never sets <mjml lang>
-	"preheader":         true, // layout.mjml has no mj-preview
-	"external-resource": true, // Lexend loads from Google Fonts
-}
+var knownViolations = map[string]bool{}
 
 func TestFixturesRenderCleanInEveryLocale(t *testing.T) {
 	for _, fixture := range Catalog() {

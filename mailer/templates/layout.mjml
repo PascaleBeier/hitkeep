@@ -1,22 +1,23 @@
-<mjml>
+<mjml lang="{{ .Meta.Locale }}">
   <mj-head>
     <mj-title>{{ .Meta.Subject }}</mj-title>
+    <mj-preview>{{ block "preheader" .Data }}{{ end }}</mj-preview>
     <mj-raw>
       <meta name="color-scheme" content="light dark" />
       <meta name="supported-color-schemes" content="light dark" />
     </mj-raw>
-    <mj-font
-      name="Lexend"
-      href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700&display=swap"
-    />
     <mj-attributes>
       <mj-all
-        font-family="Lexend, sans-serif"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
         font-size="16px"
         line-height="1.6"
       />
-      <mj-text color="#334155" />
+      <!-- Every text block opts into the dark-mode palette unless it names a
+           more specific role (muted, section-heading, info-text). -->
+      <mj-text color="#334155" css-class="dark-text" />
+      <mj-class name="muted" color="#64748b" css-class="muted" />
       <mj-button
+        css-class="hk-button"
         background-color="#33d399"
         color="#18181a"
         border-radius="8px"
@@ -32,71 +33,77 @@
         supported-color-schemes: light dark;
       }
 
+      /* Brand green (#33d399) fails contrast on white; links use the darker
+         emerald in light mode and the brand green in dark mode. */
+      a {
+        color: #047857;
+      }
+
+      /* Phones: give tables the width the 40px desktop gutters take away. */
+      @media only screen and (max-width: 480px) {
+        .card-section > table > tbody > tr > td {
+          padding: 28px 20px 12px 20px !important;
+        }
+        .kpi-value {
+          font-size: 17px !important;
+        }
+        .kpi-label {
+          font-size: 14px !important;
+        }
+      }
+
       @media (prefers-color-scheme: dark) {
-        /* ── Body ── */
+        body,
         .body-wrapper > div {
           background-color: #0f172a !important;
         }
-
-        /* ── Card ── */
         .card-bg > table {
           background-color: #1e293b !important;
           background: #1e293b !important;
         }
-
-        /* ── Brand ── */
-        .brand-text div {
-          color: #f8fafc !important;
-        }
-
-        /* ── Footer ── */
-        .footer-text div {
-          color: #64748b !important;
-        }
-        .footer-text a,
-        .footer-social a {
-          color: #33d399 !important;
-        }
-        /* ── Card text (mj-text elements) ── */
-        .dark-text div {
-          color: #f1f5f9 !important;
-        }
-
-        /* ── Muted / subtitle text ── */
-        .muted div {
-          color: #94a3b8 !important;
-        }
-
-        /* ── Section headings (Top Pages, etc.) ── */
+        .brand-text div,
+        .dark-text div,
         .section-heading div {
           color: #f1f5f9 !important;
         }
-
-        /* ── Table inherited text color ──
-           Sets inherited color for child cells. Cells with
-           their own inline color (change indicators) are NOT
-           overridden because inheritance has lowest priority. */
+        .footer-text div,
+        .footer-social div {
+          color: #94a3b8 !important;
+        }
+        .muted div {
+          color: #94a3b8 !important;
+        }
+        .info-text div {
+          color: #64748b !important;
+        }
+        .card-bg a,
+        .footer-text a,
+        .footer-social a,
+        .info-text a {
+          color: #33d399 !important;
+        }
+        /* Buttons keep dark text on the brand green. */
+        .card-bg .hk-button a {
+          color: #18181a !important;
+        }
+        /* Inherited table text; cells with their own inline colour (change
+           indicators) are handled below. */
         .dark-table table {
           color: #e2e8f0 !important;
         }
-
-        /* ── Table headers (th has inline color, so !important is needed) ── */
+        .dark-table .cell-label {
+          color: #94a3b8 !important;
+        }
         .dark-table th {
           color: #94a3b8 !important;
           border-color: #334155 !important;
         }
-
-        /* ── Header row border ── */
         .tbl-header {
           border-color: #334155 !important;
         }
-
-        /* ── Alternating rows ── */
         .alt-row {
           background-color: #162033 !important;
         }
-
-        /* ── Change indicators (boost brightness for dark bg) ── */
         .change-up {
           color: #4ade80 !important;
         }
@@ -106,19 +113,35 @@
         .change-neutral {
           color: #94a3b8 !important;
         }
-
-        /* ── Dividers (mj-divider generates <p> with border) ── */
         .card-bg p {
           border-color: #334155 !important;
         }
+      }
 
-        /* ── Info / unsubscribe footer ── */
-        .info-text div {
-          color: #475569 !important;
-        }
-        .info-text a {
-          color: #33d399 !important;
-        }
+      /* Outlook.com dark mode rewrites colours and marks them with
+         data-ogsc (text) and data-ogsb (background). */
+      [data-ogsb] .body-wrapper > div {
+        background-color: #0f172a !important;
+      }
+      [data-ogsb] .card-bg > table {
+        background-color: #1e293b !important;
+      }
+      [data-ogsc] .brand-text div,
+      [data-ogsc] .dark-text div,
+      [data-ogsc] .section-heading div {
+        color: #f1f5f9 !important;
+      }
+      [data-ogsc] .muted div,
+      [data-ogsc] .footer-text div {
+        color: #94a3b8 !important;
+      }
+      [data-ogsc] .card-bg a,
+      [data-ogsc] .footer-text a,
+      [data-ogsc] .footer-social a {
+        color: #33d399 !important;
+      }
+      [data-ogsc] .card-bg .hk-button a {
+        color: #18181a !important;
       }
     </mj-style>
   </mj-head>
@@ -130,7 +153,7 @@
           align="center"
           font-size="24px"
           font-weight="700"
-          color="#000000"
+          color="#0f172a"
           css-class="brand-text"
         >
           HitKeep
@@ -140,7 +163,7 @@
 
     <!-- Content Card -->
     <mj-wrapper css-class="card-bg" background-color="#ffffff" padding="0px">
-      <mj-section padding="40px 40px 20px 40px">
+      <mj-section css-class="card-section" padding="40px 40px 20px 40px">
         <mj-column>
           <!-- DYNAMIC CONTENT INJECTION -->
           {{ template "content" .Data }}
@@ -151,11 +174,11 @@
     <!-- Footer -->
     <mj-section padding-top="20px" padding-bottom="40px">
       <mj-column>
-        <mj-text align="center" css-class="footer-text" font-size="12px">
+        <mj-text align="center" color="#64748b" css-class="footer-text" font-size="12px">
           {{ t "footer.powered_by" }}
           <a
             href="https://hitkeep.com"
-            style="color: #33d399; text-decoration: none; font-weight: 600"
+            style="color: #047857; text-decoration: none; font-weight: 600"
             >HitKeep</a
           >
           <br />
@@ -163,18 +186,18 @@
           <br />
           <a
             href="https://hitkeep.com/legal/imprint/"
-            style="color: #33d399; text-decoration: none; font-weight: 600"
+            style="color: #047857; text-decoration: none; font-weight: 600"
             >{{ t "footer.imprint" }}</a
           >
           <span style="color: #94a3b8"> · </span>
           <a
             href="https://hitkeep.com/legal/privacy-policy/"
-            style="color: #33d399; text-decoration: none; font-weight: 600"
+            style="color: #047857; text-decoration: none; font-weight: 600"
             >{{ t "footer.privacy_policy" }}</a
           >
         </mj-text>
-        <mj-text align="center" css-class="footer-social" font-size="12px" padding-top="4px">
-          <span style="color: #64748b; font-weight: 600">{{ t "footer.social.profiles" }}</span>
+        <mj-text align="center" color="#64748b" css-class="footer-social" font-size="12px" padding-top="4px">
+          <span style="font-weight: 600">{{ t "footer.social.profiles" }}</span>
           <br />
           <a
             href="https://github.com/pascalebeier/hitkeep"

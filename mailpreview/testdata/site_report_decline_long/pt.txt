@@ -4,7 +4,7 @@ Relatório de Análise do Mensal
 docs.a-rather-long-subdomain.example.com · 22-28 Set 2026
 
 Métricas
--------
+--------
 Visualizações de Página:    9.120 (−78%)
 Visitantes:     3.021 (−77%)
 Taxa de Rejeição:  41,3%
@@ -12,14 +12,14 @@ Duração Média: 2 min 34 s
 
 
 Principais Páginas
----------
+------------------
 /blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
 /: 2.040
 
 
 
 Principais Referenciadores
--------------
+--------------------------
 google.com: 5.120
 news.ycombinator.com: 2.230
 chatgpt.com: 812
@@ -29,7 +29,7 @@ duckduckgo.com: 301
 
 
 Conversões de Metas
-----------------
+-------------------
 Signup: 312
 Checkout: 88
 
