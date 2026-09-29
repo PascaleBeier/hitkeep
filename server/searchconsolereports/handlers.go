@@ -12,7 +12,6 @@ import (
 	"hitkeep/api"
 	authcore "hitkeep/auth"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -67,10 +66,7 @@ func reportHandler[T any](h *handler, reportName string, load func(context.Conte
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, result); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Search Console "+reportName, "error", err, "site_id", params.SiteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 
@@ -87,10 +83,7 @@ func (h *handler) handleGetDimension(dimension string) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, rows); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Search Console dimension rows", "error", err, "site_id", params.SiteID, "dimension", dimension)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, rows)
 	}
 }
 
@@ -127,9 +120,8 @@ func (h *handler) parseReportParams(w http.ResponseWriter, r *http.Request) (api
 		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 		return api.SearchConsoleReportParams{}, false
 	}
-	siteID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "Invalid site_id", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+	if !ok {
 		return api.SearchConsoleReportParams{}, false
 	}
 	mapping, err := h.searchConsoleMappingForReport(r, siteID)

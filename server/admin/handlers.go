@@ -182,10 +182,7 @@ func (h *handler) handleListUsers() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, users); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, users)
 	}
 }
 
@@ -203,10 +200,7 @@ func (h *handler) handleListInstanceExclusions() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, rules); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusions response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, rules)
 	}
 }
 
@@ -253,11 +247,7 @@ func (h *handler) handleCreateInstanceExclusion() http.HandlerFunc {
 			Details:     fmt.Sprintf("Traffic exclusion created (scope=instance, type=%s, value=%s)", input.Type, input.Label),
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, createdRule); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode instance exclusion response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, createdRule)
 	}
 }
 
@@ -268,9 +258,8 @@ func (h *handler) handleDeleteInstanceExclusion() http.HandlerFunc {
 			return
 		}
 
-		ruleID, err := uuid.Parse(strings.TrimSpace(r.PathValue("ruleID")))
-		if err != nil {
-			http.Error(w, "Invalid rule ID", http.StatusBadRequest)
+		ruleID, ok := shared.PathUUID(w, r, "ruleID", "Invalid rule ID")
+		if !ok {
 			return
 		}
 
@@ -343,9 +332,8 @@ func (h *handler) actorInstanceRole(r *http.Request) (authcore.InstanceRole, err
 
 func (h *handler) handleDisableUser2FA() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		targetUserID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		targetUserID, ok := shared.PathUUID(w, r, "id", "Invalid user ID")
+		if !ok {
 			return
 		}
 
@@ -390,15 +378,12 @@ func (h *handler) handleDisableUser2FA() http.HandlerFunc {
 			"sessions_invalidated", result.SessionsInvalidated,
 		)
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.AdminDisableUserMFAResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.AdminDisableUserMFAResponse{
 			Status:              "ok",
 			TOTPDisabled:        result.TOTPDisabled,
 			PasskeysDeleted:     result.PasskeysDeleted,
 			SessionsInvalidated: result.SessionsInvalidated,
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode disable user MFA response", "error", err, "target_user_id", targetUserID)
-		}
+		})
 	}
 }
 
@@ -557,14 +542,10 @@ func (h *handler) handleDeleteUser() http.HandlerFunc {
 }
 
 func writeDeleteUserBlocked(ctx context.Context, w http.ResponseWriter, targetUserID uuid.UUID, teams []api.Team) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusConflict)
-	if encodeErr := json.MarshalWrite(w, api.AdminDeleteUserBlockedResponse{
+	shared.WriteJSON(ctx, w, http.StatusConflict, api.AdminDeleteUserBlockedResponse{
 		Status:  "error",
 		Code:    "user_owns_teams",
 		Message: "Transfer ownership before deleting this user, or use ?force=true to archive their teams.",
 		Teams:   teams,
-	}); encodeErr != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode delete user blocked response", "error", encodeErr, "target_user_id", targetUserID)
-	}
+	})
 }

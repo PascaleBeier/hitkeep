@@ -52,7 +52,7 @@ func (h *handler) handleGetActivation() http.HandlerFunc {
 			resp.Rows[i].CloudRegion = h.ctx.Config.CloudRegion
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, resp)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 

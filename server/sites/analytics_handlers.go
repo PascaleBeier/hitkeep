@@ -12,7 +12,6 @@ import (
 
 	"hitkeep/api"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -69,10 +68,7 @@ func (h *handler) handleGetSitesOverviewStats() http.HandlerFunc {
 			response.Sites = append(response.Sites, *stats)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, response); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, response)
 	}
 }
 
@@ -192,10 +188,7 @@ func (h *handler) handleGetSiteStats() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, stats); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, stats)
 	}
 }
 
@@ -300,10 +293,7 @@ func (h *handler) handleGetSiteEcommerce(load func(context.Context, *database.St
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, payload); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, payload)
 	}
 }
 

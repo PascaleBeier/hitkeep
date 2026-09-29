@@ -127,10 +127,7 @@ func (h *handler) handleSSOStart() http.HandlerFunc {
 			ExpiresAt:    time.Now().UTC().Add(ssoFlowTTL),
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.SSOStartResponse{AuthURL: authorization.URL(state)}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO start response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.SSOStartResponse{AuthURL: authorization.URL(state)})
 	}
 }
 
@@ -273,10 +270,7 @@ func (h *handler) requireSSOAccessCapacity(ctx context.Context, teamID uuid.UUID
 }
 
 func writeSSOAvailability(ctx context.Context, w http.ResponseWriter, enabled bool) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, api.SSOAvailability{Enabled: enabled}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode SSO availability", "error", err)
-	}
+	shared.WriteJSON(ctx, w, http.StatusOK, api.SSOAvailability{Enabled: enabled})
 }
 
 func (h *handler) handleSSOCallback() http.HandlerFunc {
@@ -507,15 +501,11 @@ func splitSSODisplayName(displayName string) (string, string) {
 }
 
 func writeSSOStartError(ctx context.Context, w http.ResponseWriter, status int, code string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, map[string]string{
+	shared.WriteJSON(ctx, w, status, map[string]string{
 		"status":  "error",
 		"code":    code,
 		"message": "SSO login could not be started for this email address",
-	}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode SSO start error response", "error", err)
-	}
+	})
 }
 
 func (h *handler) handleSSOCompletionError(w http.ResponseWriter, r *http.Request, state shared.SSOOAuthState, err error) {

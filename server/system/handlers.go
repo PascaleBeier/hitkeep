@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -79,16 +78,12 @@ func databaseReadinessReason(state string) string {
 }
 
 func writeNotReady(ctx context.Context, w http.ResponseWriter, reason string) {
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
-	w.WriteHeader(http.StatusServiceUnavailable)
-	if err := json.MarshalWrite(w, map[string]any{
+	shared.WriteJSON(ctx, w, http.StatusServiceUnavailable, map[string]any{
 		"status":              "not_ready",
 		"reason":              reason,
 		"retry_after_seconds": 5,
-	}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode readiness response", "error", err)
-	}
+	})
 }
 
 func (h *handler) handleGetStatus() http.HandlerFunc {
@@ -105,9 +100,6 @@ func (h *handler) handleGetStatus() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, response); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, response)
 	}
 }

@@ -38,18 +38,14 @@ func (h *handler) handleAdminListTeams() http.HandlerFunc {
 			http.Error(w, "Internal error", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, teams); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, teams)
 	}
 }
 
 func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+		if !ok {
 			return
 		}
 
@@ -60,7 +56,7 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			return
 		}
 
-		err = h.archiveTeam(r.Context(), teamID, actorID)
+		err := h.archiveTeam(r.Context(), teamID, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, database.ErrTeamArchiveDefaultTenant):
@@ -73,10 +69,7 @@ func (h *handler) handleAdminArchiveTeam() http.HandlerFunc {
 			}
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode archive team response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
@@ -87,9 +80,8 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			return
 		}
 
-		teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+		if !ok {
 			return
 		}
 
@@ -138,7 +130,7 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 					return
 				}
 				for _, site := range sites {
-					err = h.deleteSite(r.Context(), site.ID)
+					err := h.deleteSite(r.Context(), site.ID)
 					if err != nil {
 						shared.LoggerFromContext(r.Context()).Error("Failed to delete site during force team delete", "error", err, "site_id", site.ID, "team_id", teamID)
 						http.Error(w, "Failed to delete team", http.StatusInternalServerError)
@@ -179,14 +171,11 @@ func (h *handler) handleAdminDeleteTeam() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.AdminDeleteTeamResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.AdminDeleteTeamResponse{
 			Status: "ok",
 			TeamID: deleted.ID,
 			Name:   deleted.Name,
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode delete team response", "error", err, "team_id", teamID)
-		}
+		})
 	}
 }
 
@@ -222,10 +211,7 @@ func (h *handler) handleAdminListSites() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, sites); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, sites)
 	}
 }
 
@@ -268,10 +254,7 @@ func (h *handler) handleGetSiteMembers() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, members); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, members)
 	}
 }
 

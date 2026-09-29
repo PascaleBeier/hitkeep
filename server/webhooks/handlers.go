@@ -1,7 +1,6 @@
 package webhooks
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -59,9 +58,8 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 
 func (h *handler) siteScoped(build func(*uuid.UUID) http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site ID")
+		if !ok {
 			return
 		}
 		build(&siteID).ServeHTTP(w, r)
@@ -70,7 +68,7 @@ func (h *handler) siteScoped(build func(*uuid.UUID) http.HandlerFunc) http.Handl
 
 func (h *handler) handleCatalog(scope webhookcore.Scope) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(r.Context(), w, http.StatusOK, webhookcore.Catalog(scope))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, webhookcore.Catalog(scope))
 	}
 }
 
@@ -82,7 +80,7 @@ func (h *handler) handleList(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, items)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, items)
 	}
 }
 
@@ -104,7 +102,7 @@ func (h *handler) handleCreate(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Failed to create webhook", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusCreated, api.WebhookSecretResponse{Webhook: *created, Secret: secret})
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, api.WebhookSecretResponse{Webhook: *created, Secret: secret})
 	}
 }
 
@@ -134,7 +132,7 @@ func (h *handler) handleUpdate(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Failed to update webhook", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, updated)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, updated)
 	}
 }
 
@@ -160,7 +158,7 @@ func (h *handler) handleRotate(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Failed to rotate webhook secret", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, api.WebhookSecretResponse{Webhook: *updated, Secret: secret})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.WebhookSecretResponse{Webhook: *updated, Secret: secret})
 	}
 }
 
@@ -229,7 +227,7 @@ func (h *handler) handleTest(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Failed to create webhook test delivery", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusAccepted, api.WebhookTestResponse{EventID: emission.EventID, DeliveryIDs: emission.DeliveryIDs})
+		shared.WriteJSON(r.Context(), w, http.StatusAccepted, api.WebhookTestResponse{EventID: emission.EventID, DeliveryIDs: emission.DeliveryIDs})
 	}
 }
 
@@ -249,7 +247,7 @@ func (h *handler) handleDeliveries(siteID *uuid.UUID) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, items)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, items)
 	}
 }
 
@@ -311,20 +309,7 @@ func (h *handler) auditParams(r *http.Request, siteID *uuid.UUID, action string,
 }
 
 func parseWebhookID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	webhookID, err := uuid.Parse(strings.TrimSpace(r.PathValue("webhookID")))
-	if err != nil {
-		http.Error(w, "Invalid webhook ID", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return webhookID, true
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode webhook response", "error", err)
-	}
+	return shared.PathUUID(w, r, "webhookID", "Invalid webhook ID")
 }
 
 func nullableSiteLogValue(siteID *uuid.UUID) any {

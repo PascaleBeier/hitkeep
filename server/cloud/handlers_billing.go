@@ -299,11 +299,7 @@ func (h *handler) handleSignup() http.HandlerFunc {
 			RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud signup response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, resp)
 	}
 }
 
@@ -352,14 +348,10 @@ func signupVerificationLink(publicURL, token string) string {
 }
 
 func writeResendSignupVerificationAccepted(ctx context.Context, w http.ResponseWriter) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
-	if err := json.MarshalWrite(w, resendSignupVerificationResponse{
+	shared.WriteJSON(ctx, w, http.StatusAccepted, resendSignupVerificationResponse{
 		Status:            "accepted",
 		RetryAfterSeconds: int(database.PendingSignupVerificationResendCooldown / time.Second),
-	}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode signup verification resend response", "error_code", "response_encode_failed")
-	}
+	})
 }
 
 func (h *handler) handleVerifySignup() http.HandlerFunc {
@@ -515,9 +507,6 @@ func (h *handler) handleListCloudPlans() http.HandlerFunc {
 		}
 		mu.Unlock()
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, response); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud plans response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, response)
 	}
 }

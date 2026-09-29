@@ -130,10 +130,7 @@ func (h *handler) handleCreateBillingPortalSession() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, billingPortalSessionResponse{URL: session.URL}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing portal session response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, billingPortalSessionResponse{URL: session.URL})
 	}
 }
 
@@ -288,10 +285,7 @@ func (h *handler) handleCreateBillingCheckoutSession() http.HandlerFunc {
 			shared.LoggerFromContext(r.Context()).Warn("Failed to record checkout conversion", "error", err, "team_id", activeTenantID, "checkout_session_id", session.ID)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, billingCheckoutSessionResponse{URL: session.URL}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode billing checkout session response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, billingCheckoutSessionResponse{URL: session.URL})
 	}
 }
 
@@ -333,10 +327,7 @@ func (h *handler) handleGetBillingState() http.HandlerFunc {
 				state.BillingInterval = account.BillingInterval
 			}
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, state); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode cloud billing state", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, state)
 	}
 }
 

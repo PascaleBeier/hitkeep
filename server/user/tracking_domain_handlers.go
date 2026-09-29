@@ -70,10 +70,7 @@ func (h *handler) handleListCustomTrackingDomains() http.HandlerFunc {
 			return
 		}
 		domains = decorateCustomTrackingDomains(domains, h.ctx.Config.CustomTrackingDNSTargetValue())
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, domains); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domains response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, domains)
 	}
 }
 
@@ -132,11 +129,7 @@ func (h *handler) handleCreateCustomTrackingDomain() http.HandlerFunc {
 		}
 		h.appendCustomTrackingDomainAudit(r, teamID, userID, *domain, "tracking_domain.created", "Custom tracking domain "+domain.Hostname+" created")
 		*domain = decorateCustomTrackingDomain(*domain, h.ctx.Config.CustomTrackingDNSTargetValue())
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, domain); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode custom tracking domain response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, domain)
 	}
 }
 
@@ -170,10 +163,7 @@ func (h *handler) handleVerifyCustomTrackingDomain() http.HandlerFunc {
 		}
 		h.appendCustomTrackingDomainAudit(r, teamID, userID, *verified, "tracking_domain.verified", "Custom tracking domain "+verified.Hostname+" verification checked")
 		*verified = decorateCustomTrackingDomain(*verified, h.ctx.Config.CustomTrackingDNSTargetValue())
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, verified); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode verified custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, verified)
 	}
 }
 
@@ -211,10 +201,7 @@ func (h *handler) handleUpdateCustomTrackingDomain() http.HandlerFunc {
 		}
 		h.appendCustomTrackingDomainAudit(r, teamID, userID, *domain, action, details)
 		*domain = decorateCustomTrackingDomain(*domain, h.ctx.Config.CustomTrackingDNSTargetValue())
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, domain); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated custom tracking domain response", "error", err, "team_id", teamID, "domain_id", domainID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, domain)
 	}
 }
 
@@ -386,12 +373,7 @@ func (h *handler) conflictsWithPublicHost(hostname string) bool {
 }
 
 func parseTeamIDPath(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid team ID", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return teamID, true
+	return shared.PathUUID(w, r, "id", "Invalid team ID")
 }
 
 func parseTeamDomainIDs(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUID, bool) {
@@ -399,9 +381,8 @@ func parseTeamDomainIDs(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
-	domainID, err := uuid.Parse(strings.TrimSpace(r.PathValue("domainId")))
-	if err != nil {
-		http.Error(w, "Invalid custom tracking domain ID", http.StatusBadRequest)
+	domainID, ok := shared.PathUUID(w, r, "domainId", "Invalid custom tracking domain ID")
+	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
 	return teamID, domainID, true

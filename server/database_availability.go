@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -54,17 +53,13 @@ func databaseIndependentRoute(path string) bool {
 
 func writeDatabaseUnavailable(ctx context.Context, w http.ResponseWriter, state string) {
 	code, message := databaseUnavailableResponse(state)
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "5")
-	w.WriteHeader(http.StatusServiceUnavailable)
-	if err := json.MarshalWrite(w, map[string]any{
+	shared.WriteJSON(ctx, w, http.StatusServiceUnavailable, map[string]any{
 		"status":              "error",
 		"code":                code,
 		"message":             message,
 		"retry_after_seconds": 5,
-	}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode database recovery response", "error", err)
-	}
+	})
 }
 
 func databaseUnavailableResponse(state string) (string, string) {

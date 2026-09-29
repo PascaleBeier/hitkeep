@@ -79,7 +79,7 @@ func (h *handler) handleSocialProviders() http.HandlerFunc {
 				providers = append(providers, api.SocialProvider{ID: status.Provider, DisplayName: status.DisplayName})
 			}
 		}
-		writeSocialJSON(r.Context(), w, http.StatusOK, api.SocialProvidersResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.SocialProvidersResponse{
 			Providers: providers, SignupEnabled: h.socialSignupEnabled(),
 		})
 	}
@@ -147,7 +147,7 @@ func (h *handler) handleSocialStart(linkFlow bool) http.HandlerFunc {
 			ExpiresAt: time.Now().UTC().Add(socialFlowTTL),
 		})
 		h.setSocialStateCookie(w, state)
-		writeSocialJSON(r.Context(), w, http.StatusOK, map[string]string{"auth_url": authorization.URL(state)})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"auth_url": authorization.URL(state)})
 	}
 }
 
@@ -319,7 +319,7 @@ func (h *handler) handleSocialPreview() http.HandlerFunc {
 			}
 			emailConfirmationRequired = identity == nil
 		}
-		writeSocialJSON(r.Context(), w, http.StatusOK, socialPreviewResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, socialPreviewResponse{
 			Provider: completion.Provider, DisplayName: config.DisplayName, ObservedEmail: completion.ObservedEmail,
 			EmailVerified: completion.EmailVerified, EmailConfirmationRequired: emailConfirmationRequired, Flow: completion.Flow,
 		})
@@ -407,7 +407,7 @@ func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, re
 		}
 		if targetUser == nil {
 			if h.socialSignupEnabled() {
-				writeSocialJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
+				shared.WriteJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
 				return
 			}
 			h.appendAuthAuditSystem(r, "auth.social_login_failed", "failure", completion.Provider, "provider="+completion.Provider+";reason=account_not_found")
@@ -418,12 +418,12 @@ func (h *handler) completeSocialLogin(w http.ResponseWriter, r *http.Request, re
 			writeSocialError(r.Context(), w, http.StatusBadGateway, "social_confirmation_failed")
 			return
 		}
-		writeSocialJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{Status: "verification_sent"})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{Status: "verification_sent"})
 		return
 	}
 
 	if h.socialSignupEnabled() {
-		writeSocialJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, h.socialSignupRequiredResponse(completion))
 		return
 	}
 	writeSocialError(r.Context(), w, http.StatusForbidden, "social_account_not_found")
@@ -487,7 +487,7 @@ func (h *handler) writeCompletedSocialLogin(w http.ResponseWriter, r *http.Reque
 	} else {
 		h.appendAuthAuditForUserTeams(r, userID, "auth.social_login_succeeded", "success", "provider="+completion.Provider+";reason=success", true)
 	}
-	writeSocialJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{
+	shared.WriteJSON(r.Context(), w, http.StatusOK, socialCompleteResponse{
 		Status: response.Status, RedirectURL: completion.ReturnPath, ChallengeToken: response.ChallengeToken,
 		Factors: response.Factors, Passkey: response.Passkey,
 	})
@@ -562,7 +562,7 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 				writeSocialError(r.Context(), w, http.StatusBadGateway, "social_confirmation_failed")
 				return
 			}
-			writeSocialJSON(r.Context(), w, http.StatusCreated, map[string]any{
+			shared.WriteJSON(r.Context(), w, http.StatusCreated, map[string]any{
 				"status": "verification_sent", "plan_code": req.PlanCode, "billing": req.BillingInterval,
 			})
 			return
@@ -584,7 +584,7 @@ func (h *handler) handleSocialCloudSignupComplete() http.HandlerFunc {
 			return
 		}
 		h.appendAuthAuditForUserTeams(r, account.UserID, "auth.social_signup_succeeded", "success", "provider="+completion.Provider+";reason=verified_provider_email", true)
-		writeSocialJSON(r.Context(), w, http.StatusCreated, map[string]any{
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, map[string]any{
 			"status": "ok", "plan_code": req.PlanCode, "billing": req.BillingInterval,
 			"redirect_url": socialSignupRedirect(req.PlanCode, req.BillingInterval),
 		})
@@ -881,15 +881,7 @@ func socialLoginErrorCategory(err error) string {
 }
 
 func writeSocialError(ctx context.Context, w http.ResponseWriter, status int, code string) {
-	writeSocialJSON(ctx, w, status, map[string]string{"status": "error", "code": code})
-}
-
-func writeSocialJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode social auth response", "error", err)
-	}
+	shared.WriteJSON(ctx, w, status, map[string]string{"status": "error", "code": code})
 }
 
 func decodeSocialJSON(w http.ResponseWriter, r *http.Request, dest any, allowEmpty bool) bool {

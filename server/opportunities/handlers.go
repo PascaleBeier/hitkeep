@@ -1,7 +1,6 @@
 package opportunities
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -46,7 +45,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 
 func (h *handler) handleList() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid "+"id")
 		if !ok {
 			return
 		}
@@ -61,13 +60,13 @@ func (h *handler) handleList() http.HandlerFunc {
 			return
 		}
 		opps = opportunitysvc.RankOpportunities(opps)
-		writeJSON(r.Context(), w, http.StatusOK, api.OpportunityListResponse{Opportunities: opps})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.OpportunityListResponse{Opportunities: opps})
 	}
 }
 
 func (h *handler) handleDigestPreview() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid "+"id")
 		if !ok {
 			return
 		}
@@ -88,13 +87,13 @@ func (h *handler) handleDigestPreview() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, apiOpportunityDigestPreview(preview))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, apiOpportunityDigestPreview(preview))
 	}
 }
 
 func (h *handler) handleGenerate() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid "+"id")
 		if !ok {
 			return
 		}
@@ -166,17 +165,17 @@ func (h *handler) handleGenerate() http.HandlerFunc {
 			return
 		}
 		h.publishOpportunityChange(siteID, len(opps))
-		writeJSON(r.Context(), w, http.StatusOK, api.OpportunityGenerateResponse{Opportunities: opps, AIRunID: runID, AIStatus: aiStatus})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.OpportunityGenerateResponse{Opportunities: opps, AIRunID: runID, AIStatus: aiStatus})
 	}
 }
 
 func (h *handler) handleUpdateStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid "+"id")
 		if !ok {
 			return
 		}
-		opportunityID, ok := parseUUIDPath(w, r, "opportunityID")
+		opportunityID, ok := shared.PathUUID(w, r, "opportunityID", "Invalid "+"opportunityID")
 		if !ok {
 			return
 		}
@@ -226,7 +225,7 @@ func (h *handler) handleUpdateStatus() http.HandlerFunc {
 			return
 		}
 		h.publishOpportunityChange(siteID, 1)
-		writeJSON(r.Context(), w, http.StatusOK, opportunity)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, opportunity)
 	}
 }
 
@@ -360,15 +359,6 @@ func apiClientAuditMetadata(apiClient *database.APIClientAuth) string {
 	return string(raw)
 }
 
-func parseUUIDPath(w http.ResponseWriter, r *http.Request, key string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(r.PathValue(key))
-	if err != nil {
-		http.Error(w, "Invalid "+key, http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return id, true
-}
-
 func parseRange(r *http.Request) (time.Time, time.Time, error) {
 	now := time.Now().UTC()
 	to, err := parseOptionalTime(r.URL.Query().Get("to"), now)
@@ -400,12 +390,4 @@ func parseOptionalTime(raw string, fallback time.Time) (time.Time, error) {
 		return ts, nil
 	}
 	return time.Time{}, fmt.Errorf("invalid time %q", raw)
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode opportunities response", "error", err)
-	}
 }

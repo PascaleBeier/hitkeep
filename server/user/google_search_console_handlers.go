@@ -46,10 +46,7 @@ func (h *handler) handleGetGoogleSearchConsoleStatus() http.HandlerFunc {
 		}
 
 		status := h.buildGoogleSearchConsoleStatus(r, teamID, role)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console status", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -89,10 +86,7 @@ func (h *handler) handleConnectGoogleSearchConsole() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.GoogleSearchConsoleConnectResponse{AuthURL: authURL}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console connect response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.GoogleSearchConsoleConnectResponse{AuthURL: authURL})
 	}
 }
 
@@ -139,10 +133,7 @@ func (h *handler) handleListGoogleSearchConsoleProperties() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console properties", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -195,10 +186,7 @@ func (h *handler) handleGetGoogleSearchConsoleSiteMapping() http.HandlerFunc {
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -275,10 +263,7 @@ func (h *handler) handleMapGoogleSearchConsoleSiteProperty() http.HandlerFunc {
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -324,10 +309,7 @@ func (h *handler) handleUnmapGoogleSearchConsoleSiteProperty() http.HandlerFunc 
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console site mapping", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -402,10 +384,7 @@ func (h *handler) handleRequestGoogleSearchConsoleSiteSync() http.HandlerFunc {
 			http.Error(w, "Could not load Google Search Console site mapping", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console sync response", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -548,17 +527,13 @@ func (h *handler) handleDisconnectGoogleSearchConsole() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode Google Search Console disconnect response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
 func (h *handler) resolveGoogleSearchConsoleTeamAccess(w http.ResponseWriter, r *http.Request, userID uuid.UUID) (uuid.UUID, string, bool) {
-	teamID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "Invalid team_id", http.StatusBadRequest)
+	teamID, ok := shared.PathUUID(w, r, "id", "Invalid team_id")
+	if !ok {
 		return uuid.Nil, "", false
 	}
 
@@ -576,9 +551,8 @@ func (h *handler) resolveGoogleSearchConsoleSiteScope(w http.ResponseWriter, r *
 		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 		return uuid.Nil, uuid.Nil, false
 	}
-	siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid site_id", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
 	teamID, err := h.ctx.Store.GetSiteTenantID(r.Context(), siteID)

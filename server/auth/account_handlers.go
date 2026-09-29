@@ -221,11 +221,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 			h.appendInviteAcceptedAuditEvents(r, authenticatedUser.ID, acceptedEmail, acceptedInvites)
 
 			shared.LoggerFromContext(r.Context()).Info("Invite accepted by existing user", "user_id", authenticatedUser.ID)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
-				shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-			}
+			shared.WriteJSON(r.Context(), w, http.StatusOK, loginResponse{Status: "ok"})
 			return
 		}
 
@@ -274,11 +270,7 @@ func (h *handler) handleAcceptInvite() http.HandlerFunc {
 
 		shared.LoggerFromContext(r.Context()).Info("Invite accepted", "user_id", userID)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, loginResponse{Status: "ok"})
 	}
 }
 

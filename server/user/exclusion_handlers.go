@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -37,10 +36,7 @@ func (h *handler) handleListTeamExclusions() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, rules); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusions response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, rules)
 	}
 }
 
@@ -87,11 +83,7 @@ func (h *handler) handleCreateTeamExclusion() http.HandlerFunc {
 			Details:     fmt.Sprintf("Traffic exclusion created (scope=team, type=%s, value=%s)", input.Type, input.Label),
 		})
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, rule); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team exclusion response", "error", err, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, rule)
 	}
 }
 
@@ -101,9 +93,8 @@ func (h *handler) handleDeleteTeamExclusion() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		ruleID, err := uuid.Parse(strings.TrimSpace(r.PathValue("ruleID")))
-		if err != nil {
-			http.Error(w, "Invalid rule_id", http.StatusBadRequest)
+		ruleID, ok := shared.PathUUID(w, r, "ruleID", "Invalid rule_id")
+		if !ok {
 			return
 		}
 
@@ -134,12 +125,7 @@ func (h *handler) handleDeleteTeamExclusion() http.HandlerFunc {
 }
 
 func teamExclusionID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid team_id", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return teamID, true
+	return shared.PathUUID(w, r, "id", "Invalid team_id")
 }
 
 func teamEffectiveExclusionsQuery(r *http.Request) (bool, error) {

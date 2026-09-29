@@ -76,12 +76,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 // parseSiteID extracts and validates the site UUID from the URL path.
 // Authorization is already handled by the RequirePermission middleware.
 func parseSiteID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	siteID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "Invalid site_id", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return siteID, true
+	return shared.PathUUID(w, r, "id", "Invalid site_id")
 }
 
 func (h *handler) handleListDefinitions(
@@ -108,10 +103,7 @@ func (h *handler) handleListDefinitions(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, definitions); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, definitions)
 	}
 }
 
@@ -129,9 +121,8 @@ func (h *handler) handleDeleteDefinition(
 			return
 		}
 
-		definitionID, err := uuid.Parse(r.PathValue(pathParam))
-		if err != nil {
-			http.Error(w, invalidIDMessage, http.StatusBadRequest)
+		definitionID, ok := shared.PathUUID(w, r, pathParam, invalidIDMessage)
+		if !ok {
 			return
 		}
 
@@ -247,9 +238,8 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		goalID, err := uuid.Parse(r.PathValue("goalID"))
-		if err != nil {
-			http.Error(w, "Invalid goal_id", http.StatusBadRequest)
+		goalID, ok := shared.PathUUID(w, r, "goalID", "Invalid goal_id")
+		if !ok {
 			return
 		}
 		var input api.Goal
@@ -285,8 +275,7 @@ func (h *handler) handleUpdateGoal() http.HandlerFunc {
 				"site_id": siteID.String(), "goal_id": goalID.String(), "name": input.Name, "type": input.Type,
 			},
 		})
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, input)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, input)
 	}
 }
 
@@ -352,10 +341,7 @@ func (h *handler) handleTimeseries(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, series); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, series)
 	}
 }
 
@@ -421,9 +407,8 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		funnelID, err := uuid.Parse(r.PathValue("funnelID"))
-		if err != nil {
-			http.Error(w, "Invalid funnel_id", http.StatusBadRequest)
+		funnelID, ok := shared.PathUUID(w, r, "funnelID", "Invalid funnel_id")
+		if !ok {
 			return
 		}
 
@@ -455,10 +440,7 @@ func (h *handler) handleUpdateFunnel() http.HandlerFunc {
 		}
 
 		h.publishDefinitionChange(siteID, realtime.KindFunnels)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, input); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, input)
 	}
 }
 
@@ -559,9 +541,6 @@ func (h *handler) handleGetFunnelStats() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, stats); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, stats)
 	}
 }

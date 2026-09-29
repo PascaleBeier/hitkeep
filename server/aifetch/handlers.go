@@ -64,9 +64,8 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 }
 
 func parseSiteAndRange(w http.ResponseWriter, r *http.Request) (api.AIFetchQueryParams, bool) {
-	siteID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "Invalid site_id", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+	if !ok {
 		return api.AIFetchQueryParams{}, false
 	}
 
@@ -296,8 +295,7 @@ func (h *handler) handleGetOverview() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, result)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 
@@ -324,8 +322,7 @@ func (h *handler) handleGetTimeseries() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, result)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 
@@ -352,8 +349,7 @@ func (h *handler) handleGetCorrelation() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, result)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 

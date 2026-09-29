@@ -92,15 +92,11 @@ func (h *handler) appendTeamAudit(r *http.Request, teamID, actorID uuid.UUID, ac
 }
 
 func writeTeamActionError(ctx context.Context, w http.ResponseWriter, statusCode int, code string, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	if err := json.MarshalWrite(w, map[string]string{
+	shared.WriteJSON(ctx, w, statusCode, map[string]string{
 		"status":  "error",
 		"code":    code,
 		"message": message,
-	}); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode team action error", "error", err, "code", code)
-	}
+	})
 }
 
 func operatorTeamEntitlements() *api.TeamEntitlements {
@@ -288,11 +284,7 @@ func (h *handler) handleCreateTeam() http.HandlerFunc {
 		}
 		h.appendTeamAudit(r, team.ID, actorID, "team.created", fmt.Sprintf("Team %q created", team.Name), nil)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, map[string]any{"team": team}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team response", "error", err, "actor_id", actorID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, map[string]any{"team": team})
 	}
 }
 
@@ -311,10 +303,7 @@ func (h *handler) handleGetTeams() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode teams response", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -360,14 +349,11 @@ func (h *handler) handleSetActiveTeam() http.HandlerFunc {
 			activeTeamID = teamID
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, map[string]any{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]any{
 			"status":          "ok",
 			"active_team_id":  activeTeamID,
 			"recent_team_ids": orderedRecentTeamIDs(teams, activeTeamID),
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode active team response", "error", err, "user_id", userID)
-		}
+		})
 	}
 }
 
@@ -379,9 +365,8 @@ func (h *handler) handleGetTeamMembers() http.HandlerFunc {
 			return
 		}
 
-		teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+		if !ok {
 			return
 		}
 
@@ -397,10 +382,7 @@ func (h *handler) handleGetTeamMembers() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, members); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team members response", "error", err, "user_id", userID, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, members)
 	}
 }
 
@@ -412,9 +394,8 @@ func (h *handler) handleGetTeamInvites() http.HandlerFunc {
 			return
 		}
 
-		teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+		if !ok {
 			return
 		}
 
@@ -431,10 +412,7 @@ func (h *handler) handleGetTeamInvites() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, invites); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team invites response", "error", err, "user_id", userID, "team_id", teamID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, invites)
 	}
 }
 
@@ -446,9 +424,8 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 			return
 		}
 
-		teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid team ID", http.StatusBadRequest)
+		teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+		if !ok {
 			return
 		}
 
@@ -471,17 +448,14 @@ func (h *handler) handleGetTeamAudit() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.TeamAuditListResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.TeamAuditListResponse{
 			Entries: entries,
 			Total:   total,
 			Limit:   normalizedTeamAuditLimit(filter.Limit),
 			Offset:  filter.Offset,
 			HasMore: filter.Offset+len(entries) < total,
 			Action:  filter.Action,
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team audit response", "error", err, "user_id", userID, "team_id", teamID)
-		}
+		})
 	}
 }
 

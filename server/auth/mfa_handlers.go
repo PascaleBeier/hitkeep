@@ -9,7 +9,6 @@ import (
 
 	"hitkeep/appurl"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/mailables"
 	"hitkeep/mailer"
 	"hitkeep/security"
@@ -106,11 +105,7 @@ func (h *handler) handleMFATOTPVerify() http.HandlerFunc {
 		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "totp_succeeded"), true)
 		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa totp verification response", "error", err, "user_id", challenge.UserID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, loginResponse{Status: "ok"})
 	}
 }
 
@@ -152,11 +147,7 @@ func (h *handler) handleMFARecoveryCodeVerify() http.HandlerFunc {
 		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.mfa_succeeded", "success", mfaAuditDetails(challenge, "recovery_code_succeeded"), true)
 		h.appendAuthAuditForUserTeams(r, challenge.UserID, "auth.login_succeeded", "success", mfaAuditDetails(challenge, "mfa_succeeded"), true)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.MarshalWrite(w, loginResponse{Status: "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode recovery code verification response", "error", err, "user_id", challenge.UserID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, loginResponse{Status: "ok"})
 	}
 }
 
@@ -205,11 +196,7 @@ func (h *handler) handleMFAEmailLinkRequest() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.MarshalWrite(w, map[string]string{"status": "sent"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode mfa email link response", "error", err, "user_id", user.ID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "sent"})
 	}
 }
 

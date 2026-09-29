@@ -73,10 +73,7 @@ func (h *handler) handlePasskeyLoginStart() http.HandlerFunc {
 			PublicKey:      assertion.Response,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login start response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -208,10 +205,7 @@ func (h *handler) handlePasskeyLoginFinish() http.HandlerFunc {
 			h.appendAuthAuditForUserTeams(r, userID, "auth.login_succeeded", "success", "Passkey login succeeded", true)
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, map[string]string{"status": "ok"}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey login response", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 

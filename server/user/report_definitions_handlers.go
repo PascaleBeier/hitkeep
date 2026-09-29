@@ -30,11 +30,7 @@ func decodeReportJSON(w http.ResponseWriter, r *http.Request, target any) error 
 }
 
 func writeReportError(ctx context.Context, w http.ResponseWriter, status int, code, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, map[string]string{"code": code, "message": message}); err != nil {
-		shared.LoggerFromContext(ctx).Debug("Failed to encode report error response", "error_code", code)
-	}
+	shared.WriteJSON(ctx, w, status, map[string]string{"code": code, "message": message})
 }
 
 func (h *handler) handleReportGetAction() http.HandlerFunc {
@@ -90,8 +86,7 @@ func (h *handler) handleListReports() http.HandlerFunc {
 				reports[index].Recipients = currentReportRecipient(reports[index].Recipients, userID)
 			}
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, reports)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, reports)
 	}
 }
 
@@ -129,9 +124,7 @@ func (h *handler) handleCreateReport() http.HandlerFunc {
 		if refreshed, refreshErr := h.ctx.Store.GetReportDefinition(r.Context(), report.ID); refreshErr == nil {
 			report = refreshed
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_ = json.MarshalWrite(w, report)
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, report)
 	}
 }
 
@@ -156,8 +149,7 @@ func (h *handler) handleGetReport() http.HandlerFunc {
 		if manageErr == nil && !manageable {
 			report.Recipients = currentReportRecipient(report.Recipients, userID)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, report)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, report)
 	}
 }
 
@@ -226,8 +218,7 @@ func (h *handler) handleUpdateReport() http.HandlerFunc {
 		if refreshed, refreshErr := h.ctx.Store.GetReportDefinition(r.Context(), report.ID); refreshErr == nil {
 			report = refreshed
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, report)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, report)
 	}
 }
 
@@ -342,8 +333,7 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 				}
 			}
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, preview)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, preview)
 	}
 }
 
@@ -405,8 +395,7 @@ func (h *handler) handleTestSendReport() http.HandlerFunc {
 		if report.TenantID != nil {
 			h.appendReportAudit(r, *report.TenantID, userID, report.ID, "report.test_sent", "Report test accepted by mail server")
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, api.ReportTestSendResponse{Status: "accepted", MessageID: messageID, SentAt: time.Now().UTC()})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.ReportTestSendResponse{Status: "accepted", MessageID: messageID, SentAt: time.Now().UTC()})
 	}
 }
 
@@ -445,16 +434,14 @@ func (h *handler) handleListReportRuns() http.HandlerFunc {
 				runs[index].Deliveries = currentReportDeliveries(runs[index].Deliveries, userID)
 			}
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, runs)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, runs)
 	}
 }
 
 func (h *handler) handleRetryReportRun() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := uuid.Parse(r.PathValue("run_id"))
-		if err != nil {
-			http.Error(w, "Invalid run ID", http.StatusBadRequest)
+		runID, ok := shared.PathUUID(w, r, "run_id", "Invalid run ID")
+		if !ok {
 			return
 		}
 		reportID, err := h.ctx.Store.GetReportIDForRun(r.Context(), runID)
@@ -515,8 +502,7 @@ func (h *handler) handleGetReportRecipientConfirmation() http.HandlerFunc {
 			writeReportError(r.Context(), w, http.StatusBadRequest, "confirmation_invalid", "This confirmation link is invalid")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, confirmation)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, confirmation)
 	}
 }
 
@@ -697,12 +683,7 @@ func currentReportDeliveries(deliveries []api.ReportDelivery, userID uuid.UUID) 
 }
 
 func reportIDFromPath(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	reportID, err := uuid.Parse(r.PathValue("report_id"))
-	if err != nil {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return reportID, true
+	return shared.PathUUID(w, r, "report_id", "Invalid report ID")
 }
 
 func mergeReportPatch(current *api.ReportDefinition, patch api.UpdateReportRequest) api.CreateReportRequest {

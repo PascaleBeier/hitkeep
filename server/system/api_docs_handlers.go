@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	json "hitkeep/jsonapi"
+	"hitkeep/server/shared"
 )
 
 func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {
@@ -30,8 +31,7 @@ func (h *handler) handleGetAPIDocVersions() http.HandlerFunc {
 			},
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, resp)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
