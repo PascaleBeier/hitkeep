@@ -541,6 +541,49 @@ func TestReportPreviewUsesTheActualLocalizedReportContent(t *testing.T) {
 	if preview.Suppressed {
 		t.Fatal("site summary preview was unexpectedly suppressed")
 	}
+	if !strings.Contains(preview.HTML, site.Domain) || !strings.Contains(preview.Text, site.Domain) || !strings.Contains(preview.Preheader, site.Domain) {
+		t.Fatal("preview must include the rendered HTML, text, and preheader of the actual report")
+	}
+	if !strings.Contains(preview.HTML, `lang="en"`) || preview.Audience != api.ReportRecipientKindMember || preview.ScheduledFor.IsZero() {
+		t.Fatalf("preview metadata = audience %q scheduled %v", preview.Audience, preview.ScheduledFor)
+	}
+	if !strings.Contains(preview.HTML, "/dashboard") {
+		t.Fatal("member preview should link to the dashboard")
+	}
+
+	external := previewReportAs(t, h, userID, reqBody, api.ReportRecipientKindExternal)
+	if external.Code != http.StatusOK {
+		t.Fatalf("external preview status = %d: %s", external.Code, external.Body.String())
+	}
+	var externalPreview api.ReportPreview
+	if err := json.UnmarshalRead(external.Body, &externalPreview); err != nil {
+		t.Fatal(err)
+	}
+	if externalPreview.Audience != api.ReportRecipientKindExternal || !strings.Contains(externalPreview.HTML, site.Domain) || strings.Contains(externalPreview.HTML, "/dashboard") {
+		t.Fatal("external preview must render the self-contained report without dashboard links")
+	}
+
+	if invalid := previewReportAs(t, h, userID, reqBody, "everyone"); invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid audience status = %d, want %d", invalid.Code, http.StatusBadRequest)
+	}
+}
+
+// previewReportAs posts a preview request with the given audience.
+func previewReportAs(t *testing.T, h *handler, userID uuid.UUID, definitionRequest []byte, audience api.ReportRecipientKind) *httptest.ResponseRecorder {
+	t.Helper()
+	var request api.ReportPreviewRequest
+	if err := json.Unmarshal(definitionRequest, &request); err != nil {
+		t.Fatal(err)
+	}
+	request.Audience = audience
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := withTestUser(httptest.NewRequest(http.MethodPost, "/api/reports/preview", bytes.NewReader(body)), userID)
+	response := httptest.NewRecorder()
+	h.handlePreviewReport().ServeHTTP(response, req)
+	return response
 }
 
 func TestReportTestSendSendsTheActualReportToTheCurrentUser(t *testing.T) {

@@ -73,7 +73,7 @@ describe('ReportDefinitionsService', () => {
     it('uses preview, test-send, history, retry, and resubscribe endpoints', () => {
         service.preview(definition).subscribe();
         const preview = httpMock.expectOne('/api/reports/preview');
-        expect(preview.request.body).toEqual({ definition, report_id: undefined });
+        expect(preview.request.body).toEqual({ definition, report_id: undefined, audience: 'member' });
         preview.flush({});
 
         service.testSend(report.id).subscribe();

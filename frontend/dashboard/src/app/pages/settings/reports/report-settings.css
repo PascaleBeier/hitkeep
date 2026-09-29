@@ -245,16 +245,6 @@
     overflow-wrap: anywhere;
 }
 
-.preview-card {
-    display: grid;
-    gap: 0.3rem;
-    border: 1px solid color-mix(in srgb, var(--p-primary-color) 40%, var(--p-content-border-color));
-    border-radius: 0.5rem;
-    background: var(--p-content-hover-background);
-    padding: 0.8rem 1rem;
-    font-size: 0.875rem;
-}
-
 .history-list {
     display: grid;
     gap: 0.6rem;

@@ -1,0 +1,108 @@
+@if (preview(); as current) {
+<div class="email-preview" [class.email-preview--stale]="stale() || loading()" [attr.aria-busy]="loading()" data-testid="report-email-preview">
+    <dl class="envelope" data-testid="report-email-envelope">
+        <div class="envelope-row">
+            <dt>{{ "settings.reports.emailPreview.from" | transloco }}</dt>
+            <dd>{{ sender() || ("settings.reports.emailPreview.senderUnavailable" | transloco) }}</dd>
+        </div>
+        <div class="envelope-row">
+            <dt>{{ "settings.reports.emailPreview.to" | transloco }}</dt>
+            <dd>
+                {{ "settings.reports.emailPreview.recipients" | transloco: { count: current.recipient_count } }} @if (current.pending_recipient_count) {
+                <span class="envelope-muted">· {{ "settings.reports.emailPreview.pending" | transloco: { count: current.pending_recipient_count } }}</span>
+                }
+            </dd>
+        </div>
+        <div class="envelope-row">
+            <dt>{{ "settings.reports.emailPreview.subject" | transloco }}</dt>
+            <dd>
+                <strong data-testid="report-email-subject">{{ current.subject }}</strong>
+                @if (current.preheader) {
+                <span class="envelope-preheader">{{ current.preheader }}</span>
+                }
+            </dd>
+        </div>
+        <div class="envelope-row">
+            <dt>{{ "settings.reports.emailPreview.arrives" | transloco }}</dt>
+            <dd>
+                {{ arrival() }} ({{ current.schedule.timezone }})
+                <span class="envelope-muted">· {{ "settings.reports.emailPreview.covers" | transloco: { period: period() } }}</span>
+            </dd>
+        </div>
+    </dl>
+
+    @if (current.suppressed || !hasEmail()) {
+    <div class="empty-state" data-testid="report-email-suppressed">
+        <i class="pi pi-inbox" aria-hidden="true"></i>
+        <strong>{{ "settings.reports.emailPreview.suppressedTitle" | transloco }}</strong>
+        <p>{{ "settings.reports.previewSuppressed" | transloco }}</p>
+    </div>
+    } @else {
+    <div class="toolbar" role="toolbar" [attr.aria-label]="'settings.reports.emailPreview.toolbar' | transloco">
+        <div class="segmented" role="group" [attr.aria-label]="'settings.reports.emailPreview.view' | transloco">
+            <button type="button" [attr.aria-pressed]="view() === 'email'" (click)="setView('email')"><i class="pi pi-envelope" aria-hidden="true"></i>{{ "settings.reports.emailPreview.viewEmail" | transloco }}</button>
+            <button type="button" [attr.aria-pressed]="view() === 'text'" (click)="setView('text')"><i class="pi pi-align-left" aria-hidden="true"></i>{{ "settings.reports.emailPreview.viewText" | transloco }}</button>
+        </div>
+        @if (view() === 'email') {
+        <div class="segmented" role="group" [attr.aria-label]="'settings.reports.emailPreview.device' | transloco">
+            <button type="button" [attr.aria-pressed]="device() === 'desktop'" (click)="setDevice('desktop')"><i class="pi pi-desktop" aria-hidden="true"></i>{{ "settings.reports.emailPreview.desktop" | transloco }}</button>
+            <button type="button" [attr.aria-pressed]="device() === 'mobile'" (click)="setDevice('mobile')"><i class="pi pi-mobile" aria-hidden="true"></i>{{ "settings.reports.emailPreview.mobile" | transloco }}</button>
+        </div>
+        <div class="segmented" role="group" [attr.aria-label]="'settings.reports.emailPreview.theme' | transloco">
+            <button type="button" [attr.aria-pressed]="theme() === 'light'" (click)="setTheme('light')"><i class="pi pi-sun" aria-hidden="true"></i>{{ "settings.reports.emailPreview.light" | transloco }}</button>
+            <button type="button" [attr.aria-pressed]="theme() === 'dark'" (click)="setTheme('dark')"><i class="pi pi-moon" aria-hidden="true"></i>{{ "settings.reports.emailPreview.dark" | transloco }}</button>
+        </div>
+        } @if (hasExternalRecipients()) {
+        <div class="segmented" role="group" [attr.aria-label]="'settings.reports.emailPreview.audience' | transloco">
+            <button type="button" data-testid="report-email-audience-member" [attr.aria-pressed]="audience() === 'member'" (click)="setAudience('member')">{{ "settings.reports.emailPreview.audienceMember" | transloco }}</button>
+            <button type="button" data-testid="report-email-audience-external" [attr.aria-pressed]="audience() === 'external'" (click)="setAudience('external')">{{ "settings.reports.emailPreview.audienceExternal" | transloco }}</button>
+        </div>
+        }
+        <span class="toolbar-spacer"></span>
+        <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [loading]="loading()" [ariaLabel]="'settings.reports.emailPreview.refresh' | transloco" (onClick)="refresh.emit()" />
+        <p-button icon="pi pi-window-maximize" [text]="true" [rounded]="true" [ariaLabel]="'settings.reports.emailPreview.expand' | transloco" (onClick)="openExpanded()" />
+    </div>
+
+    <ng-template #message>
+        @if (view() === 'email') {
+        <div class="stage" [class.stage--dark]="theme() === 'dark'">
+            <iframe
+                class="frame"
+                sandbox="allow-same-origin"
+                data-testid="report-email-frame"
+                [title]="'settings.reports.emailPreview.frameTitle' | transloco: { subject: current.subject }"
+                [style.width.px]="frameWidth()"
+                [style.height.px]="frameHeight()"
+                [srcdoc]="frameDocument()"
+                (load)="fitFrame($any($event.target))"
+            ></iframe>
+        </div>
+        } @else {
+        <pre class="plain-text" data-testid="report-email-text">{{ current.text }}</pre>
+        }
+    </ng-template>
+
+    <ng-container [ngTemplateOutlet]="message" />
+
+    @if (audience() === 'external') {
+    <p class="context-note"><i class="pi pi-lock" aria-hidden="true"></i>{{ "settings.reports.emailPreview.externalNote" | transloco }}</p>
+    }
+    <p class="context-note"><i class="pi pi-info-circle" aria-hidden="true"></i>{{ "settings.reports.emailPreview.dataNote" | transloco }}</p>
+
+    <dialog #expandedDialog class="expanded" [attr.aria-label]="current.subject" (close)="expandedOpen.set(false)">
+        <div class="expanded-header">
+            <strong>{{ current.subject }}</strong>
+            <p-button icon="pi pi-times" [text]="true" [rounded]="true" [ariaLabel]="'settings.reports.emailPreview.close' | transloco" (onClick)="closeExpanded()" />
+        </div>
+        @if (expandedOpen()) {
+        <ng-container [ngTemplateOutlet]="message" />
+        }
+    </dialog>
+    }
+</div>
+} @else if (loading()) {
+<div class="email-preview-loading" aria-busy="true" data-testid="report-email-preview-loading">
+    <p-skeleton height="7rem" />
+    <p-skeleton height="18rem" />
+</div>
+}

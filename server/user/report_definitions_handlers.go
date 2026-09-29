@@ -254,6 +254,14 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_request", "Invalid preview request")
 			return
 		}
+		switch req.Audience {
+		case "":
+			req.Audience = api.ReportRecipientKindMember
+		case api.ReportRecipientKindMember, api.ReportRecipientKindExternal:
+		default:
+			writeReportError(r.Context(), w, http.StatusBadRequest, "invalid_audience", "Invalid preview audience")
+			return
+		}
 		var err error
 		req.Definition, err = h.canonicalizeReportRecipients(r, req.Definition)
 		if err != nil {
@@ -289,15 +297,24 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 		locale := h.reportRecipientLocale(r, userID)
 		email, shouldSend, err := h.reportContentBuilder().Build(r.Context(), worker.ReportContentRequest{
 			Report: report, RecipientUserID: userID, RecipientLocale: locale,
-			ScheduledFor: next, PeriodStart: start, PeriodEnd: end,
+			SelfContained: req.Audience == api.ReportRecipientKindExternal,
+			ScheduledFor:  next, PeriodStart: start, PeriodEnd: end,
 		})
 		if err != nil {
 			writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
 			return
 		}
 		subject := req.Definition.Name
+		// The preview renders the exact email the recipient would receive;
+		// nothing rendered is persisted.
+		var rendered mailer.Rendered
 		if shouldSend && email != nil {
-			subject = email.Subject()
+			rendered, err = mailer.Render(email, mailer.RenderOptions{})
+			if err != nil {
+				writeReportError(r.Context(), w, http.StatusUnprocessableEntity, "content_unavailable", "Report content is unavailable")
+				return
+			}
+			subject = rendered.Subject
 		}
 		siteCount := len(req.Definition.SiteIDs)
 		if req.Definition.SiteMode == api.ReportSiteModeAllAccessible {
@@ -309,6 +326,11 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 			SiteCount: siteCount, RecipientCount: len(req.Definition.RecipientUserIDs),
 			PendingRecipientCount: len(req.Definition.ExternalRecipientEmails),
 			PeriodStart:           start, PeriodEnd: end, Suppressed: !shouldSend,
+			ScheduledFor: next, Audience: req.Audience,
+			Preheader: rendered.Preheader, HTML: rendered.HTML, Text: rendered.Text,
+		}
+		if h.ctx.Config != nil {
+			preview.FromName, preview.FromAddress = h.ctx.Config.MailFromName, h.ctx.Config.MailFromAddress
 		}
 		if req.ReportID != nil {
 			if manageable, manageErr := h.ctx.Store.CanManageReport(r.Context(), *req.ReportID, userID); manageErr == nil && manageable {

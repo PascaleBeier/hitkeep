@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"html"
 	htmltpl "html/template"
 	"io/fs"
 	"math"
@@ -187,10 +188,12 @@ type RenderOptions struct {
 // Rendered is a fully rendered email, ready for a transport.
 type Rendered struct {
 	Subject string
-	Locale  string
-	MJML    string
-	HTML    string
-	Text    string
+	// Preheader is the inbox preview text shown after the subject.
+	Preheader string
+	Locale    string
+	MJML      string
+	HTML      string
+	Text      string
 }
 
 // Render executes a mailable's MJML and plain-text templates without sending.
@@ -222,6 +225,12 @@ func Render(email Mailable, opts RenderOptions) (Rendered, error) {
 		return Rendered{}, wrapSendError(SendStageHTMLTemplateExecute, fmt.Errorf("failed to execute html template: %w", err))
 	}
 
+	// The layout's preview block is plain inbox text; expose it for previews.
+	var preheader bytes.Buffer
+	if err := htmlTmpl.ExecuteTemplate(&preheader, "preheader", ctx.Data); err != nil {
+		return Rendered{}, wrapSendError(SendStageHTMLTemplateExecute, fmt.Errorf("failed to execute preheader template: %w", err))
+	}
+
 	mjmlOptions := []mjml.ToHTMLOption{mjml.WithMinify(!opts.Beautify), mjml.WithBeautify(opts.Beautify)}
 	if opts.Validation != "" {
 		mjmlOptions = append(mjmlOptions, mjml.WithValidationLevel(opts.Validation))
@@ -244,11 +253,12 @@ func Render(email Mailable, opts RenderOptions) (Rendered, error) {
 	}
 
 	return Rendered{
-		Subject: ctx.Meta.Subject,
-		Locale:  locale,
-		MJML:    mjmlBuffer.String(),
-		HTML:    htmlContent,
-		Text:    textBuffer.String(),
+		Subject:   ctx.Meta.Subject,
+		Preheader: strings.Join(strings.Fields(html.UnescapeString(preheader.String())), " "),
+		Locale:    locale,
+		MJML:      mjmlBuffer.String(),
+		HTML:      htmlContent,
+		Text:      textBuffer.String(),
 	}, nil
 }
 
