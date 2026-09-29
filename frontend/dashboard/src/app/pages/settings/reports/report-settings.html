@@ -466,18 +466,19 @@
             <div class="step-number">5</div>
             <div class="step-content">
                 <h3>{{ "settings.reports.editor.previewStep" | transloco }}</h3>
-                <p-button [label]="'settings.reports.actions.preview' | transloco" icon="pi pi-eye" [outlined]="true" [loading]="previewLoading()" [disabled]="!formValid() || previewLoading()" (onClick)="previewReport()" />
-                @if (preview()) {
-                <div class="preview-card">
-                    <strong>{{ preview()!.subject }}</strong>
-                    <span>{{ presetLabel(preview()!.preset) }}</span>
-                    <span>{{ preview()!.schedule.local_time }} · {{ preview()!.schedule.timezone }}</span>
-                    <span>{{ formatDate(preview()!.period_start) }} – {{ formatDate(preview()!.period_end) }}</span>
-                    <span>{{ "settings.reports.previewDeliverable" | transloco: { count: preview()!.recipient_count } }}</span>
-                    <span>{{ "settings.reports.previewPending" | transloco: { count: preview()!.pending_recipient_count } }}</span>
-                    @if (preview()!.suppressed) { <p-message severity="info">{{ "settings.reports.previewSuppressed" | transloco }}</p-message> }
-                </div>
+                <p class="field-hint">{{ "settings.reports.emailPreview.hint" | transloco }}</p>
+                @if (!formValid()) {
+                <p class="field-hint" data-testid="report-email-preview-incomplete">{{ "settings.reports.emailPreview.incomplete" | transloco }}</p>
                 }
+                <app-report-email-preview
+                    [preview]="preview()"
+                    [loading]="previewLoading()"
+                    [stale]="previewStale()"
+                    [hasExternalRecipients]="hasExternalRecipients()"
+                    [audience]="effectivePreviewAudience()"
+                    (audienceChange)="previewAudience.set($event)"
+                    (refresh)="previewReport()"
+                />
             </div>
         </section>
 

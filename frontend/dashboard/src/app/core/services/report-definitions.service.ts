@@ -1,7 +1,7 @@
 import { inject, signal, Service } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { finalize, tap } from 'rxjs';
-import { ReportDefinition, ReportDefinitionInput, ReportPreview, ReportRecipientConfirmation, ReportRun } from '@models/analytics.types';
+import { ReportDefinition, ReportDefinitionInput, ReportPreview, ReportRecipientKind, ReportRecipientConfirmation, ReportRun } from '@models/analytics.types';
 
 @Service()
 export class ReportDefinitionsService {
@@ -30,8 +30,8 @@ export class ReportDefinitionsService {
         return this.http.delete<void>(`/api/reports/${encodeURIComponent(reportID)}`).pipe(tap(() => this.reports.update((reports) => reports.filter((report) => report.id !== reportID))));
     }
 
-    preview(definition: ReportDefinitionInput, reportID?: string) {
-        return this.http.post<ReportPreview>('/api/reports/preview', { definition, report_id: reportID });
+    preview(definition: ReportDefinitionInput, reportID?: string, audience: ReportRecipientKind = 'member') {
+        return this.http.post<ReportPreview>('/api/reports/preview', { definition, report_id: reportID, audience });
     }
 
     testSend(reportID: string) {

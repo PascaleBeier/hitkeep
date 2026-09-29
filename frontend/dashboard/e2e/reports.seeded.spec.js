@@ -20,9 +20,17 @@ test("reporting creates a browser-timezone schedule and supports its delivery co
         await editor.getByTestId("report-delivery-time").click();
         await page.getByRole("option", { name: "08:15", exact: true }).click();
 
-        await editor.getByRole("button", { name: "Generate preview" }).click();
-        await expect(editor.locator(".preview-card strong")).toContainText("Daily Report for");
-        await expect(editor.locator(".preview-card")).toContainText(`08:15 · ${timezone}`);
+        // The preview renders the real email automatically once the draft settles.
+        const envelope = editor.getByTestId("report-email-envelope");
+        await expect(editor.getByTestId("report-email-subject")).toContainText("Daily Report for");
+        await expect(envelope).toContainText("08:15");
+        await expect(envelope).toContainText(`(${timezone})`);
+        await expect(
+            editor
+                .frameLocator('[data-testid="report-email-frame"]')
+                .getByText(/Analytics Report/)
+                .first()
+        ).toBeVisible();
 
         await editor.getByTestId("report-status").click();
         await page.getByRole("option", { name: "Active", exact: true }).click();
@@ -106,8 +114,11 @@ test("team reporting validates and tracks a pending external recipient", async (
         await editor.getByTestId("report-external-recipient").press("Enter");
         await expect(editor.locator(".external-recipient-chip", { hasText: externalEmail })).toBeVisible();
 
-        await editor.getByRole("button", { name: "Generate preview" }).click();
-        await expect(editor.locator(".preview-card")).toContainText(/1 external recipient.*pending confirmation/);
+        await expect(editor.getByTestId("report-email-envelope")).toContainText("1 awaiting confirmation");
+        // External recipients get the self-contained email; the preview can show that variant.
+        await editor.getByTestId("report-email-audience-external").click();
+        await expect(editor.getByTestId("report-email-audience-external")).toHaveAttribute("aria-pressed", "true");
+        await expect(editor.getByText("External recipients get a self-contained email")).toBeVisible();
         await editor.getByTestId("report-status").click();
         await page.getByRole("option", { name: "Active", exact: true }).click();
         await editor.getByRole("button", { name: /Save$/ }).click();

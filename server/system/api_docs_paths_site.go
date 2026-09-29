@@ -624,8 +624,8 @@ func openAPIV1AdminSitePaths() map[string]any {
 				map[string]any{"201": jsonRefResp("Created report", "#/components/schemas/ReportDefinition"), "400": errResp("Invalid report"), "409": errResp("Mail unavailable")}),
 		},
 		"/api/reports/preview": map[string]any{
-			"post": op([]string{"Reports"}, "Preview report", "Validates a draft report and returns its resolved schedule and reporting period without persisting rendered email content.", secCookie(), nil,
-				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"definition": map[string]any{"$ref": "#/components/schemas/ReportDefinitionInput"}, "report_id": map[string]any{"type": "string", "format": "uuid"}}, "required": []string{"definition"}}),
+			"post": op([]string{"Reports"}, "Preview report", "Validates a draft report and returns its resolved schedule, reporting period, sender, and the exact email the current user would receive, rendered in their language for the selected audience. Rendered content is never persisted.", secCookie(), nil,
+				jsonBody(map[string]any{"type": "object", "properties": map[string]any{"definition": map[string]any{"$ref": "#/components/schemas/ReportDefinitionInput"}, "report_id": map[string]any{"type": "string", "format": "uuid"}, "audience": map[string]any{"type": "string", "enum": []string{"member", "external"}, "default": "member"}}, "required": []string{"definition"}}),
 				map[string]any{"200": jsonRefResp("Report preview", "#/components/schemas/ReportPreview"), "400": errResp("Invalid report")}),
 		},
 		"/api/reports/{report_id}": map[string]any{

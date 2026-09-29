@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -29,11 +29,12 @@ import { TableRowActionItem, TableRowActions } from '@components/table-row-actio
 import { SiteSelectOption } from '@features/sites/components/site-select-option';
 import { SiteService } from '@features/sites/services/site.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { ReportDefinition, ReportDefinitionInput, ReportDelivery, ReportFrequency, ReportPreset, ReportPreview, ReportRecipient, ReportRun, ReportScope, ReportStatus, TeamMember } from '@models/analytics.types';
+import { ReportDefinition, ReportDefinitionInput, ReportDelivery, ReportFrequency, ReportPreset, ReportPreview, ReportRecipient, ReportRecipientKind, ReportRun, ReportScope, ReportStatus, TeamMember } from '@models/analytics.types';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { ReportDefinitionsService } from '@services/report-definitions.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
+import { ReportEmailPreview } from './report-email-preview';
 
 interface ReportFeedback {
     key: string;
@@ -81,6 +82,7 @@ type MobileSortField = 'name' | 'schedule' | 'status' | 'nextRun' | 'lastOutcome
         SiteScopeSummary,
         SiteSelectOption,
         TableRowActions,
+        ReportEmailPreview,
         TranslocoPipe
     ],
     providers: [ConfirmationService],
@@ -120,6 +122,13 @@ export class ReportSettings {
     protected readonly historyActionID = signal<string | null>(null);
     protected readonly historyLoading = signal(false);
     protected readonly previewLoading = signal(false);
+    protected readonly previewAudience = signal<ReportRecipientKind>('member');
+    protected readonly hasExternalRecipients = computed(() => this.draft().external_recipient_emails.length > 0);
+    protected readonly effectivePreviewAudience = computed<ReportRecipientKind>(() => (this.hasExternalRecipients() ? this.previewAudience() : 'member'));
+    /** Identifies the draft and audience a preview was rendered for. */
+    private readonly previewKey = computed(() => JSON.stringify([this.draft(), this.effectivePreviewAudience()]));
+    private readonly renderedPreviewKey = signal('');
+    protected readonly previewStale = computed(() => this.preview() !== null && this.renderedPreviewKey() !== this.previewKey());
     protected readonly membersLoading = signal(false);
     protected readonly membersError = signal(false);
     protected readonly initialLoadError = signal(false);
@@ -133,6 +142,14 @@ export class ReportSettings {
     protected readonly searchQuery = signal('');
     protected readonly mobileSortField = signal<MobileSortField>('name');
     protected readonly mobileSortOrder = signal<1 | -1>(1);
+
+    // Keep the email preview live: re-render shortly after the draft settles.
+    private readonly autoPreview = effect((onCleanup) => {
+        if (!this.editorVisible() || !this.formValid()) return;
+        this.previewKey();
+        const timer = setTimeout(() => this.previewReport(), 600);
+        onCleanup(() => clearTimeout(timer));
+    });
     protected readonly mobileFirst = signal(0);
     protected readonly mobileRows = signal(10);
     private memberRequestID = 0;
@@ -278,12 +295,10 @@ export class ReportSettings {
 
     protected setField<K extends keyof ReportDefinitionInput>(key: K, value: ReportDefinitionInput[K]): void {
         this.draft.update((draft) => ({ ...draft, [key]: value }));
-        this.preview.set(null);
     }
 
     protected setScheduleField(key: keyof ReportDefinitionInput['schedule'], value: string | number | undefined): void {
         this.draft.update((draft) => ({ ...draft, schedule: { ...draft.schedule, [key]: value } }));
-        this.preview.set(null);
     }
 
     protected setScope(scope: ReportScope): void {
@@ -298,7 +313,6 @@ export class ReportSettings {
             external_recipient_emails: []
         }));
         if (scope === 'team') this.loadMembers(teamID);
-        this.preview.set(null);
     }
 
     protected setPreset(preset: ReportPreset): void {
@@ -318,7 +332,6 @@ export class ReportSettings {
                 schedule
             };
         });
-        this.preview.set(null);
     }
 
     protected setFrequency(frequency: ReportFrequency): void {
@@ -328,7 +341,6 @@ export class ReportSettings {
             if (frequency === 'monthly') schedule.monthly_day = draft.schedule.monthly_day ?? 1;
             return { ...draft, schedule };
         });
-        this.preview.set(null);
     }
 
     protected selectedSiteID(): string {
@@ -343,11 +355,21 @@ export class ReportSettings {
         if (!this.formValid() || this.previewLoading()) return;
         this.dialogFeedback.set(null);
         this.previewLoading.set(true);
+        const requestKey = this.previewKey();
         this.service
-            .preview({ ...this.draft(), status: 'draft' }, this.editingReportID() ?? undefined)
-            .pipe(finalize(() => this.previewLoading.set(false)))
+            .preview({ ...this.draft(), status: 'draft' }, this.editingReportID() ?? undefined, this.effectivePreviewAudience())
+            .pipe(
+                finalize(() => {
+                    this.previewLoading.set(false);
+                    // The draft changed while this render was in flight; catch up.
+                    if (this.editorVisible() && this.previewKey() !== requestKey && this.formValid()) this.previewReport();
+                })
+            )
             .subscribe({
-                next: (preview) => this.preview.set(preview),
+                next: (preview) => {
+                    this.preview.set(preview);
+                    this.renderedPreviewKey.set(requestKey);
+                },
                 error: () => this.dialogFeedback.set({ key: 'settings.reports.errors.preview', severity: 'error' })
             });
     }
@@ -478,7 +500,6 @@ export class ReportSettings {
                 external_recipient_emails: draft.external_recipient_emails.filter((candidate) => candidate !== email)
             }));
             this.externalEmailInput.set('');
-            this.preview.set(null);
             return;
         }
         if (this.draft().external_recipient_emails.includes(email)) {
@@ -491,13 +512,11 @@ export class ReportSettings {
         }
         this.draft.update((draft) => ({ ...draft, external_recipient_emails: [...draft.external_recipient_emails, email] }));
         this.externalEmailInput.set('');
-        this.preview.set(null);
     }
 
     protected removeExternalDraft(email: string): void {
         this.draft.update((draft) => ({ ...draft, external_recipient_emails: draft.external_recipient_emails.filter((candidate) => candidate !== email) }));
         this.externalEmailError.set('');
-        this.preview.set(null);
     }
 
     protected resendConfirmation(report: ReportDefinition, recipient: ReportRecipient): void {
@@ -742,6 +761,8 @@ export class ReportSettings {
 
     private resetEditorState(): void {
         this.preview.set(null);
+        this.renderedPreviewKey.set('');
+        this.previewAudience.set('member');
         this.previewLoading.set(false);
         this.saveState.set('idle');
         this.dialogFeedback.set(null);

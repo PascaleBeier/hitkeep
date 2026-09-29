@@ -130,6 +130,9 @@ type UpdateReportRequest struct {
 type ReportPreviewRequest struct {
 	Definition CreateReportRequest `json:"definition"`
 	ReportID   *uuid.UUID          `json:"report_id,omitempty"`
+	// Audience selects the rendered variant: members get dashboard links,
+	// external recipients get the self-contained email. Defaults to member.
+	Audience ReportRecipientKind `json:"audience,omitempty"`
 }
 
 type ReportRecipientConfirmationRequest struct {
@@ -146,6 +149,16 @@ type ReportPreview struct {
 	PeriodStart           time.Time      `json:"period_start"`
 	PeriodEnd             time.Time      `json:"period_end"`
 	Suppressed            bool           `json:"suppressed"`
+	// ScheduledFor is the next delivery time the preview period belongs to.
+	ScheduledFor time.Time           `json:"scheduled_for"`
+	Audience     ReportRecipientKind `json:"audience"`
+	FromName     string              `json:"from_name"`
+	FromAddress  string              `json:"from_address"`
+	// Preheader, HTML, and Text are the exact rendered email; empty when
+	// the report is suppressed for this period.
+	Preheader string `json:"preheader"`
+	HTML      string `json:"html"`
+	Text      string `json:"text"`
 }
 
 type ReportDelivery struct {

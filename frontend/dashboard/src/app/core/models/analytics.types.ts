@@ -892,7 +892,16 @@ export interface ReportPreview {
     period_start: string;
     period_end: string;
     suppressed: boolean;
+    scheduled_for: string;
+    audience: ReportRecipientKind;
+    from_name: string;
+    from_address: string;
+    preheader: string;
+    html: string;
+    text: string;
 }
+
+export type ReportRecipientKind = 'member' | 'external';
 
 export interface ReportDelivery {
     id: string;

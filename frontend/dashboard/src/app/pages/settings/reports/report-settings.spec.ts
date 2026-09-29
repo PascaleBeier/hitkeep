@@ -410,6 +410,52 @@ describe('ReportSettings', () => {
         expect(document.body.querySelector('[data-testid="report-dialog-feedback"]')?.textContent).toContain('The preview could not be generated.');
     });
 
+    it('re-renders the email preview shortly after the draft settles', () => {
+        vi.useFakeTimers();
+        try {
+            serviceMock.preview.mockReturnValue(
+                of({
+                    subject: 'Live preview',
+                    preset: 'site_summary',
+                    schedule: { frequency: 'daily', timezone: 'UTC', local_time: '08:00' },
+                    site_count: 1,
+                    recipient_count: 1,
+                    pending_recipient_count: 0,
+                    period_start: '2026-09-28T00:00:00Z',
+                    period_end: '2026-09-29T00:00:00Z',
+                    suppressed: false,
+                    scheduled_for: '2026-09-30T08:00:00Z',
+                    audience: 'member',
+                    from_name: 'HitKeep',
+                    from_address: 'reports@hitkeep.example',
+                    preheader: 'Live preview',
+                    html: '<html><head></head><body>x</body></html>',
+                    text: 'x'
+                })
+            );
+            const component = fixture.componentInstance as TestAccess;
+            component.openCreate();
+            component.draft.update((draft) => ({ ...draft, name: 'Live preview' }));
+            TestBed.tick();
+            expect(serviceMock.preview).not.toHaveBeenCalled();
+
+            vi.advanceTimersByTime(600);
+            expect(serviceMock.preview).toHaveBeenCalledTimes(1);
+            expect(serviceMock.preview.mock.calls[0][2]).toBe('member');
+
+            component.draft.update((draft) => ({ ...draft, name: 'Live preview v2' }));
+            TestBed.tick();
+            vi.advanceTimersByTime(300);
+            component.draft.update((draft) => ({ ...draft, name: 'Live preview v3' }));
+            TestBed.tick();
+            vi.advanceTimersByTime(600);
+            expect(serviceMock.preview).toHaveBeenCalledTimes(2);
+            expect(serviceMock.preview.mock.calls[1][0].name).toBe('Live preview v3');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('surfaces team-member and history loading failures locally', async () => {
         listTeamMembers.mockReturnValueOnce(throwError(() => new Error('members failed'))).mockReturnValueOnce(throwError(() => new Error('members failed')));
         serviceMock.runs.mockReturnValueOnce(throwError(() => new Error('history failed')));
