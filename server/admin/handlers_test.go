@@ -43,7 +43,8 @@ type adminTestMailDriver struct {
 	sendErr    error
 }
 
-func (d *adminTestMailDriver) Send(recipients []string, subject, htmlBody, textBody string) error {
+func (d *adminTestMailDriver) Send(message mailer.Message) error {
+	recipients, subject, htmlBody, textBody := message.To, message.Subject, message.HTML, message.Text
 	d.recipients = recipients
 	d.subject = subject
 	d.htmlBody = htmlBody

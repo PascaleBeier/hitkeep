@@ -7,36 +7,25 @@ import (
 	"time"
 )
 
-// mockDriver captures every argument passed to Send.
+// mockDriver captures every message passed to Send.
 type mockDriver struct {
-	to       []string
-	subject  string
-	htmlBody string
-	textBody string
-	sendErr  error
+	to        []string
+	subject   string
+	htmlBody  string
+	textBody  string
+	messageID string
+	headers   map[string]string
+	inline    []InlineImage
+	sendErr   error
 }
 
-func (d *mockDriver) Send(to []string, subject string, htmlBody string, textBody string) error {
-	d.to = to
-	d.subject = subject
-	d.htmlBody = htmlBody
-	d.textBody = textBody
+func (d *mockDriver) Send(message Message) error {
+	d.to, d.subject, d.htmlBody, d.textBody = message.To, message.Subject, message.HTML, message.Text
+	d.messageID, d.headers, d.inline = message.MessageID, message.Headers, message.Inline
 	return d.sendErr
 }
 
 func (d *mockDriver) Close() error { return nil }
-
-type headerMockDriver struct {
-	mockDriver
-	messageID string
-	headers   map[string]string
-}
-
-func (d *headerMockDriver) SendWithHeaders(to []string, subject, htmlBody, textBody, messageID string, headers map[string]string) error {
-	d.messageID = messageID
-	d.headers = headers
-	return d.Send(to, subject, htmlBody, textBody)
-}
 
 // stubMailable is a minimal Mailable for tests.
 type stubMailable struct {
@@ -940,7 +929,7 @@ func TestSendHTMLContainsSubjectInTitle(t *testing.T) {
 }
 
 func TestSendWithOptionsPreservesStableMessageIDAndUnsubscribeHeaders(t *testing.T) {
-	driver := &headerMockDriver{}
+	driver := &mockDriver{}
 	m := NewWithDriver(driver, nil)
 	messageID := "<report.run.recipient@hitkeep>"
 	headers := map[string]string{

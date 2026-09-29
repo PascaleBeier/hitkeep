@@ -34,7 +34,8 @@ type authTestMailDriver struct {
 	sendErr  error
 }
 
-func (d *authTestMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
+func (d *authTestMailDriver) Send(message mailer.Message) error {
+	subject, htmlBody, textBody := message.Subject, message.HTML, message.Text
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody

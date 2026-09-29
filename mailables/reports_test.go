@@ -18,7 +18,8 @@ type renderedReportDriver struct {
 	text string
 }
 
-func (d *renderedReportDriver) Send(_ []string, _ string, htmlBody, textBody string) error {
+func (d *renderedReportDriver) Send(message mailer.Message) error {
+	htmlBody, textBody := message.HTML, message.Text
 	d.html = htmlBody
 	d.text = textBody
 	return nil

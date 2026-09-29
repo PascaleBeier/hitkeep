@@ -66,6 +66,9 @@ func Lint(r mailer.Rendered) []Problem {
 			lang = attr(n, "lang")
 		case n.Data == "img" && !hasAttr(n, "alt"):
 			add("img-alt", "<img src=%q> has no alt attribute", attr(n, "src"))
+		case n.Data == "img" && !strings.HasPrefix(attr(n, "src"), "cid:") && !strings.HasPrefix(attr(n, "src"), "data:"):
+			// Remote images act as open-tracking pixels; embed them instead.
+			add("remote-image", "<img src=%q> loads remotely; embed it as an inline image", attr(n, "src"))
 		case n.Data == "a":
 			href := attr(n, "href")
 			if !strings.HasPrefix(href, "https://") && !strings.HasPrefix(href, "mailto:") {

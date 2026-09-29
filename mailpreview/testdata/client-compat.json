@@ -16,6 +16,7 @@
   "css-max-height": "Part of MJML's layered preheader hiding (see css-display-none).",
   "css-max-width": "Centres the 600px container; Outlook uses the MJML ghost table with a fixed width.",
   "css-opacity": "Part of MJML's layered preheader hiding (see css-display-none).",
+  "css-outline": "MJML's image reset sets outline:none; clients without support only show a default focus outline around the header icon.",
   "css-overflow": "Part of MJML's layered preheader hiding (see css-display-none).",
   "css-overflow-wrap": "Lets long page paths and domains wrap inside report tables; without it the cell grows but stays readable.",
   "css-padding": "Core MJML layout spacing; clients with partial support (Outlook on paragraphs) are covered by MJML's table-cell padding.",

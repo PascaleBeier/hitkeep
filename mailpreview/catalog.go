@@ -58,12 +58,11 @@ var fixtures = []Fixture{
 			appURL+"/opportunities", appURL+"/settings", opportunityPreview())
 	}},
 	{ID: "report_confirmation", Build: func(locale string) mailer.Mailable {
-		weekday := 1
 		return mailables.NewReportRecipientConfirmation(appURL+"/reports/confirm?token=preview", locale, api.ReportRecipientConfirmation{
 			ReportName: "Weekly executive summary",
 			TeamName:   "Acme Analytics",
 			Preset:     api.ReportPresetSiteSummary,
-			Schedule:   api.ReportSchedule{Frequency: api.ReportFrequencyWeekly, Timezone: "Europe/Berlin", LocalTime: "08:00", WeeklyDay: &weekday},
+			Schedule:   api.ReportSchedule{Frequency: api.ReportFrequencyWeekly, Timezone: "Europe/Berlin", LocalTime: "08:00", WeeklyDay: new(1)},
 			Sites:      []api.ReportSite{{ID: fixedUUID(1), Domain: "shop.example"}, {ID: fixedUUID(2), Domain: "blog.example.org"}},
 			ExpiresAt:  Now.Add(7 * 24 * time.Hour),
 		})

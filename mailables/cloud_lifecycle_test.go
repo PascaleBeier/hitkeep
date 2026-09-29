@@ -15,7 +15,8 @@ type cloudLifecycleMailDriver struct {
 	textBody string
 }
 
-func (d *cloudLifecycleMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
+func (d *cloudLifecycleMailDriver) Send(message mailer.Message) error {
+	subject, htmlBody, textBody := message.Subject, message.HTML, message.Text
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody

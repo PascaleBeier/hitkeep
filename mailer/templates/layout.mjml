@@ -71,6 +71,13 @@
         .section-heading div {
           color: #f1f5f9 !important;
         }
+        .brand-icon-light {
+          display: none !important;
+        }
+        .brand-icon-dark {
+          display: inline-block !important;
+          max-height: none !important;
+        }
         .footer-text div,
         .footer-social div {
           color: #94a3b8 !important;
@@ -145,6 +152,13 @@
       [data-ogsc] .footer-social a {
         color: #33d399 !important;
       }
+      [data-ogsc] .brand-icon-light {
+        display: none !important;
+      }
+      [data-ogsc] .brand-icon-dark {
+        display: inline-block !important;
+        max-height: none !important;
+      }
       [data-ogsc] .card-bg .hk-button a {
         color: #18181a !important;
       }
@@ -161,7 +175,8 @@
           color="#0f172a"
           css-class="brand-text"
         >
-          HitKeep
+          <!-- Decorative icons (empty alt): the wordmark carries the name. -->
+          <img src="cid:hitkeep-icon-light" width="32" height="32" alt="" class="brand-icon-light" style="display: inline-block; width: 32px; height: 32px; margin-right: 10px; border: 0; vertical-align: middle;" /><img src="cid:hitkeep-icon-dark" width="32" height="32" alt="" class="brand-icon-dark" style="display: none; mso-hide: all; width: 32px; height: 32px; max-height: 0; margin-right: 10px; border: 0; vertical-align: middle; overflow: hidden;" /><span style="vertical-align: middle;">HitKeep</span>
         </mj-text>
       </mj-column>
     </mj-section>

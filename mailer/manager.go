@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html"
@@ -26,6 +27,19 @@ import (
 
 //go:embed templates/*.mjml templates/*.txt
 var templateFS embed.FS
+
+//go:embed assets/brand-icon-light.png
+var brandIconLight []byte
+
+//go:embed assets/brand-icon-dark.png
+var brandIconDark []byte
+
+// brandImages are embedded in every email so the header icon never loads
+// from a remote server (no open tracking, works offline).
+var brandImages = []InlineImage{
+	{CID: "hitkeep-icon-light", ContentType: "image/png", Data: brandIconLight},
+	{CID: "hitkeep-icon-dark", ContentType: "image/png", Data: brandIconDark},
+}
 
 // Mailer acts as the Manager.
 type Mailer struct {
@@ -168,10 +182,15 @@ func (m *Mailer) SendWithOptions(to string, email Mailable, options SendOptions)
 		return err
 	}
 
-	if driver, ok := m.driver.(HeaderDriver); ok && (options.MessageID != "" || len(options.Headers) > 0) {
-		return wrapSendError(SendStageTransport, driver.SendWithHeaders([]string{to}, rendered.Subject, rendered.HTML, rendered.Text, options.MessageID, options.Headers))
-	}
-	return wrapSendError(SendStageTransport, m.driver.Send([]string{to}, rendered.Subject, rendered.HTML, rendered.Text))
+	return wrapSendError(SendStageTransport, m.driver.Send(Message{
+		To:        []string{to},
+		Subject:   rendered.Subject,
+		HTML:      rendered.HTML,
+		Text:      rendered.Text,
+		MessageID: options.MessageID,
+		Headers:   options.Headers,
+		Inline:    rendered.Inline,
+	}))
 }
 
 // RenderOptions controls rendering for previews and tests. The zero value
@@ -191,9 +210,21 @@ type Rendered struct {
 	// Preheader is the inbox preview text shown after the subject.
 	Preheader string
 	Locale    string
-	MJML      string
-	HTML      string
-	Text      string
+	// HTML references inline images as cid:<CID>; see PreviewHTML.
+	HTML string
+	Text string
+	// Inline are the images the HTML embeds, sent as related MIME parts.
+	Inline []InlineImage
+}
+
+// PreviewHTML inlines embedded images as data URIs so the HTML renders on its
+// own in browsers and previews, where cid: references cannot resolve.
+func (r Rendered) PreviewHTML() string {
+	html := r.HTML
+	for _, image := range r.Inline {
+		html = strings.ReplaceAll(html, "cid:"+image.CID, "data:"+image.ContentType+";base64,"+base64.StdEncoding.EncodeToString(image.Data))
+	}
+	return html
 }
 
 // Render executes a mailable's MJML and plain-text templates without sending.
@@ -256,9 +287,9 @@ func Render(email Mailable, opts RenderOptions) (Rendered, error) {
 		Subject:   ctx.Meta.Subject,
 		Preheader: strings.Join(strings.Fields(html.UnescapeString(preheader.String())), " "),
 		Locale:    locale,
-		MJML:      mjmlBuffer.String(),
 		HTML:      htmlContent,
 		Text:      textBuffer.String(),
+		Inline:    brandImages,
 	}, nil
 }
 
