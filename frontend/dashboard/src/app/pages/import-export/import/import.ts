@@ -137,9 +137,9 @@ export class ImportPage {
     protected readonly showDatasetEventsColumn = computed(() => importManifestHasDatasetEvents(this.manifest()));
     protected readonly datasetColumns = computed<AppTableColumn[]>(() => [
         { field: 'name', headerKey: 'imports.datasets.dataset', frozen: true },
-        { field: 'rows_accepted', headerKey: 'imports.datasets.rows', type: 'number', align: 'end' },
-        { field: 'pageviews', headerKey: 'imports.datasets.pageviews', type: 'number', align: 'end' },
-        ...(this.showDatasetEventsColumn() ? [{ field: 'events', headerKey: 'imports.datasets.events', type: 'number', align: 'end' } satisfies AppTableColumn] : [])
+        { field: 'rows_accepted', headerKey: 'imports.datasets.rows', type: 'number', align: 'end', total: true },
+        { field: 'pageviews', headerKey: 'imports.datasets.pageviews', type: 'number', align: 'end', total: true },
+        ...(this.showDatasetEventsColumn() ? [{ field: 'events', headerKey: 'imports.datasets.events', type: 'number', align: 'end', total: true } satisfies AppTableColumn] : [])
     ]);
     protected readonly historyColumns: AppTableColumn<ImportJob>[] = [
         { field: 'provider', headerKey: 'imports.history.importer', frozen: true },

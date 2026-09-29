@@ -3943,6 +3943,7 @@
     "dateRange": "Zeitraum",
     "noResults": "Keine Zeilen entsprechen den aktuellen Filtern.",
     "clearFilters": "Filter zurücksetzen",
-    "empty": "Noch keine Einträge."
+    "empty": "Noch keine Einträge.",
+    "total": "Gesamt"
   }
 }

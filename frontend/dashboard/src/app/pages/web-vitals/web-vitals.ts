@@ -227,8 +227,8 @@ export class WebVitalsPage {
         { field: 'path', headerKey: 'webVitals.columns.path', frozen: true },
         ...METRICS.map((metric): AppTableColumn<WebVitalPageTableRow> => ({ field: `${metric.toLowerCase()}.p75`, header: metric, type: 'number', align: 'end' })),
         { field: 'rating', headerKey: 'webVitals.columns.rating', type: 'enum', groupable: true, labelKeyPrefix: 'webVitals.ratings.' },
-        ...(this.selectedRating() ? [{ field: 'ratingSamples', header: this.ratingCountColumnLabel(), type: 'number', align: 'end' } satisfies AppTableColumn<WebVitalPageTableRow>] : []),
-        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end' }
+        ...(this.selectedRating() ? [{ field: 'ratingSamples', header: this.ratingCountColumnLabel(), type: 'number', align: 'end', total: true } satisfies AppTableColumn<WebVitalPageTableRow>] : []),
+        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end', total: true }
     ]);
     protected readonly dimensionColumns = computed(
         () =>
@@ -238,7 +238,7 @@ export class WebVitalsPage {
                     [
                         { field: 'name', header: tab.label, frozen: true },
                         { field: 'p75', headerKey: 'webVitals.columns.p75', type: 'number', align: 'end' },
-                        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end' },
+                        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end', total: true },
                         { field: 'rating', headerKey: 'webVitals.columns.rating', type: 'enum', groupable: true, labelKeyPrefix: 'webVitals.ratings.' }
                     ]
                 ])

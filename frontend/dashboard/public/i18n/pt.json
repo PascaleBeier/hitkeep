@@ -3872,6 +3872,7 @@
     "dateRange": "Intervalo de datas",
     "noResults": "Nenhuma linha corresponde aos filtros atuais.",
     "clearFilters": "Limpar filtros",
-    "empty": "Ainda não há nada aqui."
+    "empty": "Ainda não há nada aqui.",
+    "total": "Total"
   }
 }

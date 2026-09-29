@@ -3882,6 +3882,7 @@
     "dateRange": "Datumbereik",
     "noResults": "Geen rijen komen overeen met de huidige filters.",
     "clearFilters": "Filters wissen",
-    "empty": "Hier staat nog niets."
+    "empty": "Hier staat nog niets.",
+    "total": "Totaal"
   }
 }

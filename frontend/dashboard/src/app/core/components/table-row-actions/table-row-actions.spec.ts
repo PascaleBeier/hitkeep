@@ -68,6 +68,23 @@ describe('TableRowActions', () => {
         expect(editCommand).toHaveBeenCalledTimes(1);
     });
 
+    it('reopens after a command runs from the menu', async () => {
+        triggerButton().click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        (document.querySelector('.table-row-actions-menu a') as HTMLElement).click();
+        fixture.detectChanges();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        fixture.detectChanges();
+
+        triggerButton().click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        expect(editCommand).toHaveBeenCalledTimes(1);
+        expect(document.querySelector('.table-row-actions-menu')?.textContent).toContain('Edit');
+    });
+
     it('supports disabled state', () => {
         fixture.componentRef.setInput('disabled', true);
         fixture.detectChanges();

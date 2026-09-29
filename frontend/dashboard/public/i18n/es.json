@@ -4150,6 +4150,7 @@
     "dateRange": "Rango de fechas",
     "noResults": "Ninguna fila coincide con los filtros actuales.",
     "clearFilters": "Borrar filtros",
-    "empty": "Todavía no hay nada aquí."
+    "empty": "Todavía no hay nada aquí.",
+    "total": "Total"
   }
 }

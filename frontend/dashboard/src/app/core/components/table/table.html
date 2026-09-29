@@ -61,7 +61,7 @@
             />
             }
             <p-button
-                icon="pi pi-undo"
+                icon="pi pi-eraser"
                 [text]="true"
                 [rounded]="true"
                 severity="secondary"
@@ -85,6 +85,7 @@
         #table
         [value]="tableValue()"
         [dataKey]="dataKey()"
+        [rowTrackBy]="trackRow"
         [loading]="loading()"
         [showLoader]="!skeleton()"
         [lazy]="lazy()"
@@ -95,6 +96,8 @@
         stateStorage="local"
         (onFilter)="onFilter()"
         (onStateRestore)="onFilter()"
+        (onRowExpand)="rowExpansionChange.emit({ row: $event.data, expanded: true })"
+        (onRowCollapse)="rowExpansionChange.emit({ row: $event.data, expanded: false })"
         [globalFilterFields]="globalFilterFields()"
         [filterDelay]="250"
         sortMode="multiple"
@@ -170,7 +173,7 @@
             </tr>
         </ng-template>
 
-        <ng-template #body let-row let-rowIndex="rowIndex">
+        <ng-template #body let-row let-rowIndex="rowIndex" let-expanded="expanded">
             @if (skeleton()) {
             <tr class="app-table__skeleton">
                 @for (cell of skeletonCells(); track cell) {
@@ -202,24 +205,21 @@
                 @if (expandedTemplate()) {
                 <td class="app-table__expander" pFrozenColumn [frozen]="true">
                     <p-button
-                        [icon]="isExpanded(row) ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
+                        [pRowToggler]="row"
+                        [pRowTogglerDisabled]="!rowExpandable()(row)"
+                        [icon]="expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
                         [rounded]="true"
                         [text]="true"
                         severity="secondary"
                         size="small"
                         [disabled]="!rowExpandable()(row)"
-                        [ariaLabel]="(isExpanded(row) ? 'table.collapseRow' : 'table.expandRow') | transloco"
-                        [attr.aria-expanded]="isExpanded(row)"
-                        (onClick)="toggleExpanded(row)"
+                        [ariaLabel]="(expanded ? 'table.collapseRow' : 'table.expandRow') | transloco"
+                        [attr.aria-expanded]="expanded"
                     />
                 </td>
                 } @for (column of visibleColumns(); track column.field) {
                 <td pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'">
-                    @if (cells().get(column.field); as cell) {
-                    <ng-container [ngTemplateOutlet]="cell" [ngTemplateOutletContext]="{ $implicit: row }" />
-                    } @else { @switch (column.type ?? 'text') { @case ('date') { @if (resolve(row, column.field); as date) {
-                    <app-relative-date-time [value]="$any(date)" />
-                    } @else { — } } @case ('number') { {{ formatNumber(resolve(row, column.field)) }} } @case ('text') { {{ resolve(row, column.field) ?? "—" }} } @default { {{ label(column, resolve(row, column.field)) }} } } }
+                    <ng-container [ngTemplateOutlet]="cellContent" [ngTemplateOutletContext]="{ $implicit: row, column }" />
                 </td>
                 } @if (hasActions()) {
                 <td class="app-table__actions" pFrozenColumn [frozen]="true" alignFrozen="right" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
@@ -237,13 +237,35 @@
                     <ng-container [ngTemplateOutlet]="card" [ngTemplateOutletContext]="{ $implicit: row }" />
                 </td>
             </tr>
-            } @if (isExpanded(row) && expandedTemplate(); as expanded) {
+            } } }
+        </ng-template>
+
+        <ng-template #expandedrow let-row>
+            @if (expandedTemplate(); as expanded) {
             <tr class="app-table__expanded">
                 <td [attr.colspan]="colspan()">
                     <ng-container [ngTemplateOutlet]="expanded" [ngTemplateOutletContext]="{ $implicit: row }" />
                 </td>
             </tr>
-            } } }
+            }
+        </ng-template>
+
+        <ng-template #footer>
+            @if (totals(); as totals) {
+            <tr class="app-table__total">
+                @if (expandedTemplate()) {
+                <td pFrozenColumn [frozen]="true"></td>
+                } @for (column of visibleColumns(); track column.field; let first = $first) {
+                <td pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'">
+                    @if (column.total) {
+                    <ng-container [ngTemplateOutlet]="cellContent" [ngTemplateOutletContext]="{ $implicit: totals, column }" />
+                    } @else if (first) { {{ "table.total" | transloco }} }
+                </td>
+                } @if (hasActions()) {
+                <td class="app-table__actions" pFrozenColumn [frozen]="true" alignFrozen="right"></td>
+                }
+            </tr>
+            }
         </ng-template>
 
         <ng-template #emptymessage>
@@ -264,3 +286,11 @@
         </ng-template>
     </p-table>
 </section>
+
+<ng-template #cellContent let-row let-column="column">
+    @if (cells().get(column.field); as cell) {
+    <ng-container [ngTemplateOutlet]="cell" [ngTemplateOutletContext]="{ $implicit: row }" />
+    } @else { @switch (column.type ?? 'text') { @case ('date') { @if (resolve(row, column.field); as date) {
+    <app-relative-date-time [value]="$any(date)" />
+    } @else { — } } @case ('number') { {{ formatNumber(resolve(row, column.field)) }} } @case ('text') { {{ resolve(row, column.field) ?? "—" }} } @default { {{ label(column, resolve(row, column.field)) }} } } }
+</ng-template>

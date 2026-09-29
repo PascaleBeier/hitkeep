@@ -85,16 +85,16 @@ export class EcommercePage {
     protected readonly sources = signal<EcommerceSourceStat[]>([]);
     protected readonly productColumns: AppTableColumn<EcommerceProductStat>[] = [
         { field: 'item_name', headerKey: 'ecommerce.columns.product', frozen: true },
-        { field: 'quantity', headerKey: 'ecommerce.columns.quantity', type: 'number', align: 'end' },
-        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end' },
-        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end' }
+        { field: 'quantity', headerKey: 'ecommerce.columns.quantity', type: 'number', align: 'end', total: true },
+        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end', total: true },
+        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end', total: true }
     ];
     protected readonly sourceColumns: AppTableColumn<EcommerceSourceStat>[] = [
         { field: 'utm_source', headerKey: 'ecommerce.columns.source', frozen: true, groupable: true },
         { field: 'utm_campaign', headerKey: 'ecommerce.columns.campaign', groupable: true },
         { field: 'referrer', headerKey: 'ecommerce.columns.referrer' },
-        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end' },
-        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end' }
+        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end', total: true },
+        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end', total: true }
     ];
     protected readonly productRowActive = (product: EcommerceProductStat) => this.isProductFilterActive(product);
     protected readonly sourceRowActive = (source: EcommerceSourceStat) => this.isSourceFilterActive(source);

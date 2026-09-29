@@ -32,6 +32,8 @@ export interface AppTableColumn<T = unknown> {
     /** Hidden until the viewer shows it. */
     hidden?: boolean;
     align?: 'start' | 'end';
+    /** Sums the column into a totals footer row. */
+    total?: boolean;
     /** Formatted CSV value. */
     exportValue?: (row: T) => string;
 }

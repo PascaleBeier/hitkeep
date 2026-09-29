@@ -347,9 +347,9 @@ export class AdminSettings implements OnInit {
         },
         { field: 'last_hit_at', headerKey: 'admin.system.activation.columns.lastHit', type: 'date' },
         { field: 'last_event_at', headerKey: 'admin.system.activation.columns.lastEvent', type: 'date' },
-        { field: 'hits_last_24h', headerKey: 'admin.system.activation.columns.hits24h', type: 'number', align: 'end' },
-        { field: 'hits_last_7d', headerKey: 'admin.system.activation.columns.hits7d', type: 'number', align: 'end' },
-        { field: 'events_last_7d', headerKey: 'admin.system.activation.columns.events7d', type: 'number', align: 'end' }
+        { field: 'hits_last_24h', headerKey: 'admin.system.activation.columns.hits24h', type: 'number', align: 'end', total: true },
+        { field: 'hits_last_7d', headerKey: 'admin.system.activation.columns.hits7d', type: 'number', align: 'end', total: true },
+        { field: 'events_last_7d', headerKey: 'admin.system.activation.columns.events7d', type: 'number', align: 'end', total: true }
     ];
     protected readonly activationActionLoading = (row: SystemActivationRow) => this.openingActivationTeamId() === row.team_id;
     protected readonly activationLiveSites = computed(() => this.activationRows().filter((row) => row.status === 'live').length);

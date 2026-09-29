@@ -127,7 +127,6 @@ export class AppTable<T = Row> implements OnInit {
     protected readonly groupBy = signal<string | null>(null);
     private readonly hidden = signal<ReadonlySet<string>>(new Set());
     private readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
-    private readonly expandedKeys = signal<ReadonlySet<unknown>>(new Set());
     private readonly filterTick = signal(0);
     private readonly translation = toSignal(this.transloco.selectTranslation());
 
@@ -145,6 +144,8 @@ export class AppTable<T = Row> implements OnInit {
         }
         return [...groups.values()].flat();
     });
+    /** Keeps rendered rows (and open row menus) alive when callers rebuild row objects. */
+    protected readonly trackRow = (_index: number, row: T) => this.resolve(row, this.dataKey()) ?? row;
     protected readonly storageKey = computed(() => STORAGE_PREFIX + this.stateKey());
     protected readonly groupCounts = computed(() => {
         this.filterTick();
@@ -157,6 +158,14 @@ export class AppTable<T = Row> implements OnInit {
             counts.set(key, (counts.get(key) ?? 0) + 1);
         }
         return counts;
+    });
+    /** Sums of `total` columns over the current filtered view; server-paged tables only see one page, so they get none. */
+    protected readonly totals = computed(() => {
+        this.filterTick();
+        const columns = this.columns().filter((column) => column.total);
+        if (columns.length === 0 || this.lazy() || this.skeleton() || this.value().length === 0) return null;
+        const rows = (this.tableRef()?.filteredValue ?? this.tableValue()) as T[];
+        return Object.fromEntries(columns.map((column) => [column.field, rows.reduce((sum, row) => sum + (Number(this.resolve(row, column.field)) || 0), 0)]));
     });
     protected readonly visibleColumns = computed(() => this.columns().filter((column) => !this.hidden().has(column.field)));
     protected readonly hasActions = computed(() => Boolean(this.rowActions() || this.actionsTemplate()));
@@ -386,19 +395,6 @@ export class AppTable<T = Row> implements OnInit {
         if (!this.selectable()) return;
         event?.preventDefault();
         this.rowSelect.emit(row);
-    }
-
-    protected isExpanded(row: T): boolean {
-        return this.expandedKeys().has(this.resolve(row, this.dataKey()));
-    }
-
-    protected toggleExpanded(row: T): void {
-        const key = this.resolve(row, this.dataKey());
-        const next = new Set(this.expandedKeys());
-        const expanded = !next.delete(key);
-        if (expanded) next.add(key);
-        this.expandedKeys.set(next);
-        this.rowExpansionChange.emit({ row, expanded });
     }
 
     protected resolve(row: T | undefined, field: string): unknown {

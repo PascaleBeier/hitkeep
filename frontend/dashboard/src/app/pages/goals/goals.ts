@@ -112,7 +112,7 @@ export class Goals {
             ]
         },
         { field: 'value', headerKey: 'common.columns.value' },
-        { field: 'conversions', headerKey: 'goals.kpis.conversions', type: 'number', align: 'end' },
+        { field: 'conversions', headerKey: 'goals.kpis.conversions', type: 'number', align: 'end', total: true },
         { field: 'conversion_rate', headerKey: 'common.kpis.conversionRate', type: 'number', align: 'end' }
     ];
     protected readonly isSelectedGoal = (goal: Goal) => goal.id === this.selectedGoalId();

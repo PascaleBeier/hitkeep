@@ -4006,6 +4006,7 @@
     "dateRange": "Date range",
     "noResults": "No rows match the current filters.",
     "clearFilters": "Clear filters",
-    "empty": "Nothing here yet."
+    "empty": "Nothing here yet.",
+    "total": "Total"
   }
 }

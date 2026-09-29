@@ -33,7 +33,7 @@ const COLUMNS: AppTableColumn<Hook>[] = [
             { value: 'paused', labelKey: 'status.paused' }
         ]
     },
-    { field: 'attempts', headerKey: 'cols.attempts', type: 'number', align: 'end' },
+    { field: 'attempts', headerKey: 'cols.attempts', type: 'number', align: 'end', total: true },
     { field: 'events', headerKey: 'cols.events', type: 'enum', sortable: false, options: [{ value: 'hit.created', labelKey: 'status.hit' }] }
 ];
 
@@ -68,7 +68,7 @@ describe('AppTable', () => {
                             cols: { name: 'Name', status: 'Status', attempts: 'Attempts', events: 'Events' },
                             status: { active: 'Active', paused: 'Paused', hit: 'Hit' },
                             common: { searchPlaceholder: 'Search', columns: { actions: 'Actions' }, actions: { exportCsv: 'Export CSV', more: 'More' } },
-                            table: { searchChip: 'Search: {{value}}', groupCount: '{{count}} rows', noResults: 'No matches', empty: 'Nothing yet', clearFilters: 'Clear filters' }
+                            table: { total: 'Total', searchChip: 'Search: {{value}}', groupCount: '{{count}} rows', noResults: 'No matches', empty: 'Nothing yet', clearFilters: 'Clear filters' }
                         }
                     },
                     translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
@@ -134,6 +134,22 @@ describe('AppTable', () => {
         await settle();
         expect(names()).toEqual(['Beta']);
         expect(JSON.parse(localStorage.getItem('hitkeep.table.v1.spec.view')!).groupBy).toBe('status');
+    });
+
+    it('keeps rendered rows when callers rebuild row objects with the same keys', async () => {
+        const before = fixture.nativeElement.querySelector('tr.app-table__row');
+        fixture.componentInstance.rows.set(ROWS.map((row) => ({ ...row })));
+        await settle();
+
+        expect(fixture.nativeElement.querySelector('tr.app-table__row')).toBe(before);
+    });
+
+    it('sums total columns over the filtered rows', async () => {
+        const footer = () => (fixture.nativeElement.querySelector('tr.app-table__total') as HTMLElement).textContent?.replace(/\s+/g, ' ').trim();
+        expect(footer()).toBe('Total 11');
+
+        await search('alp');
+        expect(footer()).toBe('Total 3');
     });
 
     it('hides columns and persists the choice', async () => {

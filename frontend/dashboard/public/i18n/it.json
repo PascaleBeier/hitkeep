@@ -3896,6 +3896,7 @@
     "dateRange": "Intervallo di date",
     "noResults": "Nessuna riga corrisponde ai filtri attuali.",
     "clearFilters": "Cancella filtri",
-    "empty": "Ancora nulla qui."
+    "empty": "Ancora nulla qui.",
+    "total": "Totale"
   }
 }

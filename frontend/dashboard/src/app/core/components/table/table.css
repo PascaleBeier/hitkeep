@@ -45,10 +45,15 @@
 }
 
 .app-table__heading {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.25rem;
     white-space: nowrap;
+}
+
+/* Filter trigger sits at the cell's far edge, clear of the label and sort icon. */
+.app-table__heading > p-columnfilter {
+    margin-inline-start: auto;
 }
 
 :host ::ng-deep .app-table__table {
@@ -76,6 +81,10 @@
 
 .app-table__end .app-table__heading {
     justify-content: flex-end;
+}
+
+.app-table__end .app-table__heading > p-columnfilter {
+    margin-inline-start: 0;
 }
 
 .app-table__actions,
@@ -126,6 +135,10 @@
 
 .app-table__expanded > td {
     background: color-mix(in srgb, var(--p-text-color) 4%, transparent);
+}
+
+.app-table__total > td {
+    font-weight: 600;
 }
 
 .app-table__empty {
