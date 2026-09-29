@@ -21,74 +21,27 @@
         </div>
         }
 
-        <div class="flex justify-end">
-            <p-iconfield class="hk-crud-search">
-                <p-inputicon class="pi pi-search" />
-                <input pInputText #shareSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="shareLinksTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-            </p-iconfield>
-        </div>
-
-        <div class="hk-crud-table-wrap">
-            <p-table
-                #shareLinksTable
-                [value]="shareLinks()"
-                [loading]="linksLoading()"
-                dataKey="id"
-                [globalFilterFields]="['token_hint', 'created_at', 'url']"
-                [sortField]="'created_at'"
-                [sortOrder]="-1"
-                [paginator]="true"
-                [rows]="10"
-                [rowsPerPageOptions]="[10, 25, 50]"
-                [rowHover]="true"
-                responsiveLayout="scroll"
-                styleClass="hk-crud-table p-datatable-sm"
-                [tableStyle]="{ 'min-width': '760px' }"
-            >
-                <ng-template pTemplate="header">
-                    <tr>
-                        <th pSortableColumn="token_hint">
-                            {{ "share.dialog.tokenHintLabel" | transloco }}
-                            <p-sortIcon field="token_hint" />
-                        </th>
-                        <th pSortableColumn="created_at">
-                            {{ "common.columns.created" | transloco }}
-                            <p-sortIcon field="created_at" />
-                        </th>
-                        <th pSortableColumn="url">
-                            {{ "share.dialog.shareUrlLabel" | transloco }}
-                            <p-sortIcon field="url" />
-                        </th>
-                        <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                    </tr>
-                </ng-template>
-
-                <ng-template pTemplate="body" let-link>
-                    <tr>
-                        <td>
-                            <code class="share-token">{{ link.token_hint }}</code>
-                        </td>
-                        <td><app-relative-date-time [value]="link.created_at" /></td>
-                        <td>
-                            @if (link.url) {
-                            <input pInputText readonly [value]="link.url" class="w-full share-url-input" />
-                            } @else {
-                            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "share.dialog.urlUnavailable" | transloco }}</span>
-                            }
-                        </td>
-                        <td class="hk-actions-cell">
-                            <app-table-row-actions [items]="shareLinkActions(link)" [loading]="deletingShareId() === link.id" />
-                        </td>
-                    </tr>
-                </ng-template>
-
-                <ng-template pTemplate="emptymessage">
-                    <tr>
-                        <td colspan="4" class="text-center text-muted-color py-4">{{ "share.dialog.empty" | transloco }}</td>
-                    </tr>
-                </ng-template>
-            </p-table>
-        </div>
+        <app-table
+            [value]="shareLinks()"
+            [columns]="shareLinkColumns"
+            stateKey="share-links"
+            [loading]="linksLoading()"
+            [defaultSort]="{ field: 'created_at', order: -1 }"
+            [rowActions]="shareLinkRowActions"
+            [rowActionsLoading]="shareLinkActionLoading"
+            [exportable]="false"
+            emptyTextKey="share.dialog.empty"
+            data-testid="share-links-table"
+        >
+            <ng-template appTableCell="token_hint" let-link><code class="share-token">{{ link.token_hint }}</code></ng-template>
+            <ng-template appTableCell="url" let-link>
+                @if (link.url) {
+                <input pInputText readonly [value]="link.url" class="w-full share-url-input" [attr.aria-label]="'share.dialog.shareUrlLabel' | transloco" />
+                } @else {
+                <span class="text-sm text-[var(--p-text-muted-color)]">{{ "share.dialog.urlUnavailable" | transloco }}</span>
+                }
+            </ng-template>
+        </app-table>
     </div>
 </app-dialog-shell>
 }

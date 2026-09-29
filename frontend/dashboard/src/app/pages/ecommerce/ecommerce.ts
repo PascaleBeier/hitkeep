@@ -8,10 +8,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { TableModule } from '@openng/optimus-ui/table';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
 import { TabsModule } from '@openng/optimus-ui/tabs';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
@@ -52,10 +49,8 @@ type DataLoadMode = 'blocking' | 'background';
         TranslocoPipe,
         ButtonModule,
         CardModule,
-        IconFieldModule,
-        InputIconModule,
-        InputTextModule,
-        TableModule,
+        AppTable,
+        AppTableCell,
         TabsModule,
         PageHeader,
         PageHeaderLeft,
@@ -88,6 +83,21 @@ export class EcommercePage {
     protected readonly series = signal<EcommerceSeriesPoint[]>([]);
     protected readonly products = signal<EcommerceProductStat[]>([]);
     protected readonly sources = signal<EcommerceSourceStat[]>([]);
+    protected readonly productColumns: AppTableColumn<EcommerceProductStat>[] = [
+        { field: 'item_name', headerKey: 'ecommerce.columns.product', frozen: true },
+        { field: 'quantity', headerKey: 'ecommerce.columns.quantity', type: 'number', align: 'end' },
+        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end' },
+        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end' }
+    ];
+    protected readonly sourceColumns: AppTableColumn<EcommerceSourceStat>[] = [
+        { field: 'utm_source', headerKey: 'ecommerce.columns.source', frozen: true, groupable: true },
+        { field: 'utm_campaign', headerKey: 'ecommerce.columns.campaign', groupable: true },
+        { field: 'referrer', headerKey: 'ecommerce.columns.referrer' },
+        { field: 'orders', headerKey: 'ecommerce.columns.orders', type: 'number', align: 'end' },
+        { field: 'revenue', headerKey: 'ecommerce.columns.revenue', type: 'number', align: 'end' }
+    ];
+    protected readonly productRowActive = (product: EcommerceProductStat) => this.isProductFilterActive(product);
+    protected readonly sourceRowActive = (source: EcommerceSourceStat) => this.isSourceFilterActive(source);
     protected readonly filterStats = signal<SiteStats | null>(null);
     protected readonly isLoading = signal(false);
     protected readonly kpiUpdateKey = signal(0);

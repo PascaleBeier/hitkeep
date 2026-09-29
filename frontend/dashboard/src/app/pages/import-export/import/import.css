@@ -33,9 +33,7 @@
 .imports-provider-card,
 .imports-upload-toolbar,
 :host ::ng-deep .imports-fileupload.p-fileupload,
-.imports-file-row,
-:host ::ng-deep .imports-table,
-:host ::ng-deep .imports-history-table {
+.imports-file-row {
     border: 1px solid var(--p-content-border-color);
     border-radius: 0.5rem;
 }
@@ -113,9 +111,7 @@
     font-weight: 700;
 }
 
-:host ::ng-deep .imports-fileupload.p-fileupload,
-:host ::ng-deep .imports-table,
-:host ::ng-deep .imports-history-table {
+:host ::ng-deep .imports-fileupload.p-fileupload {
     overflow: hidden;
 }
 

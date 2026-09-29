@@ -208,6 +208,10 @@ describe('AuditTableComponent', () => {
         fixture.detectChanges();
     });
 
+    function expandFirstRow() {
+        (fixture.nativeElement.querySelector('td.app-table__expander button') as HTMLButtonElement).click();
+    }
+
     it('renders compact audit evidence columns', () => {
         const text = fixture.nativeElement.textContent as string;
 
@@ -227,7 +231,7 @@ describe('AuditTableComponent', () => {
     });
 
     it('expands evidence without requiring an API call', () => {
-        component['toggleRow'](rows[0]);
+        expandFirstRow();
         fixture.detectChanges();
 
         const text = fixture.nativeElement.textContent as string;
@@ -241,7 +245,7 @@ describe('AuditTableComponent', () => {
         fixture.componentRef.setInput('total', 1);
         fixture.detectChanges();
 
-        component['toggleRow'](askAIRow);
+        expandFirstRow();
         fixture.detectChanges();
 
         const text = fixture.nativeElement.textContent as string;
@@ -262,7 +266,7 @@ describe('AuditTableComponent', () => {
         fixture.componentRef.setInput('total', 1);
         fixture.detectChanges();
 
-        component['toggleRow'](askAIRequestRow);
+        expandFirstRow();
         fixture.detectChanges();
 
         const text = fixture.nativeElement.textContent as string;
@@ -282,7 +286,7 @@ describe('AuditTableComponent', () => {
         fixture.componentRef.setInput('total', 1);
         fixture.detectChanges();
 
-        component['toggleRow'](askAIHistoryRow);
+        expandFirstRow();
         fixture.detectChanges();
 
         const text = fixture.nativeElement.textContent as string;
@@ -300,7 +304,7 @@ describe('AuditTableComponent', () => {
         fixture.componentRef.setInput('total', 1);
         fixture.detectChanges();
 
-        component['toggleRow'](row);
+        expandFirstRow();
         fixture.detectChanges();
 
         const text = fixture.nativeElement.textContent as string;

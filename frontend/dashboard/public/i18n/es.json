@@ -4134,5 +4134,22 @@
       "title": "Entrega del informe rechazada",
       "description": "No recibirás este informe salvo que aceptes una nueva confirmación más adelante."
     }
+  },
+  "table": {
+    "pageReport": "{first}–{last} de {totalRecords}",
+    "searchChip": "Búsqueda: {{value}}",
+    "groupBy": "Agrupar por",
+    "columns": "Columnas",
+    "resetView": "Restablecer vista",
+    "expand": "Expandir",
+    "expandRow": "Mostrar detalles",
+    "collapseRow": "Ocultar detalles",
+    "groupCount": "{{count}} filas",
+    "noValue": "Sin valor",
+    "any": "Cualquiera",
+    "dateRange": "Rango de fechas",
+    "noResults": "Ninguna fila coincide con los filtros actuales.",
+    "clearFilters": "Borrar filtros",
+    "empty": "Todavía no hay nada aquí."
   }
 }

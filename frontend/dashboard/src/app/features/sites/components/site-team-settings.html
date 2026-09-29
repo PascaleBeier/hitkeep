@@ -1,0 +1,121 @@
+<p-confirmdialog />
+<app-crud-dialog
+    [title]="'sites.team.addMemberDialogTitle' | transloco"
+    [visible]="isAddMemberDialogVisible()"
+    (visibleChange)="onAddMemberDialogVisibleChange($event)"
+    [submitLabel]="'sites.team.addMemberAction' | transloco"
+    [cancelLabel]="'common.actions.cancel' | transloco"
+    submitIcon="pi pi-user-plus"
+    [saving]="isAdding()"
+    (submitted)="addMember()"
+>
+    <form class="site-settings-dialog-form" (submit)="$event.preventDefault(); addMember()">
+        <div class="site-settings-field-grid site-settings-member-grid">
+            <div class="site-settings-field">
+                <label for="member-email">{{ 'common.emailAddress' | transloco }}</label>
+                <input
+                    id="member-email"
+                    pInputText
+                    [formControl]="memberForm.email().control()"
+                    [placeholder]="'sites.team.emailPlaceholder' | transloco"
+                    [class.ng-invalid]="memberForm.email().touched() && memberForm.email().invalid()"
+                    [class.ng-dirty]="memberForm.email().dirty()"
+                    inputmode="email"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    class="w-full"
+                />
+            </div>
+
+            <div class="site-settings-field">
+                <label for="member-role">{{ 'common.columns.role' | transloco }}</label>
+                <p-select inputId="member-role" [options]="roleOptions()" [formControl]="memberForm.role().control()" optionLabel="label" optionValue="value" appendTo="body" class="w-full" />
+            </div>
+        </div>
+        @if (memberErrorKey(); as key) {
+        <p-message severity="error" [text]="key | transloco" />
+        }
+    </form>
+</app-crud-dialog>
+<div class="site-settings-stack">
+    @if (canManageTeam() && availableTransferTeams().length) {
+    <section class="site-settings-card">
+        <header class="site-settings-card__header">
+            <div class="site-settings-card__title-row">
+                <span class="site-settings-card__icon"><i class="pi pi-arrow-right-arrow-left" aria-hidden="true"></i></span>
+                <div>
+                    <h3>{{ 'sites.team.transfer.title' | transloco }}</h3>
+                    <p>{{ 'sites.team.transfer.description' | transloco }}</p>
+                </div>
+            </div>
+        </header>
+        <div class="site-settings-card__body">
+            @if (transferSuccessKey(); as key) {
+            <p-message severity="success" [text]="key | transloco" />
+            } @if (transferErrorKey(); as key) {
+            <p-message severity="error" [text]="key | transloco" />
+            }
+            <div class="site-settings-field">
+                <label for="site-transfer-team">{{ 'sites.team.transfer.teamLabel' | transloco }}</label>
+                <p-select
+                    inputId="site-transfer-team"
+                    [options]="availableTransferTeams()"
+                    [formControl]="transferForm.teamId().control()"
+                    optionLabel="label"
+                    optionValue="value"
+                    [placeholder]="'sites.team.transfer.teamPlaceholder' | transloco"
+                    class="w-full"
+                />
+            </div>
+        </div>
+        <footer class="site-settings-card__footer">
+            <p-button
+                styleClass="site-settings-action-btn"
+                [label]="'sites.team.transfer.action' | transloco"
+                icon="pi pi-arrow-right-arrow-left"
+                [loading]="isTransferring()"
+                [disabled]="isTransferring() || transferForm().invalid()"
+                (onClick)="transferSite()"
+            />
+        </footer>
+    </section>
+    }
+
+    <section class="site-settings-card">
+        <header class="site-settings-card__header">
+            <div class="site-settings-card__title-row">
+                <span class="site-settings-card__icon"><i class="pi pi-users" aria-hidden="true"></i></span>
+                <div>
+                    <h3>{{ 'sites.settings.tabs.access' | transloco }}</h3>
+                </div>
+            </div>
+        </header>
+        <div class="site-settings-card__body">
+            @if (memberSuccessKey(); as key) {
+            <p-message severity="success" [text]="key | transloco" />
+            } @if (memberErrorKey() && !isAddMemberDialogVisible()) {
+            <p-message severity="error" [text]="memberErrorKey() | transloco" />
+            }
+            <app-table
+                [value]="members()"
+                [columns]="memberColumns()"
+                stateKey="site-team"
+                dataKey="user_id"
+                [loading]="isLoading()"
+                [defaultSort]="{ field: 'added_at', order: -1 }"
+                [rowActions]="canManageTeam() ? memberRowActions : undefined"
+                exportFilename="site-team"
+                data-testid="site-team-table"
+            >
+                <ng-template appTableSlot="toolbar">
+                    @if (canManageTeam()) {
+                    <p-button styleClass="site-settings-action-btn" [label]="'sites.team.addMemberAction' | transloco" icon="pi pi-user-plus" [type]="'button'" (onClick)="openAddMemberDialog()" />
+                    }
+                </ng-template>
+                <ng-template appTableCell="role" let-member>
+                    <span [class]="getRoleBadgeClass(member.role)">{{ getRoleLabel(member.role) }}</span>
+                </ng-template>
+            </app-table>
+        </div>
+    </section>
+</div>

@@ -3866,5 +3866,22 @@
     "invalid": { "title": "Deze bevestigingslink is niet beschikbaar", "description": "De link kan ongeldig, verlopen, al gebruikt of vervangen zijn. Vraag de rapportbeheerder om hem opnieuw te verzenden." },
     "confirmed": { "title": "Rapportbezorging bevestigd", "description": "Je ontvangt toekomstige geplande rapporten. Rapporten van vóór de bevestiging worden niet opnieuw verzonden." },
     "declined": { "title": "Rapportbezorging geweigerd", "description": "Je ontvangt dit rapport niet, tenzij je later een nieuwe bevestiging accepteert." }
+  },
+  "table": {
+    "pageReport": "{first}–{last} van {totalRecords}",
+    "searchChip": "Zoeken: {{value}}",
+    "groupBy": "Groeperen op",
+    "columns": "Kolommen",
+    "resetView": "Weergave herstellen",
+    "expand": "Uitklappen",
+    "expandRow": "Details tonen",
+    "collapseRow": "Details verbergen",
+    "groupCount": "{{count}} rijen",
+    "noValue": "Geen waarde",
+    "any": "Alle",
+    "dateRange": "Datumbereik",
+    "noResults": "Geen rijen komen overeen met de huidige filters.",
+    "clearFilters": "Filters wissen",
+    "empty": "Hier staat nog niets."
   }
 }

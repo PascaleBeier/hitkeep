@@ -7,24 +7,20 @@ import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ChipModule } from '@openng/optimus-ui/chip';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { MultiSelectModule } from '@openng/optimus-ui/multiselect';
-import { PaginatorModule, PaginatorState } from '@openng/optimus-ui/paginator';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { SkeletonModule } from '@openng/optimus-ui/skeleton';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
-import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { PageState } from '@components/page-state/page-state';
 import { SiteScopeSummary, SiteScopeSummaryItem } from '@components/site-scope-summary/site-scope-summary';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { SiteSelectOption } from '@features/sites/components/site-select-option';
 import { SiteService } from '@features/sites/services/site.service';
@@ -54,8 +50,6 @@ interface ReportTableRow {
     lastOutcome: string;
 }
 
-type MobileSortField = 'name' | 'schedule' | 'status' | 'nextRun' | 'lastOutcome';
-
 @Component({
     selector: 'app-report-settings',
     imports: [
@@ -64,24 +58,22 @@ type MobileSortField = 'name' | 'schedule' | 'status' | 'nextRun' | 'lastOutcome
         ButtonModule,
         ChipModule,
         ConfirmDialogModule,
-        IconFieldModule,
-        InputIconModule,
         InputTextModule,
         MessageModule,
         MultiSelectModule,
-        PaginatorModule,
         SelectModule,
         SkeletonModule,
-        TableModule,
         TagModule,
         CrudDialog,
-        CrudTableToolbar,
         DialogShell,
         PageFrame,
         PageState,
         SiteScopeSummary,
         SiteSelectOption,
         TableRowActions,
+        AppTable,
+        AppTableCell,
+        AppTableSlot,
         ReportEmailPreview,
         TranslocoPipe
     ],
@@ -139,9 +131,6 @@ export class ReportSettings {
     protected readonly externalEmailInput = signal('');
     protected readonly externalEmailError = signal('');
     protected readonly focusedReportID = signal<string | null>(null);
-    protected readonly searchQuery = signal('');
-    protected readonly mobileSortField = signal<MobileSortField>('name');
-    protected readonly mobileSortOrder = signal<1 | -1>(1);
 
     // Keep the email preview live: re-render shortly after the draft settles.
     private readonly autoPreview = effect((onCleanup) => {
@@ -150,9 +139,17 @@ export class ReportSettings {
         const timer = setTimeout(() => this.previewReport(), 600);
         onCleanup(() => clearTimeout(timer));
     });
-    protected readonly mobileFirst = signal(0);
-    protected readonly mobileRows = signal(10);
     private memberRequestID = 0;
+    protected readonly reportColumns: AppTableColumn<ReportTableRow>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        { field: 'scope', headerKey: 'settings.reports.scopeSites', type: 'enum', groupable: true },
+        { field: 'recipients', headerKey: 'settings.reports.recipients.label' },
+        { field: 'schedule', headerKey: 'settings.reports.schedule.label' },
+        { field: 'nextRun', headerKey: 'settings.reports.nextRun' },
+        { field: 'lastOutcome', headerKey: 'settings.reports.lastOutcome', type: 'enum' }
+    ];
+    protected readonly reportRowActions = (row: ReportTableRow) => this.reportActions(row.report);
+    protected readonly reportActionLoading = (row: ReportTableRow) => this.reportActionID() === row.report.id;
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
         this.activeLanguage();
@@ -172,29 +169,6 @@ export class ReportSettings {
             nextRun: this.formatDate(report.next_run_at),
             lastOutcome: report.last_outcome ? this.transloco.translate(`settings.reports.runStatus.${report.last_outcome.status}`) : this.transloco.translate('settings.reports.notAvailable')
         }));
-    });
-    protected readonly filteredReportRows = computed(() => {
-        const query = this.searchQuery().trim().toLocaleLowerCase(this.activeLanguage());
-        if (!query) return this.reportTableRows();
-        return this.reportTableRows().filter((row) =>
-            [row.name, row.preset, row.scope, row.sites, row.recipients, row.schedule, row.status, row.nextRun, row.lastOutcome].some((value) => value.toLocaleLowerCase(this.activeLanguage()).includes(query))
-        );
-    });
-    protected readonly mobileSortedRows = computed(() => {
-        const field = this.mobileSortField();
-        const order = this.mobileSortOrder();
-        return [...this.filteredReportRows()].sort((left, right) => this.mobileSortValue(left, field).localeCompare(this.mobileSortValue(right, field), this.activeLanguage(), { numeric: true }) * order);
-    });
-    protected readonly mobilePageRows = computed(() => this.mobileSortedRows().slice(this.mobileFirst(), this.mobileFirst() + this.mobileRows()));
-    protected readonly mobileSortOptions = computed(() => {
-        this.activeLanguage();
-        return [
-            { label: this.transloco.translate('common.columns.name'), value: 'name' },
-            { label: this.transloco.translate('settings.reports.schedule.label'), value: 'schedule' },
-            { label: this.transloco.translate('common.columns.status'), value: 'status' },
-            { label: this.transloco.translate('settings.reports.nextRun'), value: 'nextRun' },
-            { label: this.transloco.translate('settings.reports.lastOutcome'), value: 'lastOutcome' }
-        ] as { label: string; value: MobileSortField }[];
     });
     protected readonly reportStatusOptions = computed(() => {
         this.activeLanguage();
@@ -222,26 +196,6 @@ export class ReportSettings {
     protected refresh(): void {
         if (this.isLoading()) return;
         this.loadReports(false);
-    }
-
-    protected setSearch(value: string): void {
-        this.searchQuery.set(value);
-        this.mobileFirst.set(0);
-    }
-
-    protected setMobileSortField(field: MobileSortField): void {
-        this.mobileSortField.set(field);
-        this.mobileFirst.set(0);
-    }
-
-    protected toggleMobileSortOrder(): void {
-        this.mobileSortOrder.update((order) => (order === 1 ? -1 : 1));
-        this.mobileFirst.set(0);
-    }
-
-    protected onMobilePage(event: PaginatorState): void {
-        this.mobileFirst.set(event.first ?? 0);
-        this.mobileRows.set(event.rows ?? 10);
     }
 
     protected openCreate(): void {
@@ -835,19 +789,13 @@ export class ReportSettings {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
     }
 
-    private mobileSortValue(row: ReportTableRow, field: MobileSortField): string {
-        if (field === 'nextRun') return row.report.next_run_at ?? '';
-        if (field === 'lastOutcome') return row.report.last_outcome?.status ?? '';
-        return row[field];
-    }
-
     private openDeepLinkedReport(): void {
         const reportID = this.route.snapshot.queryParamMap.get('report');
         if (!reportID) return;
         const report = this.reports().find((candidate) => candidate.id === reportID);
         if (!report) return;
         this.focusedReportID.set(reportID);
-        queueMicrotask(() => this.elementRef.nativeElement.querySelector<HTMLElement>(`[data-report-id="${CSS.escape(reportID)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+        queueMicrotask(() => this.elementRef.nativeElement.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(reportID)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
         if (this.canManage(report)) this.openEdit(report);
     }
 }

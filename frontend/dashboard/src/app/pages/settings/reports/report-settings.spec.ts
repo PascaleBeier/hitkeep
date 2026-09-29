@@ -43,14 +43,8 @@ describe('ReportSettings', () => {
         reportActions(report: ReportDefinition): { label?: string; items?: unknown }[];
         save(): void;
         refresh(): void;
-        setSearch(value: string): void;
-        setMobileSortField(field: 'name' | 'schedule' | 'status' | 'nextRun' | 'lastOutcome'): void;
-        toggleMobileSortOrder(): void;
-        onMobilePage(event: { first: number; rows: number }): void;
         previewReport(): void;
         openHistory(report: ReportDefinition): void;
-        filteredReportRows: Signal<{ report: ReportDefinition }[]>;
-        mobilePageRows: Signal<{ report: ReportDefinition }[]>;
         previewLoading: Signal<boolean>;
         membersError: Signal<boolean>;
         historyLoading: Signal<boolean>;
@@ -162,6 +156,7 @@ describe('ReportSettings', () => {
 
     afterEach(() => {
         document.querySelectorAll('.p-dialog-mask, .p-dialog, .p-confirmdialog').forEach((element) => element.remove());
+        localStorage.clear();
     });
 
     it('shows the Pro nudge and prevents adding an external address on Free', async () => {
@@ -186,10 +181,10 @@ describe('ReportSettings', () => {
         await fixture.whenStable();
 
         expect(fixture.nativeElement.querySelector('[data-testid="report-table"]')).not.toBeNull();
-        expect(fixture.nativeElement.querySelector('[data-testid="report-search"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="report-table"] [data-testid="table-search"]')).not.toBeNull();
         expect(fixture.nativeElement.querySelector('app-table-row-actions')).not.toBeNull();
         expect(fixture.nativeElement.querySelector('article.report-card')).toBeNull();
-        expect(fixture.nativeElement.querySelector('[data-testid="report-mobile-list"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="report-mobile-row"]')).not.toBeNull();
         expect(fixture.nativeElement.textContent).toContain('Morning growth report');
     });
 
@@ -225,7 +220,7 @@ describe('ReportSettings', () => {
         ]);
         await fixture.whenStable();
 
-        const desktopTable = fixture.nativeElement.querySelector('.report-desktop-table') as HTMLElement;
+        const desktopTable = fixture.nativeElement.querySelector('[data-testid="report-table"]') as HTMLElement;
         const status = desktopTable.querySelector('[data-testid="report-status-indicator"]') as HTMLElement;
         const outcome = desktopTable.querySelector('[data-testid="report-outcome-indicator"]') as HTMLElement;
         const recipient = desktopTable.querySelector('[data-testid="report-recipient-status-indicator"]') as HTMLElement;
@@ -242,26 +237,21 @@ describe('ReportSettings', () => {
         expect(desktopTable.querySelectorAll('thead th').length).toBe(7);
     });
 
-    it('shares search state across desktop and mobile rows', async () => {
+    it('shares search, sort, and paging between desktop rows and mobile cards', async () => {
         reports.set([reportFixture(), reportFixture({ id: 'report-2', name: 'Weekly portfolio review' })]);
-        const component = fixture.componentInstance as TestAccess;
-        component.setSearch('portfolio');
         await fixture.whenStable();
 
-        expect(component.filteredReportRows().map((row) => row.report.name)).toEqual(['Weekly portfolio review']);
+        const search = fixture.nativeElement.querySelector('[data-testid="table-search"]') as HTMLInputElement;
+        search.value = 'portfolio';
+        search.dispatchEvent(new Event('input'));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        fixture.detectChanges();
+        await fixture.whenStable();
+
         expect(fixture.nativeElement.querySelectorAll('[data-testid="report-mobile-row"]').length).toBe(1);
+        expect(fixture.nativeElement.querySelectorAll('tr.app-table__row').length).toBe(1);
         expect(fixture.nativeElement.textContent).toContain('Weekly portfolio review');
         expect(fixture.nativeElement.textContent).not.toContain('Morning growth report');
-    });
-
-    it('sorts and paginates the mobile summary list', () => {
-        reports.set(Array.from({ length: 12 }, (_, index) => reportFixture({ id: `report-${index}`, name: `Report ${String(index).padStart(2, '0')}` })));
-        const component = fixture.componentInstance as TestAccess;
-        component.setMobileSortField('name');
-        component.toggleMobileSortOrder();
-        component.onMobilePage({ first: 10, rows: 10 });
-
-        expect(component.mobilePageRows().map((row) => row.report.name)).toEqual(['Report 01', 'Report 00']);
     });
 
     it('wraps long report identity, domains, and recipient addresses into the mobile summary', async () => {

@@ -446,7 +446,7 @@ describe('EcommercePage', () => {
 
     it('toggles product filters from table rows like metric cards', () => {
         const component = fixture.componentInstance as EcommercePageTestAccess;
-        const productRow = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('tr.ecommerce-filter-row')).find((row) => row.textContent?.includes('Pro'));
+        const productRow = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('tr.app-table__row--selectable')).find((row) => row.textContent?.includes('Pro'));
         expect(productRow).toBeTruthy();
 
         productRow?.click();
@@ -457,9 +457,9 @@ describe('EcommercePage', () => {
             itemName: 'Pro'
         });
         expect(fixture.nativeElement.textContent).toContain('Product: Pro');
-        expect(fixture.nativeElement.querySelector('tr.ecommerce-filter-row--active')?.textContent).toContain('Pro');
+        expect(fixture.nativeElement.querySelector('tr.app-table__row--selected')?.textContent).toContain('Pro');
 
-        fixture.nativeElement.querySelector('tr.ecommerce-filter-row--active')?.click();
+        fixture.nativeElement.querySelector('tr.app-table__row--selected')?.click();
         fixture.detectChanges();
 
         expect(component.selectedProduct()).toBeNull();
@@ -469,7 +469,7 @@ describe('EcommercePage', () => {
         const component = fixture.componentInstance as EcommercePageTestAccess;
 
         clickTab('Revenue sources');
-        const sourceRow = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('tr.ecommerce-filter-row')).find((row) => row.textContent?.includes('google'));
+        const sourceRow = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('tr.app-table__row--selectable')).find((row) => row.textContent?.includes('google'));
         expect(sourceRow).toBeTruthy();
 
         sourceRow?.click();
@@ -477,7 +477,7 @@ describe('EcommercePage', () => {
 
         expect(component.activeFilters()).toEqual([{ type: 'utm_source', value: 'google.com' }]);
         expect(fixture.nativeElement.textContent).toContain('UTM source: google.com');
-        expect(fixture.nativeElement.querySelector('tr.ecommerce-filter-row--active')?.textContent).toContain('google.com');
+        expect(fixture.nativeElement.querySelector('tr.app-table__row--selected')?.textContent).toContain('google.com');
     });
 
     it('renders ecommerce-specific geo and network aggregates', () => {

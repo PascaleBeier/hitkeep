@@ -60,149 +60,64 @@
             <p-message severity="secondary">{{ "teams.management.readOnly" | transloco }}</p-message>
             }
 
-            <div class="flex justify-end">
-                <p-iconfield class="hk-crud-search">
-                    <p-inputicon class="pi pi-search" />
-                    <input pInputText id="team-members-search" #membersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="membersTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                </p-iconfield>
-            </div>
-
-            <div class="hk-crud-table-wrap">
-                <p-table
-                    #membersTable
-                    [value]="members()"
-                    [loading]="isLoading()"
-                    [globalFilterFields]="['email', 'role', 'added_at']"
-                    [sortField]="'added_at'"
-                    [sortOrder]="-1"
-                    [paginator]="true"
-                    [rows]="10"
-                    [rowsPerPageOptions]="[10, 25, 50]"
-                    [rowHover]="true"
-                    responsiveLayout="scroll"
-                    styleClass="hk-crud-table p-datatable-sm"
-                    [tableStyle]="{ 'min-width': '720px' }"
-                >
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th pSortableColumn="email">
-                                {{ "common.columns.email" | transloco }}
-                                <p-sortIcon field="email" />
-                            </th>
-                            <th pSortableColumn="role">
-                                {{ "common.columns.role" | transloco }}
-                                <p-sortIcon field="role" />
-                            </th>
-                            <th pSortableColumn="added_at">
-                                {{ "common.columns.added" | transloco }}
-                                <p-sortIcon field="added_at" />
-                            </th>
-                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="body" let-member>
-                        <tr>
-                            <td>{{ member.email }}</td>
-                            <td class="min-w-44">
-                                @if (canEditMember(member)) {
-                                <p-select
-                                    class="w-full max-w-48"
-                                    [options]="roleOptionsForMember(member)"
-                                    [formControl]="roleControlFor(member)"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    appendTo="body"
-                                    (onChange)="onRoleChange(member, $event.value)"
-                                />
-                                } @else {
-                                <p-tag [value]="roleLabel(member.role)" [severity]="roleSeverity(member.role)" [rounded]="true" />
-                                }
-                            </td>
-                            <td><app-relative-date-time [value]="member.added_at" /></td>
-                            <td class="hk-actions-cell">
-                                @if (memberActions(member).length > 0) {
-                                <app-table-row-actions [items]="memberActions(member)" [loading]="memberActionLoading(member)" />
-                                } @else {
-                                <span class="text-xs text-muted-color">{{ "teams.management.notAllowed" | transloco }}</span>
-                                }
-                            </td>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="emptymessage">
-                        <tr>
-                            <td colspan="4" class="text-center text-muted-color py-4">{{ "teams.management.empty" | transloco }}</td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-            </div>
+            <app-table
+                [value]="members()"
+                [columns]="memberColumns"
+                stateKey="team-members"
+                dataKey="user_id"
+                [loading]="isLoading()"
+                [defaultSort]="{ field: 'added_at', order: -1 }"
+                [rowActions]="memberRowActions"
+                emptyTextKey="teams.management.empty"
+                exportFilename="team-members"
+                data-testid="team-members-table"
+            >
+                <ng-template appTableCell="role" let-member>
+                    @if (canEditMember(member)) {
+                    <p-select
+                        class="w-full max-w-48"
+                        [options]="roleOptionsForMember(member)"
+                        [formControl]="roleControlFor(member)"
+                        optionLabel="label"
+                        optionValue="value"
+                        appendTo="body"
+                        [ariaLabel]="'common.columns.role' | transloco"
+                        (onChange)="onRoleChange(member, $event.value)"
+                    />
+                    } @else {
+                    <p-tag [value]="roleLabel(member.role)" [severity]="roleSeverity(member.role)" [rounded]="true" />
+                    }
+                </ng-template>
+                <ng-template appTableSlot="actions" let-member>
+                    @if (memberActions(member).length > 0) {
+                    <app-table-row-actions [items]="memberActions(member)" [loading]="memberActionLoading(member)" />
+                    } @else {
+                    <span class="text-xs text-muted-color">{{ "teams.management.notAllowed" | transloco }}</span>
+                    }
+                </ng-template>
+            </app-table>
         </div>
     </app-settings-card>
 
     @if (canManageMembers()) {
     <app-settings-card [title]="'teams.management.pendingTitle' | transloco" [subtitle]="'teams.management.pendingSubtitle' | transloco" icon="pi pi-envelope">
-        <div settings-card-header class="flex flex-wrap items-center gap-2">
-            <p-iconfield class="hk-crud-search">
-                <p-inputicon class="pi pi-search" />
-                <input pInputText #pendingInvitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pendingInvitesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-            </p-iconfield>
-        </div>
-
         <div settings-card-body>
-            <div class="hk-crud-table-wrap">
-                <p-table
-                    #pendingInvitesTable
-                    [value]="pendingInvites()"
-                    [loading]="isLoading()"
-                    [globalFilterFields]="['email', 'role', 'created_at', 'expires_at']"
-                    [sortField]="'created_at'"
-                    [sortOrder]="-1"
-                    [paginator]="true"
-                    [rows]="10"
-                    [rowsPerPageOptions]="[10, 25, 50]"
-                    [rowHover]="true"
-                    responsiveLayout="scroll"
-                    styleClass="hk-crud-table p-datatable-sm"
-                    [tableStyle]="{ 'min-width': '760px' }"
-                >
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th pSortableColumn="email">
-                                {{ "common.columns.email" | transloco }}
-                                <p-sortIcon field="email" />
-                            </th>
-                            <th pSortableColumn="role">
-                                {{ "common.columns.role" | transloco }}
-                                <p-sortIcon field="role" />
-                            </th>
-                            <th pSortableColumn="created_at">
-                                {{ "common.columns.created" | transloco }}
-                                <p-sortIcon field="created_at" />
-                            </th>
-                            <th pSortableColumn="expires_at">
-                                {{ "teams.management.expiresLabel" | transloco }}
-                                <p-sortIcon field="expires_at" />
-                            </th>
-                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="body" let-invite>
-                        <tr>
-                            <td>{{ invite.email }}</td>
-                            <td><p-tag [value]="inviteRoleLabel(invite.role)" [severity]="roleSeverity(invite.role)" [rounded]="true" /></td>
-                            <td><app-relative-date-time [value]="invite.created_at" /></td>
-                            <td><app-relative-date-time [value]="invite.expires_at" /></td>
-                            <td class="hk-actions-cell">
-                                <app-table-row-actions [items]="inviteActions(invite)" [loading]="isInviteActionLoading(invite)" />
-                            </td>
-                        </tr>
-                    </ng-template>
-                    <ng-template pTemplate="emptymessage">
-                        <tr>
-                            <td colspan="5" class="text-center text-muted-color py-4">{{ "teams.management.pendingEmpty" | transloco }}</td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-            </div>
+            <app-table
+                [value]="pendingInvites()"
+                [columns]="inviteColumns"
+                stateKey="team-invites"
+                [loading]="isLoading()"
+                [defaultSort]="{ field: 'created_at', order: -1 }"
+                [rowActions]="inviteRowActions"
+                [rowActionsLoading]="inviteActionLoading"
+                emptyTextKey="teams.management.pendingEmpty"
+                exportFilename="team-invites"
+                data-testid="team-invites-table"
+            >
+                <ng-template appTableCell="role" let-invite>
+                    <p-tag [value]="inviteRoleLabel(invite.role)" [severity]="roleSeverity(invite.role)" [rounded]="true" />
+                </ng-template>
+            </app-table>
         </div>
     </app-settings-card>
     }

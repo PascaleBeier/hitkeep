@@ -87,169 +87,79 @@
                     <p-tabpanel value="products">
                         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "ecommerce.products.description" | transloco }}</p>
-                            <p-iconfield class="w-full sm:w-64">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #productSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="productsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                            </p-iconfield>
                         </div>
-                        <p-table
-                            #productsTable
+                        <app-table
                             [value]="products()"
+                            [columns]="productColumns"
+                            stateKey="ecommerce-products"
+                            dataKey="item_id"
                             [loading]="isLoading()"
-                            [globalFilterFields]="['item_name', 'item_id', 'quantity', 'orders', 'revenue']"
-                            [paginator]="true"
-                            [rows]="10"
-                            [rowsPerPageOptions]="[10, 25, 50]"
-                            [rowHover]="true"
-                            responsiveLayout="scroll"
-                            sortField="revenue"
-                            [sortOrder]="-1"
-                            styleClass="p-datatable-sm"
-                            [tableStyle]="{ 'min-width': '720px' }"
+                            [defaultSort]="{ field: 'revenue', order: -1 }"
+                            [selectable]="true"
+                            [rowSelected]="productRowActive"
+                            (rowSelect)="toggleProductFilter($any($event))"
+                            emptyTextKey="ecommerce.products.empty"
+                            exportFilename="ecommerce-products"
+                            data-testid="ecommerce-products-table"
                         >
-                            <ng-template pTemplate="header">
-                                <tr>
-                                    <th pSortableColumn="item_name">
-                                        {{ "ecommerce.columns.product" | transloco }}
-                                        <p-sortIcon field="item_name" />
-                                    </th>
-                                    <th pSortableColumn="quantity" class="text-right">
-                                        {{ "ecommerce.columns.quantity" | transloco }}
-                                        <p-sortIcon field="quantity" />
-                                    </th>
-                                    <th pSortableColumn="orders" class="text-right">
-                                        {{ "ecommerce.columns.orders" | transloco }}
-                                        <p-sortIcon field="orders" />
-                                    </th>
-                                    <th pSortableColumn="revenue" class="text-right">
-                                        {{ "ecommerce.columns.revenue" | transloco }}
-                                        <p-sortIcon field="revenue" />
-                                    </th>
-                                </tr>
+                            <ng-template appTableCell="item_name" let-product>
+                                <div class="flex flex-col">
+                                    <span class="font-medium">{{ product.item_name || product.item_id }}</span>
+                                    @if (product.item_id) {
+                                    <span class="text-xs text-[var(--p-text-muted-color)]">{{ product.item_id }}</span>
+                                    }
+                                </div>
                             </ng-template>
-                            <ng-template pTemplate="body" let-product>
-                                <tr
-                                    class="ecommerce-filter-row"
-                                    [class.ecommerce-filter-row--active]="isProductFilterActive(product)"
-                                    role="button"
-                                    tabindex="0"
-                                    (click)="toggleProductFilter(product)"
-                                    (keydown.enter)="toggleProductFilter(product)"
-                                    (keydown.space)="$event.preventDefault(); toggleProductFilter(product)"
-                                >
-                                    <td>
-                                        <div class="flex flex-col">
-                                            <span class="font-medium">{{ product.item_name || product.item_id }}</span>
-                                            @if (product.item_id) {
-                                            <span class="text-xs text-[var(--p-text-muted-color)]">{{ product.item_id }}</span>
-                                            }
-                                        </div>
-                                    </td>
-                                    <td class="text-right">{{ formatNumber(product.quantity) }}</td>
-                                    <td class="text-right">{{ formatNumber(product.orders) }}</td>
-                                    <td class="text-right">{{ formatMoney(product.revenue, summaryCurrency()) }}</td>
-                                </tr>
-                            </ng-template>
-                            <ng-template pTemplate="emptymessage">
-                                <tr>
-                                    <td colspan="4" class="text-center text-sm text-[var(--p-text-muted-color)] py-8">{{ "ecommerce.products.empty" | transloco }}</td>
-                                </tr>
-                            </ng-template>
-                        </p-table>
+                            <ng-template appTableCell="revenue" let-product>{{ formatMoney(product.revenue, summaryCurrency()) }}</ng-template>
+                        </app-table>
                     </p-tabpanel>
 
                     <p-tabpanel value="sources">
                         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "ecommerce.sources.description" | transloco }}</p>
-                            <p-iconfield class="w-full sm:w-64">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #sourceSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="sourcesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                            </p-iconfield>
                         </div>
-                        <p-table
-                            #sourcesTable
+                        <app-table
                             [value]="sources()"
+                            [columns]="sourceColumns"
+                            stateKey="ecommerce-sources"
+                            dataKey="utm_source"
                             [loading]="isLoading()"
-                            [globalFilterFields]="['utm_source', 'utm_medium', 'utm_campaign', 'referrer', 'orders', 'revenue']"
-                            [paginator]="true"
-                            [rows]="10"
-                            [rowsPerPageOptions]="[10, 25, 50]"
-                            [rowHover]="true"
-                            responsiveLayout="scroll"
-                            sortField="revenue"
-                            [sortOrder]="-1"
-                            styleClass="p-datatable-sm"
-                            [tableStyle]="{ 'min-width': '760px' }"
+                            [defaultSort]="{ field: 'revenue', order: -1 }"
+                            defaultGroupBy="utm_source"
+                            [searchFields]="['utm_medium']"
+                            [selectable]="true"
+                            [rowSelected]="sourceRowActive"
+                            (rowSelect)="toggleSourceFilter($any($event))"
+                            emptyTextKey="ecommerce.sources.empty"
+                            exportFilename="ecommerce-sources"
+                            data-testid="ecommerce-sources-table"
                         >
-                            <ng-template pTemplate="header">
-                                <tr>
-                                    <th pSortableColumn="utm_source">
-                                        {{ "ecommerce.columns.source" | transloco }}
-                                        <p-sortIcon field="utm_source" />
-                                    </th>
-                                    <th pSortableColumn="utm_campaign">
-                                        {{ "ecommerce.columns.campaign" | transloco }}
-                                        <p-sortIcon field="utm_campaign" />
-                                    </th>
-                                    <th pSortableColumn="referrer">
-                                        {{ "ecommerce.columns.referrer" | transloco }}
-                                        <p-sortIcon field="referrer" />
-                                    </th>
-                                    <th pSortableColumn="orders" class="text-right">
-                                        {{ "ecommerce.columns.orders" | transloco }}
-                                        <p-sortIcon field="orders" />
-                                    </th>
-                                    <th pSortableColumn="revenue" class="text-right">
-                                        {{ "ecommerce.columns.revenue" | transloco }}
-                                        <p-sortIcon field="revenue" />
-                                    </th>
-                                </tr>
+                            <ng-template appTableCell="utm_source" let-source>
+                                <div class="flex flex-col">
+                                    <span class="font-medium" [title]="source.utm_source">{{ source.utm_source }}</span>
+                                    <span class="text-xs text-[var(--p-text-muted-color)]">{{ source.utm_medium }}</span>
+                                </div>
                             </ng-template>
-                            <ng-template pTemplate="body" let-source>
-                                <tr
-                                    class="ecommerce-filter-row"
-                                    [class.ecommerce-filter-row--active]="isSourceFilterActive(source)"
-                                    role="button"
-                                    tabindex="0"
-                                    (click)="toggleSourceFilter(source)"
-                                    (keydown.enter)="toggleSourceFilter(source)"
-                                    (keydown.space)="$event.preventDefault(); toggleSourceFilter(source)"
-                                >
-                                    <td>
-                                        <div class="flex flex-col">
-                                            <span class="font-medium" [title]="source.utm_source">{{ source.utm_source }}</span>
-                                            <span class="text-xs text-[var(--p-text-muted-color)]">{{ source.utm_medium }}</span>
-                                        </div>
-                                    </td>
-                                    <td>{{ source.utm_campaign }}</td>
-                                    <td>
-                                        @if (source.referrer) {
-                                        <div class="ecommerce-source-cell text-[var(--p-text-muted-color)]">
-                                            @if (sourceDomain(source.referrer); as domain) { @if (faviconUrlForDomain(domain); as favicon) {
-                                            <img [ngSrc]="favicon" class="ecommerce-source-cell__favicon" [width]="16" [height]="16" alt="" />
-                                            } } @if (sourceLinkUrl(source.referrer); as referrerUrl) {
-                                            <span class="ecommerce-source-cell__label" [title]="source.referrer">{{ sourceDisplayUrl(source.referrer) }}</span>
-                                            <a class="ecommerce-source-cell__link" [href]="referrerUrl" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()" [attr.aria-label]="'common.openInNewTabAria' | transloco">
-                                                <i class="pi pi-external-link ecommerce-source-cell__link-icon" aria-hidden="true"></i>
-                                            </a>
-                                            } @else {
-                                            <span class="ecommerce-source-cell__label" [title]="source.referrer">{{ source.referrer }}</span>
-                                            }
-                                        </div>
-                                        } @else {
-                                        <span class="text-[var(--p-text-muted-color)]">{{ "common.direct" | transloco }}</span>
-                                        }
-                                    </td>
-                                    <td class="text-right">{{ formatNumber(source.orders) }}</td>
-                                    <td class="text-right">{{ formatMoney(source.revenue, summaryCurrency()) }}</td>
-                                </tr>
+                            <ng-template appTableCell="referrer" let-source>
+                                @if (source.referrer) {
+                                <div class="ecommerce-source-cell text-[var(--p-text-muted-color)]">
+                                    @if (sourceDomain(source.referrer); as domain) { @if (faviconUrlForDomain(domain); as favicon) {
+                                    <img [ngSrc]="favicon" class="ecommerce-source-cell__favicon" [width]="16" [height]="16" alt="" />
+                                    } } @if (sourceLinkUrl(source.referrer); as referrerUrl) {
+                                    <span class="ecommerce-source-cell__label" [title]="source.referrer">{{ sourceDisplayUrl(source.referrer) }}</span>
+                                    <a class="ecommerce-source-cell__link" [href]="referrerUrl" target="_blank" rel="noopener noreferrer" (click)="$event.stopPropagation()" [attr.aria-label]="'common.openInNewTabAria' | transloco">
+                                        <i class="pi pi-external-link ecommerce-source-cell__link-icon" aria-hidden="true"></i>
+                                    </a>
+                                    } @else {
+                                    <span class="ecommerce-source-cell__label" [title]="source.referrer">{{ source.referrer }}</span>
+                                    }
+                                </div>
+                                } @else {
+                                <span class="text-[var(--p-text-muted-color)]">{{ "common.direct" | transloco }}</span>
+                                }
                             </ng-template>
-                            <ng-template pTemplate="emptymessage">
-                                <tr>
-                                    <td colspan="5" class="text-center text-sm text-[var(--p-text-muted-color)] py-8">{{ "ecommerce.sources.empty" | transloco }}</td>
-                                </tr>
-                            </ng-template>
-                        </p-table>
+                            <ng-template appTableCell="revenue" let-source>{{ formatMoney(source.revenue, summaryCurrency()) }}</ng-template>
+                        </app-table>
                     </p-tabpanel>
                 </p-tabpanels>
             </p-tabs>

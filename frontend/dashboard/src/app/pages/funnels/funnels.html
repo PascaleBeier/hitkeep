@@ -90,50 +90,32 @@
                 <h2 class="text-lg font-semibold">{{ 'funnels.definitions.title' | transloco }}</h2>
                 <p class="text-sm text-muted-color mt-1">{{ 'funnels.definitions.count' | transloco: { count: funnels().length } }}</p>
             </div>
-            <input pInputText #search [placeholder]="'common.searchPlaceholder' | transloco" [attr.aria-label]="'common.searchPlaceholder' | transloco" (input)="funnelsTable.filterGlobal(search.value, 'contains')" class="w-full sm:w-64" />
         </div>
-        <div class="hk-crud-table-wrap">
-            <p-table #funnelsTable [value]="funnels()" [loading]="loading()" [paginator]="funnels().length > 10" [rows]="10" [globalFilterFields]="['name']" sortField="name" [sortOrder]="1" styleClass="hk-crud-table p-datatable-sm">
-                <ng-template pTemplate="header"
-                    ><tr>
-                        <th pSortableColumn="name">
-                            {{ 'common.columns.name' | transloco }}
-                            <p-sortIcon field="name" />
-                        </th>
-                        <th>{{ 'funnels.definitions.steps' | transloco }}</th>
-                        @if (canManage()) {
-                        <th class="hk-actions-column">{{ 'common.columns.actions' | transloco }}</th>
-                        }
-                    </tr></ng-template
-                >
-                <ng-template pTemplate="body" let-funnel>
-                    <tr
-                        class="cursor-pointer"
-                        [class.bg-highlight]="selectedFunnelId() === funnel.id"
-                        (click)="selectFunnel(funnel.id)"
-                        tabindex="0"
-                        (keydown.enter)="selectFunnel(funnel.id)"
-                        (keydown.space)="$event.preventDefault(); selectFunnel(funnel.id)"
-                    >
-                        <td class="font-medium">{{ funnel.name }}</td>
-                        <td>
-                            <span class="text-sm">{{ 'funnels.list.stepsCount' | transloco: { count: funnel.steps.length } }}</span
-                            ><span class="block text-xs text-muted-color truncate max-w-xl">@for (step of funnel.steps; track $index) { @if ($index) { <span aria-hidden="true"> → </span> }{{ step.value }} }</span>
-                        </td>
-                        @if (canManage()) {
-                        <td class="hk-actions-cell" (click)="$event.stopPropagation()">
-                            <app-table-row-actions [items]="funnelActions(funnel)" [loading]="deletingFunnelId() === funnel.id" />
-                        </td>
-                        }
-                    </tr>
-                </ng-template>
-                <ng-template pTemplate="emptymessage"
-                    ><tr>
-                        <td [attr.colspan]="canManage() ? 3 : 2" class="text-center py-8 text-muted-color">{{ 'funnels.manager.empty' | transloco }}</td>
-                    </tr></ng-template
-                >
-            </p-table>
-        </div>
+        <app-table
+            [value]="funnelRows()"
+            [columns]="funnelColumns"
+            stateKey="funnels"
+            [loading]="loading()"
+            [defaultSort]="{ field: 'name', order: 1 }"
+            [rowActions]="canManage() ? funnelRowActions : undefined"
+            [rowActionsLoading]="funnelActionLoading"
+            [selectable]="true"
+            [selectedKey]="selectedFunnelId()"
+            (rowSelect)="selectFunnel($any($event).id)"
+            ariaLabelKey="funnels.definitions.title"
+            emptyTextKey="funnels.manager.empty"
+            exportFilename="funnels"
+            data-testid="funnels-table"
+        >
+            <ng-template appTableCell="name" let-funnel><span class="font-medium">{{ funnel.name }}</span></ng-template>
+            <ng-template appTableCell="step_path" let-funnel>
+                <span class="flex flex-wrap items-center gap-1">
+                    @for (step of funnel.steps; track $index) { @if ($index) { <i class="pi pi-arrow-right text-xs text-muted-color" aria-hidden="true"></i> }
+                    <p-tag [value]="step.value" severity="secondary" [rounded]="true" />
+                    }
+                </span>
+            </ng-template>
+        </app-table>
     </p-card>
     }
 

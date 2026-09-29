@@ -162,104 +162,41 @@
                 <p-button [label]="'settings.apiClients.actions.add' | transloco" icon="pi pi-plus" [outlined]="true" [type]="'button'" (onClick)="openCreateDialog()" />
             </div>
             } @else {
-            <div class="hk-crud-table-wrap">
-                <p-table
-                    #apiClientsTable
-                    [value]="clients()"
-                    [globalFilterFields]="['name', 'description', 'instance_role', 'created_at', 'last_used_at', 'expires_at']"
-                    [sortField]="'created_at'"
-                    [sortOrder]="-1"
-                    [paginator]="true"
-                    [rows]="10"
-                    [rowsPerPageOptions]="[10, 25, 50]"
-                    [rowHover]="true"
-                    responsiveLayout="scroll"
-                    styleClass="hk-crud-table p-datatable-sm"
-                    [tableStyle]="{ 'min-width': '1040px' }"
-                >
-                    <ng-template pTemplate="caption">
-                        <app-crud-table-toolbar>
-                            <p-iconfield class="hk-crud-search">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #apiClientsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="apiClientsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                            </p-iconfield>
-                            <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'settings.apiClients.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="reload()" />
-                        </app-crud-table-toolbar>
-                    </ng-template>
-
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th pSortableColumn="name">
-                                {{ "common.columns.name" | transloco }}
-                                <p-sortIcon field="name" />
-                            </th>
-                            <th pSortableColumn="instance_role">
-                                {{ "settings.apiClients.meta.instanceRole" | transloco }}
-                                <p-sortIcon field="instance_role" />
-                            </th>
-                            <th pSortableColumn="created_at">
-                                {{ "settings.apiClients.meta.created" | transloco }}
-                                <p-sortIcon field="created_at" />
-                            </th>
-                            <th pSortableColumn="last_used_at">
-                                {{ "settings.apiClients.meta.lastUsed" | transloco }}
-                                <p-sortIcon field="last_used_at" />
-                            </th>
-                            <th pSortableColumn="expires_at">
-                                {{ "settings.apiClients.meta.expires" | transloco }}
-                                <p-sortIcon field="expires_at" />
-                            </th>
-                            <th>{{ "settings.apiClients.form.siteScopesLabel" | transloco }}</th>
-                            <th class="hk-actions-column">{{ "common.columns.actions" | transloco }}</th>
-                        </tr>
-                    </ng-template>
-
-                    <ng-template pTemplate="body" let-client>
-                        <tr>
-                            <td>
-                                <div class="flex flex-col gap-1">
-                                    <span class="api-client-name-row">
-                                        <i [class]="clientStatusIconClass(client)" role="img" [attr.aria-label]="clientStatusLabelKey(client) | transloco" [attr.title]="clientStatusLabelKey(client) | transloco"></i>
-                                        <span class="font-semibold">{{ client.name }}</span>
-                                    </span>
-                                    @if (client.description) {
-                                    <span class="text-xs text-[var(--p-text-muted-color)]">{{ client.description }}</span>
-                                    }
-                                </div>
-                            </td>
-                            <td>{{ "admin.roles." + (client.instance_role === "owner" ? "instanceOwner" : client.instance_role === "admin" ? "instanceAdmin" : "user") | transloco }}</td>
-                            <td class="api-client-date-cell"><app-relative-date-time [value]="client.created_at" /></td>
-                            <td class="api-client-date-cell">
-                                @if (client.last_used_at) {
-                                <app-relative-date-time [value]="client.last_used_at" />
-                                } @else { - }
-                            </td>
-                            <td class="api-client-date-cell">
-                                @if (client.expires_at) {
-                                <app-relative-date-time [value]="client.expires_at" />
-                                } @else { - }
-                            </td>
-                            <td>
-                                <app-site-scope-summary
-                                    [items]="siteGrantSummaryItems(client)"
-                                    [countLabel]="siteGrantCountLabel(client.site_roles.length)"
-                                    [popoverTitle]="'settings.apiClients.siteGrantPopoverTitle' | transloco"
-                                    [emptyLabel]="emptyGrantLabelKey(client) | transloco"
-                                />
-                            </td>
-                            <td class="hk-actions-cell">
-                                <app-table-row-actions [items]="apiClientActions(client)" [disabled]="isSaving()" />
-                            </td>
-                        </tr>
-                    </ng-template>
-
-                    <ng-template pTemplate="emptymessage">
-                        <tr>
-                            <td colspan="7" class="text-center text-muted-color py-4">{{ "settings.apiClients.empty" | transloco }}</td>
-                        </tr>
-                    </ng-template>
-                </p-table>
-            </div>
+            <app-table
+                [value]="clients()"
+                [columns]="clientColumns"
+                stateKey="api-clients"
+                [searchFields]="['description']"
+                [defaultSort]="{ field: 'created_at', order: -1 }"
+                [rowActions]="clientRowActions"
+                [actionsDisabled]="isSaving()"
+                [exportable]="false"
+                emptyTextKey="settings.apiClients.empty"
+                data-testid="api-clients-table"
+            >
+                <ng-template appTableSlot="toolbar">
+                    <p-button icon="pi pi-refresh" [text]="true" [rounded]="true" [type]="'button'" [ariaLabel]="'settings.apiClients.actions.refresh' | transloco" [disabled]="isLoading()" (onClick)="reload()" />
+                </ng-template>
+                <ng-template appTableCell="name" let-client>
+                    <div class="flex flex-col gap-1">
+                        <span class="api-client-name-row">
+                            <i [class]="clientStatusIconClass(client)" role="img" [attr.aria-label]="clientStatusLabelKey(client) | transloco" [attr.title]="clientStatusLabelKey(client) | transloco"></i>
+                            <span class="font-semibold">{{ client.name }}</span>
+                        </span>
+                        @if (client.description) {
+                        <span class="text-xs text-[var(--p-text-muted-color)]">{{ client.description }}</span>
+                        }
+                    </div>
+                </ng-template>
+                <ng-template appTableCell="site_roles" let-client>
+                    <app-site-scope-summary
+                        [items]="siteGrantSummaryItems(client)"
+                        [countLabel]="siteGrantCountLabel(client.site_roles.length)"
+                        [popoverTitle]="'settings.apiClients.siteGrantPopoverTitle' | transloco"
+                        [emptyLabel]="emptyGrantLabelKey(client) | transloco"
+                    />
+                </ng-template>
+            </app-table>
             }
         </div>
     </div>

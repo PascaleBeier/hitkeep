@@ -5,26 +5,22 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { PopoverModule } from '@openng/optimus-ui/popover';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { TextareaModule } from '@openng/optimus-ui/textarea';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, Observable, of, switchMap, tap } from 'rxjs';
 
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
-import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
 import { SiteService } from '@features/sites/services/site.service';
 import { AccessService } from '@services/access.service';
@@ -42,12 +38,9 @@ interface WebhookEndpointDisplay {
         TranslocoPipe,
         ButtonModule,
         ConfirmDialogModule,
-        IconFieldModule,
-        InputIconModule,
         InputTextModule,
         MessageModule,
         PopoverModule,
-        TableModule,
         TagModule,
         TextareaModule,
         PageHeader,
@@ -56,10 +49,10 @@ interface WebhookEndpointDisplay {
         PageState,
         OneTimeCredential,
         CrudDialog,
-        CrudTableToolbar,
         DialogShell,
-        RelativeDateTime,
-        TableRowActions
+        AppTable,
+        AppTableCell,
+        AppTableSlot
     ],
     providers: [ConfirmationService],
     templateUrl: './webhooks.html',
@@ -94,6 +87,36 @@ export class WebhooksPage implements OnInit {
     protected readonly selectedEvents = signal<string[]>([]);
     protected readonly revealedSecret = signal('');
     protected readonly feedback = signal<{ severity: 'success' | 'error'; key: string } | null>(null);
+    protected readonly webhookColumns = computed<AppTableColumn<Webhook>[]>(() => [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        { field: 'url', headerKey: 'integration.webhooks.form.url' },
+        { field: 'events', headerKey: 'integration.webhooks.form.events', type: 'enum', sortable: false, searchable: true, options: this.catalog().map((event) => ({ value: event.type, label: event.type })) },
+        {
+            field: 'enabled',
+            headerKey: 'common.columns.status',
+            type: 'enum',
+            groupable: true,
+            options: [
+                { value: true, labelKey: 'integration.webhooks.status.enabled' },
+                { value: false, labelKey: 'integration.webhooks.status.disabled' }
+            ]
+        },
+        { field: 'updated_at', headerKey: 'common.columns.updated', type: 'date' }
+    ]);
+    protected readonly deliveryColumns: AppTableColumn<WebhookDelivery>[] = [
+        { field: 'event_type', headerKey: 'integration.webhooks.deliveries.event', frozen: true, groupable: true },
+        {
+            field: 'status',
+            headerKey: 'integration.webhooks.deliveries.status',
+            type: 'enum',
+            groupable: true,
+            options: ['pending', 'processing', 'retrying', 'succeeded', 'failed'].map((status) => ({ value: status, labelKey: `integration.webhooks.deliveryStatus.${status}` }))
+        },
+        { field: 'attempt_count', headerKey: 'integration.webhooks.deliveries.attempts', type: 'number', align: 'end' },
+        { field: 'response_status', headerKey: 'integration.webhooks.deliveries.response', type: 'number', exportValue: (delivery) => String(delivery.response_status || delivery.last_error_code || '') },
+        { field: 'created_at', headerKey: 'integration.webhooks.deliveries.created', type: 'date' }
+    ];
+    protected readonly webhookRowActions = (webhook: Webhook) => this.webhookActions(webhook);
     private readonly reloadSequence = signal(0);
     private readonly loadedContext = signal<{ scope: WebhookScope; siteID?: string } | null>(null);
     private readonly requestContext = computed(() => {

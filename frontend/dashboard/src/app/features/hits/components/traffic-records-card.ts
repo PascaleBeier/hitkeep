@@ -2,15 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { CardModule } from '@openng/optimus-ui/card';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { TableLazyLoadEvent, TableModule } from '@openng/optimus-ui/table';
-import { debounceTime, distinctUntilChanged, finalize, Subject } from 'rxjs';
+import { TableLazyLoadEvent } from '@openng/optimus-ui/table';
+import { finalize } from 'rxjs';
 import { buildTakeoutExportFilename, DEFAULT_HITS_EXPORT_FORMAT, TakeoutExportFormat, withTakeoutExportFormat } from '@core/export/export-formats';
 import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
 import { PageState } from '@components/page-state/page-state';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
 import { HitService } from '@features/hits/services/hit.service';
 import { SiteFavicon } from '@features/sites/components/site-favicon';
 import { TakeoutDownloadService } from '@services/takeout-download.service';
@@ -27,7 +24,7 @@ export interface TrafficRecordFilter {
 @Component({
     selector: 'app-traffic-records-card',
     standalone: true,
-    imports: [CardModule, ExportSplitButton, ExportStatusBanner, IconFieldModule, InputIconModule, InputTextModule, PageState, RelativeDateTime, SiteFavicon, TableModule, TranslocoPipe],
+    imports: [CardModule, ExportSplitButton, ExportStatusBanner, PageState, AppTable, AppTableCell, SiteFavicon, TranslocoPipe],
     providers: [HitService],
     templateUrl: './traffic-records-card.html',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -52,12 +49,18 @@ export class TrafficRecordsCard {
     protected readonly hitService = inject(HitService);
     private readonly takeoutDownload = inject(TakeoutDownloadService);
     private readonly destroyRef = inject(DestroyRef);
-    private readonly searchSubject = new Subject<string>();
     private lastTableEvent: TableLazyLoadEvent | null = null;
     private lastLoadedScope = '';
 
     protected readonly searchQuery = signal('');
     protected readonly isExporting = signal(false);
+    protected readonly hitRows = computed(() => this.hitService.hits().map((hit) => ({ ...hit, device: (hit.viewport_width ?? 0) > 768 ? 'desktop' : 'mobile' })));
+    protected readonly hitColumns: AppTableColumn[] = [
+        { field: 'path', headerKey: 'common.columns.path', frozen: true },
+        { field: 'timestamp', headerKey: 'common.columns.time', type: 'date' },
+        { field: 'referrer', headerKey: 'common.columns.referrer', groupable: true },
+        { field: 'device', headerKey: 'common.columns.device', type: 'enum', groupable: true, sortable: false, labelKeyPrefix: 'common.devices.' }
+    ];
     protected readonly exportState = signal<'idle' | 'success' | 'error'>('idle');
     private readonly requestScope = computed(() =>
         JSON.stringify({
@@ -90,11 +93,6 @@ export class TrafficRecordsCard {
     });
 
     constructor() {
-        this.searchSubject.pipe(debounceTime(400), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((query) => {
-            this.searchQuery.set(query);
-            this.reloadFromFirstPage();
-        });
-
         effect(() => {
             const scope = this.requestScope();
             if (!this.enabled()) {
@@ -107,12 +105,10 @@ export class TrafficRecordsCard {
         });
     }
 
-    protected onSearch(event: Event) {
-        this.searchSubject.next((event.target as HTMLInputElement).value);
-    }
-
     protected loadHits(event: TableLazyLoadEvent) {
         this.lastTableEvent = { ...event };
+        this.searchQuery.set(typeof event.globalFilter === 'string' ? event.globalFilter.trim() : '');
+        const sort = event.multiSortMeta?.[0] ?? { field: event.sortField as string, order: event.sortOrder };
         const siteId = this.siteId();
         const from = this.from();
         const to = this.to();
@@ -124,7 +120,7 @@ export class TrafficRecordsCard {
         const rows = event.rows || 10;
         const first = event.first || 0;
         this.lastLoadedScope = this.requestScope();
-        this.hitService.loadHits(siteId, from, to, first / rows + 1, rows, event.sortField as string, event.sortOrder === 1 ? 'asc' : 'desc', this.searchQuery(), this.filters(), this.goalIds(), this.funnelIds(), this.shareToken());
+        this.hitService.loadHits(siteId, from, to, first / rows + 1, rows, sort.field, sort.order === 1 ? 'asc' : 'desc', this.searchQuery(), this.filters(), this.goalIds(), this.funnelIds(), this.shareToken());
     }
 
     protected retry() {

@@ -9,12 +9,9 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
 
 import { CountryOption, countryDisplayName, countryOptions } from '@core/i18n/country-options';
 import { countryFlagUrl } from '@core/i18n/flag-utils';
@@ -23,8 +20,8 @@ import { ExclusionsService } from '@services/exclusions.service';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { SettingsCard } from '@features/settings/components/settings-card';
 
 const ipOrCIDRPattern = /^(([0-9]{1,3}\.){3}[0-9]{1,3}(\/(3[0-2]|[12]?[0-9]))?|([0-9A-Fa-f:]+)(\/(12[0-8]|1[01][0-9]|[1-9]?[0-9]))?)$/;
@@ -46,24 +43,7 @@ type ExclusionRow = IPExclusion & {
 @Component({
     selector: 'app-admin-global-exclusion-settings',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        NgOptimizedImage,
-        ButtonModule,
-        ConfirmDialogModule,
-        IconFieldModule,
-        InputIconModule,
-        InputTextModule,
-        MessageModule,
-        SelectModule,
-        TableModule,
-        CopyControl,
-        CrudDialog,
-        RelativeDateTime,
-        SettingsCard,
-        TableRowActions,
-        TranslocoPipe
-    ],
+    imports: [ReactiveFormsModule, NgOptimizedImage, ButtonModule, ConfirmDialogModule, InputTextModule, MessageModule, SelectModule, CopyControl, CrudDialog, AppTable, AppTableCell, SettingsCard, TranslocoPipe],
     templateUrl: './admin-global-exclusion-settings.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [ConfirmationService]
@@ -82,6 +62,14 @@ export class AdminGlobalExclusionSettings {
     protected readonly isAddDialogVisible = signal(false);
     protected readonly actionStatus = signal<ActionStatus | null>(null);
     protected readonly deletingRuleID = signal<string | null>(null);
+    protected readonly exclusionColumns: AppTableColumn<ExclusionRow>[] = [
+        { field: 'value_label', headerKey: 'admin.exclusions.columns.value', frozen: true },
+        { field: 'type_label', headerKey: 'admin.exclusions.columns.type', type: 'enum', groupable: true },
+        { field: 'description', headerKey: 'admin.exclusions.columns.description' },
+        { field: 'created_at', headerKey: 'admin.exclusions.columns.created', type: 'date' }
+    ];
+    protected readonly ruleRowActions = (rule: IPExclusion) => this.ruleActions(rule);
+    protected readonly ruleActionLoading = (rule: IPExclusion) => this.deletingRuleID() === rule.id;
     protected readonly isCurrentIPLoading = signal(false);
     protected readonly currentIPCIDR = signal('');
     protected readonly ruleTypeOptions = computed(() => {

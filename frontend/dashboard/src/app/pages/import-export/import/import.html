@@ -152,58 +152,16 @@
                     <div class="space-y-3">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h4 class="m-0 text-sm font-semibold">{{ "imports.datasets.title" | transloco }}</h4>
-                            <p-iconfield class="w-full sm:w-64">
-                                <p-inputicon class="pi pi-search" />
-                                <input pInputText #importDatasetsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="importDatasetsTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                            </p-iconfield>
                         </div>
-                        <p-table
-                            #importDatasetsTable
+                        <app-table
                             [value]="manifestDatasets()"
-                            [globalFilterFields]="['name', 'rows_accepted', 'pageviews', 'events']"
-                            [paginator]="true"
-                            [rows]="10"
-                            [rowsPerPageOptions]="[10, 25, 50]"
-                            [rowHover]="true"
-                            responsiveLayout="scroll"
-                            sortField="rows_accepted"
-                            [sortOrder]="-1"
-                            styleClass="p-datatable-sm imports-table"
-                            [tableStyle]="{ 'min-width': showDatasetEventsColumn() ? '680px' : '560px' }"
-                        >
-                            <ng-template pTemplate="header">
-                                <tr>
-                                    <th pSortableColumn="name">
-                                        {{ "imports.datasets.dataset" | transloco }}
-                                        <p-sortIcon field="name" />
-                                    </th>
-                                    <th pSortableColumn="rows_accepted">
-                                        {{ "imports.datasets.rows" | transloco }}
-                                        <p-sortIcon field="rows_accepted" />
-                                    </th>
-                                    <th pSortableColumn="pageviews">
-                                        {{ "imports.datasets.pageviews" | transloco }}
-                                        <p-sortIcon field="pageviews" />
-                                    </th>
-                                    @if (showDatasetEventsColumn()) {
-                                    <th pSortableColumn="events">
-                                        {{ "imports.datasets.events" | transloco }}
-                                        <p-sortIcon field="events" />
-                                    </th>
-                                    }
-                                </tr>
-                            </ng-template>
-                            <ng-template pTemplate="body" let-row>
-                                <tr>
-                                    <td>{{ row.name }}</td>
-                                    <td>{{ row.rows_accepted | number }}</td>
-                                    <td>{{ row.pageviews || 0 | number }}</td>
-                                    @if (showDatasetEventsColumn()) {
-                                    <td>{{ row.events || 0 | number }}</td>
-                                    }
-                                </tr>
-                            </ng-template>
-                        </p-table>
+                            [columns]="datasetColumns()"
+                            stateKey="import-datasets"
+                            dataKey="name"
+                            [defaultSort]="{ field: 'rows_accepted', order: -1 }"
+                            exportFilename="import-datasets"
+                            data-testid="import-datasets-table"
+                        />
                     </div>
 
                     @if (showEventValidationDetails()) { @if (showEventCoverage()) {
@@ -304,63 +262,22 @@
                 @if (history().length === 0) {
                 <p-message severity="secondary" styleClass="w-full">{{ "imports.history.empty" | transloco }}</p-message>
                 } @else {
-                <div class="flex justify-end">
-                    <p-iconfield class="w-full sm:w-64">
-                        <p-inputicon class="pi pi-search" />
-                        <input pInputText #importHistorySearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="importHistoryTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                    </p-iconfield>
-                </div>
-                <p-table
-                    #importHistoryTable
-                    [value]="history()"
-                    [globalFilterFields]="['provider', 'status', 'rows_imported', 'rows_scanned']"
-                    [paginator]="true"
-                    [rows]="10"
-                    [rowsPerPageOptions]="[10, 25, 50]"
-                    [rowHover]="true"
-                    responsiveLayout="scroll"
-                    sortField="created_at"
-                    [sortOrder]="-1"
-                    styleClass="p-datatable-sm imports-history-table"
-                    [tableStyle]="{ 'min-width': '620px' }"
-                >
-                    <ng-template pTemplate="header">
-                        <tr>
-                            <th pSortableColumn="provider">
-                                {{ "imports.history.importer" | transloco }}
-                                <p-sortIcon field="provider" />
-                            </th>
-                            <th pSortableColumn="status">
-                                {{ "imports.history.status" | transloco }}
-                                <p-sortIcon field="status" />
-                            </th>
-                            <th pSortableColumn="rows_imported">
-                                {{ "imports.history.rows" | transloco }}
-                                <p-sortIcon field="rows_imported" />
-                            </th>
-                            <th></th>
-                        </tr>
+                <app-table [value]="history()" [columns]="historyColumns" stateKey="import-jobs" [defaultSort]="{ field: 'created_at', order: -1 }" exportFilename="import-jobs" data-testid="import-jobs-table">
+                    <ng-template appTableCell="status" let-job><p-tag [value]="('imports.status.' + job.status) | transloco" [severity]="statusSeverity(job.status)" /></ng-template>
+                    <ng-template appTableCell="rows_imported" let-job>{{ job.rows_imported || job.rows_scanned | number }}</ng-template>
+                    <ng-template appTableSlot="actions" let-job>
+                        <p-button
+                            icon="pi pi-trash"
+                            severity="danger"
+                            size="small"
+                            [text]="true"
+                            [rounded]="true"
+                            [ariaLabel]="'imports.actions.delete' | transloco"
+                            [disabled]="['queued', 'running', 'validating'].includes(job.status)"
+                            (onClick)="deleteImport(job)"
+                        />
                     </ng-template>
-                    <ng-template pTemplate="body" let-job>
-                        <tr>
-                            <td>{{ job.provider }}</td>
-                            <td><p-tag [value]="('imports.status.' + job.status) | transloco" [severity]="statusSeverity(job.status)" /></td>
-                            <td>{{ job.rows_imported || job.rows_scanned | number }}</td>
-                            <td>
-                                <p-button
-                                    icon="pi pi-trash"
-                                    severity="danger"
-                                    size="small"
-                                    [text]="true"
-                                    [rounded]="true"
-                                    [ariaLabel]="'imports.actions.delete' | transloco"
-                                    [disabled]="['queued', 'running', 'validating'].includes(job.status)"
-                                    (onClick)="deleteImport(job)"
-                                />
-                            </td>
-                        </tr>
-                    </ng-template>
-                </p-table>
+                </app-table>
                 }
             </section>
         </p-card>

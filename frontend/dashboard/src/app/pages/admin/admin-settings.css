@@ -124,11 +124,6 @@
     font-size: 0.875rem;
 }
 
-.admin-table-wrap {
-    min-width: 0;
-    overflow-x: auto;
-}
-
 .admin-empty-cell {
     padding: 1.5rem !important;
     text-align: center;

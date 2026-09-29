@@ -8,8 +8,7 @@ import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { TableModule } from '@openng/optimus-ui/table';
+import { TagModule } from '@openng/optimus-ui/tag';
 import { finalize, Subscription } from 'rxjs';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { calcDelta } from '@core/analytics/delta-utils';
@@ -20,7 +19,8 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { KpiCard, KpiCardModel, KPI_PERCENT_FORMAT } from '@features/analytics/components/kpi-card';
 import { ConversionSubjectCard } from '@features/analytics/components/conversion-subject-card';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -46,7 +46,6 @@ import { ShareService } from '@services/share.service';
         ConfirmDialogModule,
         ConversionSubjectCard,
         FunnelManager,
-        InputTextModule,
         KpiCard,
         PageBreadcrumb,
         PageHeader,
@@ -54,8 +53,9 @@ import { ShareService } from '@services/share.service';
         PageState,
         ReportRangeToolbar,
         SeriesChart,
-        TableModule,
-        TableRowActions,
+        AppTable,
+        AppTableCell,
+        TagModule,
         TrafficRecordsCard,
         TranslocoDecimalPipe,
         TranslocoPipe
@@ -97,6 +97,14 @@ export class Funnels {
     protected editorVisible = signal(false);
     protected editingFunnel = signal<Funnel | null>(null);
     protected deletingFunnelId = signal<string | null>(null);
+    protected readonly funnelRows = computed(() => this.funnels().map((funnel) => ({ ...funnel, step_path: funnel.steps.map((step) => step.value).join(' → ') })));
+    protected readonly funnelColumns: AppTableColumn<Funnel & { step_path: string }>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        { field: 'step_path', headerKey: 'funnels.definitions.steps', sortable: false },
+        { field: 'created_at', headerKey: 'common.columns.created', type: 'date', hidden: true }
+    ];
+    protected readonly funnelRowActions = (funnel: Funnel) => this.funnelActions(funnel);
+    protected readonly funnelActionLoading = (funnel: Funnel) => this.deletingFunnelId() === funnel.id;
     protected funnelSeries = signal<FunnelSeriesPoint[]>([]);
     protected comparisonFunnelSeries = signal<FunnelSeriesPoint[]>([]);
     protected seriesLoading = signal(false);

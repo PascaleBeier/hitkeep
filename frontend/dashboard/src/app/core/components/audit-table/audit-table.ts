@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { debounceTime, Subject } from 'rxjs';
 
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { AuditPresentationService } from '@services/audit-presentation.service';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { DatePickerModule } from '@openng/optimus-ui/datepicker';
@@ -12,9 +12,8 @@ import { IconFieldModule } from '@openng/optimus-ui/iconfield';
 import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
-import { PaginatorModule } from '@openng/optimus-ui/paginator';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
+import { TableLazyLoadEvent } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 
@@ -25,11 +24,6 @@ interface AuditEvidenceField {
     labelKey: string;
     value: string;
     mono: boolean;
-}
-
-interface AuditPaginatorEvent {
-    first?: number;
-    rows?: number;
 }
 
 const DEFAULT_QUERY: AuditTableQuery = {
@@ -49,7 +43,7 @@ let nextAuditTableID = 0;
 
 @Component({
     selector: 'app-audit-table',
-    imports: [FormsModule, TableModule, PaginatorModule, ButtonModule, SelectModule, DatePickerModule, IconFieldModule, InputIconModule, InputTextModule, TagModule, MessageModule, TooltipModule, RelativeDateTime, TranslocoPipe],
+    imports: [FormsModule, ButtonModule, SelectModule, DatePickerModule, IconFieldModule, InputIconModule, InputTextModule, TagModule, MessageModule, TooltipModule, AppTable, AppTableCell, AppTableSlot, TranslocoPipe],
     templateUrl: './audit-table.html',
     styleUrl: './audit-table.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -73,6 +67,8 @@ export class AuditTableComponent {
     readonly exportEnabled = input<boolean>(false);
     readonly exportLoading = input<boolean>(false);
     readonly exportStatus = input<AuditTableExportStatus | null>(null);
+    /** Persisted view-state key; each audit surface keeps its own grouping and column choices. */
+    readonly stateKey = input('audit');
 
     readonly queryChange = output<AuditTableQuery>();
     readonly refresh = output<void>();
@@ -82,14 +78,27 @@ export class AuditTableComponent {
     protected readonly idPrefix = `audit-table-${nextAuditTableID++}`;
     protected readonly searchText = signal('');
     protected readonly dateRange = signal<Date[]>([]);
-    protected readonly expandedRowIDs = signal<ReadonlySet<string>>(new Set());
     protected readonly resolvedFilterConfig = computed<AuditTableFilterConfig>(() => ({
         ...DEFAULT_FILTER_CONFIG,
         ...this.filterConfig()
     }));
     protected readonly pageSize = computed(() => this.query().limit || this.pageSizeOptions()[0] || DEFAULT_QUERY.limit);
     protected readonly firstRow = computed(() => this.query().offset || 0);
-    protected readonly visibleRangeLabelKey = computed(() => (this.total() > 0 ? 'auditTable.pagination.summary' : 'auditTable.pagination.empty'));
+    protected readonly columns = computed<AppTableColumn<AuditTableRow>[]>(() => {
+        const options = (items: AuditTableOption[]) => items.filter((item) => item.value).map((item) => ({ value: item.value, label: item.label }));
+        return [
+            { field: 'created_at', headerKey: 'auditTable.columns.time', type: 'date', frozen: true, groupable: true, sortable: false },
+            { field: 'actor', headerKey: 'auditTable.columns.actor', sortable: false, exportValue: (row) => this.actorLabel(row) },
+            { field: 'action', headerKey: 'auditTable.columns.action', type: 'enum', groupable: true, sortable: false, options: options(this.actionOptions()) },
+            { field: 'target_type', headerKey: 'auditTable.columns.targetType', type: 'enum', groupable: true, sortable: false, options: options(this.targetTypeOptions()) },
+            { field: 'target', headerKey: 'auditTable.columns.target', sortable: false },
+            { field: 'outcome', headerKey: 'auditTable.columns.outcome', type: 'enum', groupable: true, sortable: false, options: options(this.outcomeOptions()) },
+            { field: 'ip_address', headerKey: 'auditTable.columns.ipAddress', sortable: false },
+            { field: 'ip_country_code', headerKey: 'auditTable.columns.country', sortable: false },
+            { field: 'details', headerKey: 'auditTable.columns.details', sortable: false }
+        ];
+    });
+    protected readonly rowHasEvidence = (row: AuditTableRow) => this.hasEvidence(row);
     protected readonly hasActiveFilters = computed(() => {
         const query = this.query();
         return Boolean(query.action || query.outcome || query.target_type || query.query || query.from || query.to);
@@ -147,35 +156,12 @@ export class AuditTableComponent {
         });
     }
 
-    protected onPageChange(event: AuditPaginatorEvent) {
-        this.updateQuery({
-            limit: event.rows ?? this.pageSize(),
-            offset: event.first ?? 0
-        });
-    }
-
-    protected toggleRow(row: AuditTableRow) {
-        const next = new Set(this.expandedRowIDs());
-        const expanded = !next.has(row.id);
-        if (expanded) {
-            next.add(row.id);
-        } else {
-            next.delete(row.id);
-        }
-        this.expandedRowIDs.set(next);
-        this.rowExpansionChange.emit({ row, expanded });
-    }
-
-    protected isExpanded(row: AuditTableRow): boolean {
-        return this.expandedRowIDs().has(row.id);
-    }
-
-    protected expandIcon(row: AuditTableRow): string {
-        return this.isExpanded(row) ? 'pi pi-chevron-down' : 'pi pi-chevron-right';
-    }
-
-    protected expandLabel(row: AuditTableRow): string {
-        return this.isExpanded(row) ? 'auditTable.actions.collapseRow' : 'auditTable.actions.expandRow';
+    protected onPageChange(event: Pick<TableLazyLoadEvent, 'first' | 'rows'>) {
+        const limit = event.rows ?? this.pageSize();
+        const offset = event.first ?? 0;
+        // The table also emits on init and on client-side grouping; only real paging reaches the API.
+        if (limit === this.pageSize() && offset === this.firstRow()) return;
+        this.updateQuery({ limit, offset });
     }
 
     protected actionLabel(row: AuditTableRow): string {
@@ -230,13 +216,6 @@ export class AuditTableComponent {
 
     protected hasEvidence(row: AuditTableRow): boolean {
         return this.evidenceFields(row).length > 0 || this.showFullDetails(row);
-    }
-
-    protected pageSummaryParams() {
-        const total = this.total();
-        const start = total === 0 ? 0 : this.firstRow() + 1;
-        const end = Math.min(this.firstRow() + this.rows().length, total);
-        return { start, end, total };
     }
 
     protected trackEvidenceField(_index: number, field: AuditEvidenceField): string {

@@ -207,91 +207,72 @@
                             <h3 class="text-lg font-semibold">{{ pageBreakdownTitle() }}</h3>
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ pageBreakdownDescription() }}</p>
                         </div>
-                        <p-iconfield class="w-full sm:w-64">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #pageSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="pagesTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                        </p-iconfield>
                     </div>
-                    <p-table
-                        #pagesTable
+                    <app-table
                         [value]="pageRows()"
+                        [columns]="pageColumns()"
+                        stateKey="web-vitals-pages"
+                        dataKey="path"
                         [loading]="isLoading()"
-                        [rowHover]="true"
-                        [globalFilterFields]="['path', 'samples', 'ratingSamples']"
-                        [paginator]="true"
-                        [rows]="10"
-                        [rowsPerPageOptions]="[10, 25, 50]"
-                        responsiveLayout="scroll"
-                        [sortField]="pageTableSortField()"
-                        [sortOrder]="-1"
-                        styleClass="p-datatable-sm web-vitals-table"
-                        [tableStyle]="{ 'min-width': selectedRating() ? '1040px' : '920px' }"
+                        [defaultSort]="{ field: pageTableSortField(), order: -1 }"
+                        [selectable]="true"
+                        [rowSelected]="pageRowActive"
+                        (rowSelect)="setPathFromRow($any($event).path)"
+                        emptyTextKey="webVitals.pages.empty"
+                        exportFilename="web-vitals-pages"
+                        data-testid="web-vitals-pages-table"
                     >
-                        <ng-template pTemplate="header">
-                            <tr>
-                                <th pSortableColumn="path">
-                                    {{ "webVitals.columns.path" | transloco }}
-                                    <p-sortIcon field="path" />
-                                </th>
-                                <th pSortableColumn="lcp.p75" class="text-right">LCP <p-sortIcon field="lcp.p75" /></th>
-                                <th pSortableColumn="inp.p75" class="text-right">INP <p-sortIcon field="inp.p75" /></th>
-                                <th pSortableColumn="cls.p75" class="text-right">CLS <p-sortIcon field="cls.p75" /></th>
-                                <th pSortableColumn="fcp.p75" class="text-right">FCP <p-sortIcon field="fcp.p75" /></th>
-                                <th pSortableColumn="ttfb.p75" class="text-right">TTFB <p-sortIcon field="ttfb.p75" /></th>
-                                @if (selectedRating()) {
-                                <th pSortableColumn="ratingSamples" class="text-right">
-                                    {{ ratingCountColumnLabel() }}
-                                    <p-sortIcon field="ratingSamples" />
-                                </th>
+                        <ng-template appTableCell="path" let-row>
+                            <div class="flex items-center gap-2 min-w-0">
+                                @if (siteFaviconUrl(); as favicon) {
+                                <img [ngSrc]="favicon" class="size-4 shrink-0 rounded-full" [width]="16" [height]="16" alt="" />
                                 }
-                                <th pSortableColumn="samples" class="text-right">
-                                    {{ "webVitals.columns.samples" | transloco }}
-                                    <p-sortIcon field="samples" />
-                                </th>
-                            </tr>
-                        </ng-template>
-                        <ng-template pTemplate="body" let-row>
-                            <tr class="cursor-pointer" (click)="setPathFromRow(row.path)">
-                                <td class="font-medium truncate max-w-[320px]" [title]="row.path">
-                                    <div class="flex items-center gap-2 min-w-0">
-                                        @if (siteFaviconUrl(); as favicon) {
-                                        <img [ngSrc]="favicon" class="size-4 shrink-0 rounded-full" [width]="16" [height]="16" alt="" />
-                                        }
-                                        <button type="button" class="web-vitals-path-button" [class.web-vitals-path-button--active]="row.path === pathFilter()" [title]="row.path" (click)="setPathFromRow(row.path)">{{ row.path }}</button>
-                                        @if (buildSiteUrl(row.path); as pageUrl) {
-                                        <a
-                                            class="shrink-0 text-muted-color hover:text-[var(--p-text-color)]"
-                                            [href]="pageUrl"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            [attr.aria-label]="'dashboard.openPageInNewTabAria' | transloco"
-                                            (click)="$event.stopPropagation()"
-                                        >
-                                            <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
-                                        </a>
-                                        }
-                                    </div>
-                                </td>
-                                @for (metric of metricOptions(); track metric.value) { @let cell = metricCell(row, metric.value);
-                                <td class="text-right tabular-nums">
-                                    @if (cell) {
-                                    <span class="web-vitals-metric-cell" [class.web-vitals-metric-cell--selected]="metric.value === selectedMetric()">{{ formatMetricValue(metric.value, cell.p75) }}</span>
-                                    } @else {
-                                    <span class="text-[var(--p-text-muted-color)]">-</span>
-                                    }
-                                </td>
-                                } @if (selectedRating()) {
-                                <td class="text-right tabular-nums font-semibold text-[var(--p-text-color)]">{{ formatNumber(row.ratingSamples) }}</td>
+                                <button type="button" class="web-vitals-path-button" [class.web-vitals-path-button--active]="row.path === pathFilter()" [title]="row.path" (click)="setPathFromRow(row.path)">{{ row.path }}</button>
+                                @if (buildSiteUrl(row.path); as pageUrl) {
+                                <a
+                                    class="shrink-0 text-muted-color hover:text-[var(--p-text-color)]"
+                                    [href]="pageUrl"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    [attr.aria-label]="'dashboard.openPageInNewTabAria' | transloco"
+                                    (click)="$event.stopPropagation()"
+                                >
+                                    <i class="pi pi-external-link text-xs" aria-hidden="true"></i>
+                                </a>
                                 }
-                                <td class="text-right tabular-nums">{{ formatNumber(row.samples) }}</td>
-                            </tr>
+                            </div>
                         </ng-template>
-                        <ng-template pTemplate="emptymessage">
-                            <tr>
-                                <td [attr.colspan]="selectedRating() ? 8 : 7" class="text-center text-sm text-[var(--p-text-muted-color)] py-8">{{ "webVitals.pages.empty" | transloco }}</td>
-                            </tr>
+                        <ng-template appTableCell="lcp.p75" let-row>
+                            @if (row.lcp; as cell) {
+                            <span class="web-vitals-metric-cell tabular-nums" [class.web-vitals-metric-cell--selected]="selectedMetric() === 'LCP'">{{ formatMetricValue('LCP', cell.p75) }}</span>
+                            } @else { — }
                         </ng-template>
-                    </p-table>
+                        <ng-template appTableCell="inp.p75" let-row>
+                            @if (row.inp; as cell) {
+                            <span class="web-vitals-metric-cell tabular-nums" [class.web-vitals-metric-cell--selected]="selectedMetric() === 'INP'">{{ formatMetricValue('INP', cell.p75) }}</span>
+                            } @else { — }
+                        </ng-template>
+                        <ng-template appTableCell="cls.p75" let-row>
+                            @if (row.cls; as cell) {
+                            <span class="web-vitals-metric-cell tabular-nums" [class.web-vitals-metric-cell--selected]="selectedMetric() === 'CLS'">{{ formatMetricValue('CLS', cell.p75) }}</span>
+                            } @else { — }
+                        </ng-template>
+                        <ng-template appTableCell="fcp.p75" let-row>
+                            @if (row.fcp; as cell) {
+                            <span class="web-vitals-metric-cell tabular-nums" [class.web-vitals-metric-cell--selected]="selectedMetric() === 'FCP'">{{ formatMetricValue('FCP', cell.p75) }}</span>
+                            } @else { — }
+                        </ng-template>
+                        <ng-template appTableCell="ttfb.p75" let-row>
+                            @if (row.ttfb; as cell) {
+                            <span class="web-vitals-metric-cell tabular-nums" [class.web-vitals-metric-cell--selected]="selectedMetric() === 'TTFB'">{{ formatMetricValue('TTFB', cell.p75) }}</span>
+                            } @else { — }
+                        </ng-template>
+                        <ng-template appTableCell="rating" let-row>
+                            @if (row.rating) {
+                            <p-tag [value]="'webVitals.ratings.' + row.rating | transloco" [severity]="ratingSeverity(row.rating)" [rounded]="true" />
+                            } @else { — }
+                        </ng-template>
+                    </app-table>
                 </p-tabpanel>
                 @for (tab of breakdownTabs().slice(1); track tab.value) {
                 <p-tabpanel [value]="tab.value">
@@ -300,60 +281,22 @@
                             <h3 class="text-lg font-semibold">{{ "webVitals.breakdown.title" | transloco: { dimension: tab.label } }}</h3>
                             <p class="text-sm text-[var(--p-text-muted-color)]">{{ "webVitals.breakdown.description" | transloco: { metric: selectedMetric() } }}</p>
                         </div>
-                        <p-iconfield class="w-full sm:w-64">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #dimensionSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="dimensionTable.filterGlobal($any($event.target).value, 'contains')" class="w-full" />
-                        </p-iconfield>
                     </div>
-                    <p-table
-                        #dimensionTable
+                    <app-table
                         [value]="dimensionRows()"
+                        [columns]="dimensionColumns().get(tab.value) ?? []"
+                        [stateKey]="'web-vitals-' + tab.value"
+                        dataKey="name"
                         [loading]="isLoading()"
-                        [rowHover]="true"
-                        [globalFilterFields]="['name', 'p75', 'samples', 'rating']"
-                        [paginator]="true"
-                        [rows]="10"
-                        [rowsPerPageOptions]="[10, 25, 50]"
-                        responsiveLayout="scroll"
-                        sortField="samples"
-                        [sortOrder]="-1"
-                        styleClass="p-datatable-sm web-vitals-table"
-                        [tableStyle]="{ 'min-width': '680px' }"
+                        [defaultSort]="{ field: 'samples', order: -1 }"
+                        emptyTextKey="webVitals.breakdown.empty"
+                        [exportFilename]="'web-vitals-' + tab.value"
+                        data-testid="web-vitals-breakdown-table"
                     >
-                        <ng-template pTemplate="header">
-                            <tr>
-                                <th pSortableColumn="name">
-                                    {{ tab.label }}
-                                    <p-sortIcon field="name" />
-                                </th>
-                                <th pSortableColumn="p75" class="text-right">
-                                    {{ "webVitals.columns.p75" | transloco }}
-                                    <p-sortIcon field="p75" />
-                                </th>
-                                <th pSortableColumn="samples" class="text-right">
-                                    {{ "webVitals.columns.samples" | transloco }}
-                                    <p-sortIcon field="samples" />
-                                </th>
-                                <th pSortableColumn="rating">
-                                    {{ "webVitals.columns.rating" | transloco }}
-                                    <p-sortIcon field="rating" />
-                                </th>
-                            </tr>
-                        </ng-template>
-                        <ng-template pTemplate="body" let-row>
-                            <tr>
-                                <td><span class="font-semibold">{{ dimensionLabel(row) }}</span></td>
-                                <td class="text-right tabular-nums font-semibold">{{ formatMetricValue(selectedMetric(), row.p75) }}</td>
-                                <td class="text-right tabular-nums">{{ formatNumber(row.samples) }}</td>
-                                <td><p-tag [value]="'webVitals.ratings.' + row.rating | transloco" [severity]="ratingSeverity(row.rating)" [rounded]="true" /></td>
-                            </tr>
-                        </ng-template>
-                        <ng-template pTemplate="emptymessage">
-                            <tr>
-                                <td colspan="4" class="text-center text-sm text-[var(--p-text-muted-color)] py-8">{{ "webVitals.breakdown.empty" | transloco }}</td>
-                            </tr>
-                        </ng-template>
-                    </p-table>
+                        <ng-template appTableCell="name" let-row><span class="font-semibold">{{ dimensionLabel(row) }}</span></ng-template>
+                        <ng-template appTableCell="p75" let-row><span class="tabular-nums font-semibold">{{ formatMetricValue(selectedMetric(), row.p75) }}</span></ng-template>
+                        <ng-template appTableCell="rating" let-row><p-tag [value]="'webVitals.ratings.' + row.rating | transloco" [severity]="ratingSeverity(row.rating)" [rounded]="true" /></ng-template>
+                    </app-table>
                 </p-tabpanel>
                 }
             </p-tabpanels>

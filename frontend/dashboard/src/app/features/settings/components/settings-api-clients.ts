@@ -10,20 +10,16 @@ import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { TableModule } from '@openng/optimus-ui/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 
 import { SettingsCard } from '@features/settings/components/settings-card';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
-import { CrudTableToolbar } from '@components/crud-table-toolbar/crud-table-toolbar';
 import { OneTimeCredential } from '@components/one-time-credential/one-time-credential';
-import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
+import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { SiteScopeSummary, SiteScopeSummaryItem } from '@components/site-scope-summary/site-scope-summary';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { APIClient, APIClientSiteRole, APIClientsService, CreateAPIClientRequest, InstanceRole, SiteRole } from '@services/api-clients.service';
 import { PermissionService } from '@services/permission.service';
 import { SiteSelectOption } from '@features/sites/components/site-select-option';
@@ -70,19 +66,16 @@ const expiresAtNotPastValidator = (): ValidatorFn => {
         ReactiveFormsModule,
         ButtonModule,
         ConfirmDialogModule,
-        IconFieldModule,
-        InputIconModule,
         InputTextModule,
         SelectModule,
-        TableModule,
         TagModule,
         SettingsCard,
         CrudDialog,
-        CrudTableToolbar,
         OneTimeCredential,
-        RelativeDateTime,
+        AppTable,
+        AppTableCell,
+        AppTableSlot,
         SiteScopeSummary,
-        TableRowActions,
         SiteSelectOption,
         TranslocoPipe
     ],
@@ -113,6 +106,25 @@ export class SettingsAPIClients {
     protected readonly editingClientID = signal<string | null>(null);
 
     protected readonly clients = signal<APIClient[]>([]);
+    protected readonly clientColumns: AppTableColumn<APIClient>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        {
+            field: 'instance_role',
+            headerKey: 'settings.apiClients.meta.instanceRole',
+            type: 'enum',
+            groupable: true,
+            options: [
+                { value: 'owner', labelKey: 'admin.roles.instanceOwner' },
+                { value: 'admin', labelKey: 'admin.roles.instanceAdmin' },
+                { value: 'user', labelKey: 'admin.roles.user' }
+            ]
+        },
+        { field: 'created_at', headerKey: 'settings.apiClients.meta.created', type: 'date' },
+        { field: 'last_used_at', headerKey: 'settings.apiClients.meta.lastUsed', type: 'date' },
+        { field: 'expires_at', headerKey: 'settings.apiClients.meta.expires', type: 'date' },
+        { field: 'site_roles', headerKey: 'settings.apiClients.form.siteScopesLabel', sortable: false, filterable: false, searchable: false }
+    ];
+    protected readonly clientRowActions = (client: APIClient) => this.apiClientActions(client);
     protected readonly selectedSiteRoles = signal<APIClientSiteRole[]>([]);
 
     protected readonly form = new FormGroup({

@@ -35,7 +35,7 @@ test("reporting creates a browser-timezone schedule and supports its delivery co
         await editor.getByTestId("report-status").click();
         await page.getByRole("option", { name: "Active", exact: true }).click();
         await editor.getByRole("button", { name: /Save$/ }).click();
-        const row = page.locator("tr[data-report-id]", { hasText: name });
+        const row = page.getByTestId("report-table").locator("tr.app-table__row", { hasText: name });
         await expect(row).toBeVisible();
         await expect(row).toContainText("08:15");
         const statusIndicator = row.getByTestId("report-status-indicator");
@@ -52,10 +52,10 @@ test("reporting creates a browser-timezone schedule and supports its delivery co
         await expect(page.getByRole("dialog", { name: "Delivery history" }).getByText("No scheduled runs yet.")).toBeVisible();
         await page.keyboard.press("Escape");
 
-        const reportID = await row.getAttribute("data-report-id");
+        const reportID = await row.getAttribute("data-row-key");
         await page.goto(`/settings/reports?report=${reportID}`);
-        const linkedRow = page.locator(`tr[data-report-id="${reportID}"]`);
-        await expect(linkedRow).toHaveClass(/report-row--focused/);
+        const linkedRow = page.locator(`tr[data-row-key="${reportID}"]`);
+        await expect(linkedRow).toHaveClass(/app-table__row--selected/);
         const linkedEditor = page.getByRole("dialog", { name: "Edit report" });
         await expect(linkedEditor).toBeVisible();
         const updatedName = `${name} updated`;
@@ -123,7 +123,7 @@ test("team reporting validates and tracks a pending external recipient", async (
         await page.getByRole("option", { name: "Active", exact: true }).click();
         await editor.getByRole("button", { name: /Save$/ }).click();
 
-        const row = page.locator("tr[data-report-id]", { hasText: name });
+        const row = page.getByTestId("report-table").locator("tr.app-table__row", { hasText: name });
         await expect(row).toBeVisible();
         await expect(row).toContainText(externalEmail);
         const externalRecipient = row.locator(".report-recipient", { hasText: externalEmail });
@@ -162,7 +162,7 @@ test("mobile reporting keeps every report field and action reachable without ove
     await editor.getByTestId("report-name").fill(name);
     await editor.getByRole("button", { name: /Save$/ }).click();
 
-    const search = page.getByTestId("report-search");
+    const search = page.getByTestId("report-table").getByTestId("table-search");
     await search.fill(name);
     const row = page.getByTestId("report-mobile-row").filter({ hasText: name });
     await expect(row).toBeVisible();

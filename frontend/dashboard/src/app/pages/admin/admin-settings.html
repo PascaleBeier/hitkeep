@@ -14,11 +14,6 @@
             <p-tabpanels>
                 <p-tabpanel value="users">
                     <app-admin-panel titleId="settings-users-title" [title]="'admin.users.title' | transloco" [subtitle]="users().length + ' ' + ('admin.tabs.users' | transloco)" [padded]="false">
-                        <p-iconfield admin-panel-header class="admin-search">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #settingsUsersSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsUsersTable.filterGlobal($any($event.target).value, 'contains')" />
-                        </p-iconfield>
-
                         @if (deleteUserBlock() || userMfaStatus() || userActionStatus()) {
                         <div admin-panel-messages class="grid gap-3">
                             @if (deleteUserBlock()) {
@@ -31,173 +26,88 @@
                         </div>
                         }
 
-                        <div class="admin-table-wrap">
-                            <p-table
-                                #settingsUsersTable
-                                [value]="users()"
-                                [loading]="isLoading()"
-                                [globalFilterFields]="['email', 'instance_role', 'created_at']"
-                                [sortField]="'created_at'"
-                                [sortOrder]="-1"
-                                [paginator]="true"
-                                [rows]="10"
-                                [rowsPerPageOptions]="[10, 25, 50]"
-                                [rowHover]="true"
-                                responsiveLayout="scroll"
-                                styleClass="p-datatable-sm admin-data-table"
-                                [tableStyle]="{ 'min-width': '760px' }"
-                            >
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th pSortableColumn="email">{{ "common.columns.email" | transloco }}<p-sortIcon field="email" /></th>
-                                        <th pSortableColumn="instance_role">{{ "common.columns.role" | transloco }}<p-sortIcon field="instance_role" /></th>
-                                        <th pSortableColumn="created_at">{{ "common.columns.created" | transloco }}<p-sortIcon field="created_at" /></th>
-                                        <th>{{ "common.columns.actions" | transloco }}</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-user>
-                                    <tr>
-                                        <td>
-                                            <span class="admin-user-email">{{ user.email }}</span>
-                                        </td>
-                                        <td>
-                                            @if (isCurrentUser(user)) {
-                                            <span class="admin-role-readonly" [pTooltip]="'admin.users.roleSelfLocked' | transloco" tooltipPosition="top">
-                                                <span>{{ instanceRoleLabel(user.instance_role) }}</span>
-                                                <i class="pi pi-lock" aria-hidden="true"></i>
-                                            </span>
-                                            } @else {
-                                            <span class="admin-role-select-wrap">
-                                                <p-select
-                                                    [options]="roleOptions()"
-                                                    [formControl]="roleControl(user.id)"
-                                                    (onChange)="onRoleChange(user, $event.value)"
-                                                    optionLabel="label"
-                                                    optionValue="value"
-                                                    class="admin-role-select"
-                                                    appendTo="body"
-                                                />
-                                            </span>
-                                            }
-                                        </td>
-                                        <td><app-relative-date-time [value]="user.created_at" /></td>
-                                        <td>
-                                            <app-table-row-actions [items]="userActions(user)" [loading]="isDisablingUser(user) || isDeletingUser(user)" />
-                                        </td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
+                        <app-table
+                            [value]="users()"
+                            [columns]="userColumns()"
+                            stateKey="admin-users"
+                            [loading]="isLoading()"
+                            [defaultSort]="{ field: 'created_at', order: -1 }"
+                            [rowActions]="userRowActions"
+                            [rowActionsLoading]="userActionLoading"
+                            exportFilename="users"
+                            data-testid="admin-users-table"
+                        >
+                            <ng-template appTableCell="email" let-user><span class="admin-user-email">{{ user.email }}</span></ng-template>
+                            <ng-template appTableCell="instance_role" let-user>
+                                @if (isCurrentUser(user)) {
+                                <span class="admin-role-readonly" [pTooltip]="'admin.users.roleSelfLocked' | transloco" tooltipPosition="top">
+                                    <span>{{ instanceRoleLabel(user.instance_role) }}</span>
+                                    <i class="pi pi-lock" aria-hidden="true"></i>
+                                </span>
+                                } @else {
+                                <span class="admin-role-select-wrap">
+                                    <p-select
+                                        [options]="roleOptions()"
+                                        [formControl]="roleControl(user.id)"
+                                        (onChange)="onRoleChange(user, $event.value)"
+                                        optionLabel="label"
+                                        optionValue="value"
+                                        class="admin-role-select"
+                                        [ariaLabel]="'common.columns.role' | transloco"
+                                        appendTo="body"
+                                    />
+                                </span>
+                                }
+                            </ng-template>
+                        </app-table>
                     </app-admin-panel>
                 </p-tabpanel>
 
                 <p-tabpanel value="sites">
                     <app-admin-panel titleId="settings-sites-title" [title]="'admin.sites.title' | transloco" [subtitle]="sites().length + ' ' + ('admin.tabs.sites' | transloco)" [padded]="false">
-                        <p-iconfield admin-panel-header class="admin-search">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #settingsSitesSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsSitesTable.filterGlobal($any($event.target).value, 'contains')" />
-                        </p-iconfield>
                         @if (siteActionStatus(); as status) {
                         <div admin-panel-messages>
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="siteActionStatusMessage()" />
                         </div>
                         }
-                        <div class="admin-table-wrap">
-                            <p-table
-                                #settingsSitesTable
-                                [value]="sites()"
-                                [loading]="isLoadingSites()"
-                                [globalFilterFields]="['domain', 'owner_email', 'created_at']"
-                                [sortField]="'created_at'"
-                                [sortOrder]="-1"
-                                [paginator]="true"
-                                [rows]="10"
-                                [rowsPerPageOptions]="[10, 25, 50]"
-                                [rowHover]="true"
-                                responsiveLayout="scroll"
-                                styleClass="p-datatable-sm admin-data-table"
-                                [tableStyle]="{ 'min-width': '760px' }"
-                            >
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th pSortableColumn="domain">{{ "common.columns.domain" | transloco }}<p-sortIcon field="domain" /></th>
-                                        <th pSortableColumn="owner_email">{{ "common.columns.owner" | transloco }}<p-sortIcon field="owner_email" /></th>
-                                        <th pSortableColumn="created_at">{{ "common.columns.created" | transloco }}<p-sortIcon field="created_at" /></th>
-                                        <th>{{ "common.columns.actions" | transloco }}</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-site>
-                                    <tr>
-                                        <td><a [href]="'https://' + site.domain" target="_blank" rel="noopener" class="admin-link">{{ site.domain }}</a></td>
-                                        <td>{{ siteOwnerEmail(site) }}</td>
-                                        <td><app-relative-date-time [value]="site.created_at" /></td>
-                                        <td>
-                                            <app-table-row-actions [items]="siteActions(site)" [loading]="isDeletingSite(site)" />
-                                        </td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
+                        <app-table
+                            [value]="siteRows()"
+                            [columns]="siteColumns"
+                            stateKey="admin-sites"
+                            [loading]="isLoadingSites()"
+                            [defaultSort]="{ field: 'created_at', order: -1 }"
+                            [rowActions]="siteRowActions"
+                            [rowActionsLoading]="siteActionLoading"
+                            exportFilename="sites"
+                            data-testid="admin-sites-table"
+                        >
+                            <ng-template appTableCell="domain" let-site><a [href]="'https://' + site.domain" target="_blank" rel="noopener" class="admin-link">{{ site.domain }}</a></ng-template>
+                        </app-table>
                     </app-admin-panel>
                 </p-tabpanel>
 
                 <p-tabpanel value="teams">
                     <app-admin-panel titleId="settings-teams-title" [title]="'admin.teams.title' | transloco" [subtitle]="teams().length + ' ' + ('admin.tabs.teams' | transloco)" [padded]="false">
-                        <p-iconfield admin-panel-header class="admin-search">
-                            <p-inputicon class="pi pi-search" />
-                            <input pInputText #settingsTeamsSearch [placeholder]="'common.searchPlaceholder' | transloco" (input)="settingsTeamsTable.filterGlobal($any($event.target).value, 'contains')" />
-                        </p-iconfield>
                         @if (teamActionStatus(); as status) {
                         <div admin-panel-messages>
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="teamActionStatusMessage()" />
                         </div>
                         }
-                        <div class="admin-table-wrap">
-                            <p-table
-                                #settingsTeamsTable
-                                [value]="teams()"
-                                [loading]="isLoadingTeams()"
-                                [globalFilterFields]="['name', 'created_at']"
-                                [sortField]="'created_at'"
-                                [sortOrder]="-1"
-                                [paginator]="true"
-                                [rows]="10"
-                                [rowsPerPageOptions]="[10, 25, 50]"
-                                [rowHover]="true"
-                                responsiveLayout="scroll"
-                                styleClass="p-datatable-sm admin-data-table"
-                                [tableStyle]="{ 'min-width': '820px' }"
-                            >
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th pSortableColumn="name">{{ "common.columns.name" | transloco }}<p-sortIcon field="name" /></th>
-                                        <th pSortableColumn="member_count">{{ "common.columns.members" | transloco }}<p-sortIcon field="member_count" /></th>
-                                        <th pSortableColumn="site_count">{{ "common.columns.sites" | transloco }}<p-sortIcon field="site_count" /></th>
-                                        <th pSortableColumn="is_archived">{{ "common.columns.status" | transloco }}<p-sortIcon field="is_archived" /></th>
-                                        <th>{{ "common.columns.actions" | transloco }}</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-team>
-                                    <tr>
-                                        <td>{{ team.name }}</td>
-                                        <td>{{ team.member_count }}</td>
-                                        <td>{{ team.site_count }}</td>
-                                        <td>
-                                            @if (team.is_default) {
-                                            <p-tag [value]="'admin.teams.status.default' | transloco" severity="info" />
-                                            } @else if (team.is_archived) {
-                                            <p-tag [value]="'admin.teams.status.archived' | transloco" severity="warn" />
-                                            } @else {
-                                            <p-tag [value]="'admin.teams.status.active' | transloco" severity="success" />
-                                            }
-                                        </td>
-                                        <td>
-                                            <app-table-row-actions [items]="teamActions(team)" [loading]="isDeletingTeam(team)" />
-                                        </td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
+                        <app-table
+                            [value]="teamRows()"
+                            [columns]="teamColumns"
+                            stateKey="admin-teams"
+                            [loading]="isLoadingTeams()"
+                            [defaultSort]="{ field: 'created_at', order: -1 }"
+                            [rowActions]="teamRowActions"
+                            [rowActionsLoading]="teamActionLoading"
+                            exportFilename="teams"
+                            data-testid="admin-teams-table"
+                        >
+                            <ng-template appTableCell="status" let-team>
+                                <p-tag [value]="'admin.teams.status.' + team.status | transloco" [severity]="team.status === 'default' ? 'info' : team.status === 'archived' ? 'warn' : 'success'" />
+                            </ng-template>
+                        </app-table>
                     </app-admin-panel>
                 </p-tabpanel>
 
@@ -624,28 +534,9 @@
                             } @if (isLoadingCaches() && !systemCaches()) {
                             <div class="admin-loading"><i class="pi pi-spin pi-spinner" aria-hidden="true"></i>{{ "common.loading" | transloco }}</div>
                             } @else {
-                            <div class="admin-table-wrap">
-                                <p-table [value]="cacheRows()" [rowHover]="true" styleClass="p-datatable-sm admin-data-table">
-                                    <ng-template pTemplate="header">
-                                        <tr>
-                                            <th>{{ "admin.system.caches.columns.cache" | transloco }}</th>
-                                            <th>{{ "admin.system.caches.columns.size" | transloco }}</th>
-                                            <th>{{ "admin.system.caches.columns.maxSize" | transloco }}</th>
-                                            <th>{{ "admin.system.caches.columns.ttl" | transloco }}</th>
-                                            <th>{{ "admin.system.console.pressure" | transloco }}</th>
-                                        </tr>
-                                    </ng-template>
-                                    <ng-template pTemplate="body" let-row>
-                                        <tr>
-                                            <td>{{ row.name }}</td>
-                                            <td>{{ row.size | number }}</td>
-                                            <td>{{ row.maxSize | number }}</td>
-                                            <td>{{ row.ttl }}</td>
-                                            <td>{{ row.pressure }}%</td>
-                                        </tr>
-                                    </ng-template>
-                                </p-table>
-                            </div>
+                            <app-table [value]="cacheRows()" [columns]="cacheColumns" stateKey="admin-caches" dataKey="name" exportFilename="caches" data-testid="admin-caches-table">
+                                <ng-template appTableCell="pressure" let-row>{{ row.pressure }}%</ng-template>
+                            </app-table>
                             }
                         </app-system-status-card>
                     </div>
@@ -1082,76 +973,46 @@
                                 <strong class="truncate font-bold text-[var(--p-text-color)]">{{ systemActivation()?.total ?? 0 | number }}</strong>
                             </div>
                         </div>
-                        <div class="admin-table-wrap">
-                            <p-table [value]="activationRows()" [loading]="isLoadingActivation()" [rowHover]="true" styleClass="p-datatable-sm admin-data-table">
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th>{{ "admin.system.activation.columns.team" | transloco }}</th>
-                                        <th>{{ "common.columns.domain" | transloco }}</th>
-                                        <th>{{ "common.columns.status" | transloco }}</th>
-                                        <th>{{ "admin.system.activation.columns.lastHit" | transloco }}</th>
-                                        <th>{{ "admin.system.activation.columns.lastEvent" | transloco }}</th>
-                                        <th>{{ "admin.system.activation.columns.hits24h" | transloco }}</th>
-                                        <th>{{ "admin.system.activation.columns.hits7d" | transloco }}</th>
-                                        <th>{{ "admin.system.activation.columns.events7d" | transloco }}</th>
-                                        <th>{{ "common.columns.actions" | transloco }}</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-row>
-                                    <tr>
-                                        <td>
-                                            <div class="max-w-52 truncate font-semibold text-[var(--p-text-color)]">{{ row.team_name }}</div>
-                                            <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.owner_email || ("common.unknown" | transloco) }}</div>
-                                            <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.active_sites | number }} / {{ row.sites_count | number }} {{ "common.columns.sites" | transloco }}</div>
-                                        </td>
-                                        <td>
-                                            <div class="max-w-52 truncate font-semibold text-[var(--p-text-color)]">{{ row.site_domain }}</div>
-                                            @if (isManagedCloud() && canRunMaintenance()) {
-                                            <span class="admin-role-select-wrap mt-0.5 inline-block">
-                                                <p-select
-                                                    [options]="planOptions"
-                                                    [formControl]="planControl(row.team_id)"
-                                                    (onChange)="onPlanChange(row, $event.value)"
-                                                    optionLabel="label"
-                                                    optionValue="value"
-                                                    class="admin-role-select"
-                                                    appendTo="body"
-                                                />
-                                            </span>
-                                            @if (row.cloud_region) {
-                                            <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.cloud_region }}</div>
-                                            } } @else { @if (row.plan_name || row.plan_code || row.cloud_region) {
-                                            <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.plan_name || row.plan_code || "-" }} · {{ row.cloud_region || "-" }}</div>
-                                            } }
-                                        </td>
-                                        <td><p-tag [value]="activationStatusLabel(row.status)" [severity]="activationStatusSeverity(row.status)" /></td>
-                                        <td>
-                                            @if (row.last_hit_at) {
-                                            <app-relative-date-time [value]="row.last_hit_at" />
-                                            } @else { - }
-                                        </td>
-                                        <td>
-                                            @if (row.last_event_at) {
-                                            <app-relative-date-time [value]="row.last_event_at" />
-                                            @if (row.last_event_name) {
-                                            <div class="mt-0.5 max-w-36 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.last_event_name }}</div>
-                                            } } @else { - }
-                                        </td>
-                                        <td>{{ row.hits_last_24h | number }}</td>
-                                        <td>{{ row.hits_last_7d | number }}</td>
-                                        <td>{{ row.events_last_7d | number }}</td>
-                                        <td>
-                                            <app-table-row-actions [items]="activationRowActions(row)" [loading]="openingActivationTeamId() === row.team_id" />
-                                        </td>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="emptymessage">
-                                    <tr>
-                                        <td colspan="9" class="admin-empty-cell">{{ "admin.system.activation.empty" | transloco }}</td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
+                        <app-table
+                            [value]="activationRows()"
+                            [columns]="activationColumns"
+                            stateKey="admin-tracking-health"
+                            dataKey="site_id"
+                            [loading]="isLoadingActivation()"
+                            [defaultSort]="{ field: 'hits_last_7d', order: -1 }"
+                            defaultGroupBy="team_name"
+                            [rowActions]="activationActions"
+                            [rowActionsLoading]="activationActionLoading"
+                            emptyTextKey="admin.system.activation.empty"
+                            exportFilename="tracking-health"
+                            data-testid="admin-tracking-health-table"
+                        >
+                            <ng-template appTableCell="site_domain" let-row>
+                                <div class="max-w-52 truncate font-semibold text-[var(--p-text-color)]">{{ row.site_domain }}</div>
+                                @if (isManagedCloud() && canRunMaintenance()) {
+                                <span class="admin-role-select-wrap mt-0.5 inline-block">
+                                    <p-select [options]="planOptions" [formControl]="planControl(row.team_id)" (onChange)="onPlanChange(row, $event.value)" optionLabel="label" optionValue="value" class="admin-role-select" appendTo="body" />
+                                </span>
+                                @if (row.cloud_region) {
+                                <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.cloud_region }}</div>
+                                } } @else { @if (row.plan_name || row.plan_code || row.cloud_region) {
+                                <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.plan_name || row.plan_code || "-" }} · {{ row.cloud_region || "-" }}</div>
+                                } }
+                            </ng-template>
+                            <ng-template appTableCell="team_name" let-row>
+                                <div class="max-w-52 truncate font-semibold text-[var(--p-text-color)]">{{ row.team_name }}</div>
+                                <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.owner_email || ("common.unknown" | transloco) }}</div>
+                                <div class="mt-0.5 max-w-52 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.active_sites | number }} / {{ row.sites_count | number }} {{ "common.columns.sites" | transloco }}</div>
+                            </ng-template>
+                            <ng-template appTableCell="status" let-row><p-tag [value]="activationStatusLabel(row.status)" [severity]="activationStatusSeverity(row.status)" /></ng-template>
+                            <ng-template appTableCell="last_event_at" let-row>
+                                @if (row.last_event_at) {
+                                <app-relative-date-time [value]="row.last_event_at" />
+                                @if (row.last_event_name) {
+                                <div class="mt-0.5 max-w-36 truncate text-xs font-medium text-[var(--p-text-muted-color)]">{{ row.last_event_name }}</div>
+                                } } @else { — }
+                            </ng-template>
+                        </app-table>
                         <div admin-panel-footer class="flex min-w-0 flex-1 items-center justify-between gap-4 text-sm text-[var(--p-text-muted-color)] max-sm:flex-col max-sm:items-stretch">
                             <span>{{ "admin.system.activation.pagination" | transloco: { loaded: activationRows().length, total: systemActivation()?.total ?? 0 } }}</span>
                             <div class="flex gap-2">

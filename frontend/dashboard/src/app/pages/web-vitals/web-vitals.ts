@@ -6,12 +6,9 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
-import { IconFieldModule } from '@openng/optimus-ui/iconfield';
-import { InputIconModule } from '@openng/optimus-ui/inputicon';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { TabsModule } from '@openng/optimus-ui/tabs';
-import { TableModule } from '@openng/optimus-ui/table';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
@@ -59,6 +56,7 @@ interface WebVitalPageTableRow {
     ttfb: WebVitalMetricBreakdown | null;
     samples: number;
     selectedMetricCell: WebVitalMetricBreakdown | null;
+    rating: WebVitalRating | null;
     ratingSamples: number;
 }
 
@@ -79,12 +77,10 @@ const WEB_VITAL_THRESHOLDS: Record<WebVitalMetric, { good: number; poor: number 
         TranslocoPipe,
         ButtonModule,
         CardModule,
-        IconFieldModule,
-        InputIconModule,
-        InputTextModule,
         SelectModule,
         TabsModule,
-        TableModule,
+        AppTable,
+        AppTableCell,
         TagModule,
         PageHeader,
         PageHeaderLeft,
@@ -221,11 +217,34 @@ export class WebVitalsPage {
                 ttfb: row.metrics?.TTFB ?? null,
                 samples: row.samples,
                 selectedMetricCell,
+                rating: selectedMetricCell?.rating ?? null,
                 ratingSamples: rating ? this.ratingCountForBreakdown(selectedMetricCell, rating) : row.samples
             };
         });
     });
     protected readonly pageTableSortField = computed(() => (this.selectedRating() ? 'ratingSamples' : 'samples'));
+    protected readonly pageColumns = computed<AppTableColumn<WebVitalPageTableRow>[]>(() => [
+        { field: 'path', headerKey: 'webVitals.columns.path', frozen: true },
+        ...METRICS.map((metric): AppTableColumn<WebVitalPageTableRow> => ({ field: `${metric.toLowerCase()}.p75`, header: metric, type: 'number', align: 'end' })),
+        { field: 'rating', headerKey: 'webVitals.columns.rating', type: 'enum', groupable: true, labelKeyPrefix: 'webVitals.ratings.' },
+        ...(this.selectedRating() ? [{ field: 'ratingSamples', header: this.ratingCountColumnLabel(), type: 'number', align: 'end' } satisfies AppTableColumn<WebVitalPageTableRow>] : []),
+        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end' }
+    ]);
+    protected readonly dimensionColumns = computed(
+        () =>
+            new Map(
+                this.breakdownTabs().map((tab): [string, AppTableColumn<WebVitalDimensionRow>[]] => [
+                    tab.value,
+                    [
+                        { field: 'name', header: tab.label, frozen: true },
+                        { field: 'p75', headerKey: 'webVitals.columns.p75', type: 'number', align: 'end' },
+                        { field: 'samples', headerKey: 'webVitals.columns.samples', type: 'number', align: 'end' },
+                        { field: 'rating', headerKey: 'webVitals.columns.rating', type: 'enum', groupable: true, labelKeyPrefix: 'webVitals.ratings.' }
+                    ]
+                ])
+            )
+    );
+    protected readonly pageRowActive = (row: WebVitalPageTableRow) => row.path === this.pathFilter();
     protected readonly selectedRatingLabel = computed(() => {
         this.activeLanguage();
         const rating = this.selectedRating();

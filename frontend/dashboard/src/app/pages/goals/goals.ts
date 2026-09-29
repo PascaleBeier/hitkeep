@@ -8,9 +8,7 @@ import { ConfirmationService } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
-import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { MessageModule } from '@openng/optimus-ui/message';
-import { TableModule } from '@openng/optimus-ui/table';
 import { finalize, Subscription } from 'rxjs';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { calcDelta } from '@core/analytics/delta-utils';
@@ -20,7 +18,8 @@ import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/
 import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
+import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { KpiCard, KpiCardModel, KPI_PERCENT_FORMAT } from '@features/analytics/components/kpi-card';
 import { ConversionSubjectCard } from '@features/analytics/components/conversion-subject-card';
 import { SeriesChart, SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
@@ -48,7 +47,6 @@ import { injectActiveLang } from '@core/i18n/active-lang';
         ConfirmDialogModule,
         ConversionSubjectCard,
         GoalManager,
-        InputTextModule,
         KpiCard,
         MessageModule,
         PageBreadcrumb,
@@ -57,8 +55,8 @@ import { injectActiveLang } from '@core/i18n/active-lang';
         PageState,
         ReportRangeToolbar,
         SeriesChart,
-        TableModule,
-        TableRowActions,
+        AppTable,
+        AppTableCell,
         TrafficRecordsCard,
         TranslocoDecimalPipe,
         TranslocoPipe
@@ -95,6 +93,30 @@ export class Goals {
     protected goalsError = signal(false);
     protected selectedGoalId = signal<string | null>(null);
     protected selectedGoal = computed(() => this.goals().find((goal) => goal.id === this.selectedGoalId()) ?? null);
+    protected readonly goalRows = computed(() =>
+        this.goals().map((goal) => {
+            const stats = this.conversionStats(goal);
+            return { ...goal, conversions: stats?.conversions ?? 0, conversion_rate: stats?.conversion_rate ?? 0 };
+        })
+    );
+    protected readonly goalColumns: AppTableColumn<Goal & { conversions: number; conversion_rate: number }>[] = [
+        { field: 'name', headerKey: 'common.columns.name', frozen: true },
+        {
+            field: 'type',
+            headerKey: 'common.columns.type',
+            type: 'enum',
+            groupable: true,
+            options: [
+                { value: 'path', labelKey: 'goals.types.path' },
+                { value: 'event', labelKey: 'goals.types.event' }
+            ]
+        },
+        { field: 'value', headerKey: 'common.columns.value' },
+        { field: 'conversions', headerKey: 'goals.kpis.conversions', type: 'number', align: 'end' },
+        { field: 'conversion_rate', headerKey: 'common.kpis.conversionRate', type: 'number', align: 'end' }
+    ];
+    protected readonly goalRowActions = (goal: Goal) => this.goalActions(goal);
+    protected readonly goalActionLoading = (goal: Goal) => this.deletingGoalId() === goal.id;
     protected subjectControl = new FormControl<string | null>(null);
     protected editorVisible = signal(false);
     protected editingGoal = signal<Goal | null>(null);

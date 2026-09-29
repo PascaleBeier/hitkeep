@@ -3927,5 +3927,22 @@
     "invalid": { "title": "Dieser Bestätigungslink ist nicht verfügbar", "description": "Er ist möglicherweise ungültig, abgelaufen, bereits verwendet oder durch eine neue Einladung ersetzt. Bitte die Berichtsverwaltung um erneutes Senden." },
     "confirmed": { "title": "Berichtsversand bestätigt", "description": "Du erhältst zukünftige geplante Berichte. Berichte vor der Bestätigung werden nicht nachgesendet." },
     "declined": { "title": "Berichtsversand abgelehnt", "description": "Du erhältst diesen Bericht nicht, bis du später eine neue Bestätigung annimmst." }
+  },
+  "table": {
+    "pageReport": "{first}–{last} von {totalRecords}",
+    "searchChip": "Suche: {{value}}",
+    "groupBy": "Gruppieren nach",
+    "columns": "Spalten",
+    "resetView": "Ansicht zurücksetzen",
+    "expand": "Aufklappen",
+    "expandRow": "Details anzeigen",
+    "collapseRow": "Details ausblenden",
+    "groupCount": "{{count}} Zeilen",
+    "noValue": "Kein Wert",
+    "any": "Alle",
+    "dateRange": "Zeitraum",
+    "noResults": "Keine Zeilen entsprechen den aktuellen Filtern.",
+    "clearFilters": "Filter zurücksetzen",
+    "empty": "Noch keine Einträge."
   }
 }
