@@ -1,3 +1,4 @@
+{{ define "preheader" }}{{ tf "opportunities.digest.subtitle" .SiteDomain }}{{ end }}
 {{ define "content" }}
 <mj-text css-class="dark-text" font-size="20px" font-weight="600" color="#18181a" padding-bottom="4px">
   {{ tf "opportunities.digest.title" .FreqLabel }}
@@ -38,7 +39,7 @@
 <mj-divider padding-top="12px" padding-bottom="8px" />
 <mj-text css-class="info-text" font-size="11px" color="#94a3b8" align="center" padding-top="0">
   {{ t "opportunities.digest.received_because" }}
-  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
-  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #33d399; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
+  {{ if .SettingsURL }}<a href="{{ .SettingsURL }}" style="color: #047857; text-decoration: none;">{{ t "reports.manage_preferences" }}</a>{{ end }}
+  {{ if .UnsubscribeURL }}{{ if .SettingsURL }} · {{ end }}<a href="{{ .UnsubscribeURL }}" style="color: #047857; text-decoration: none;">{{ t "reports.unsubscribe" }}</a>{{ end }}
 </mj-text>
 {{ end }}

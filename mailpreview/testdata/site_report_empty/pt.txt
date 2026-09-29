@@ -4,7 +4,7 @@ Relatório de Análise do Diário
 new.example · 22-28 Set 2026
 
 Métricas
--------
+--------
 Visualizações de Página:    0 (—)
 Visitantes:     0 (—)
 Taxa de Rejeição:  0,0%

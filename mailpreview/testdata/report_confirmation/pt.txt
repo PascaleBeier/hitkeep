@@ -1,7 +1,7 @@
 Subject: Weekly executive summary: confirme os relatórios de Acme Analytics
 
 Confirmar relatórios agendados
-==================
+==============================
 
 Acme Analytics pretende enviar-lhe o relatório agendado «Weekly executive summary». Confirme antes de receber dados analíticos por e-mail.
 

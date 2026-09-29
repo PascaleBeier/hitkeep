@@ -4,7 +4,7 @@ Täglicher Analytics-Bericht
 new.example · 22.-28. September 2026
 
 Kennzahlen
--------
+----------
 Seitenaufrufe:    0 (—)
 Besucher:     0 (—)
 Absprungrate:  0,0%

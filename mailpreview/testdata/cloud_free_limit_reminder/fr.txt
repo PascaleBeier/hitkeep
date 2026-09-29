@@ -1,7 +1,7 @@
 Subject: Vous avez atteint les limites de l'offre gratuite
 
 Votre équipe a atteint la limite de l'offre gratuite
-===========================
+====================================================
 
 Acme Analytics a atteint la capacité de l'offre gratuite (1 sites, 1 membres d'équipe).
 

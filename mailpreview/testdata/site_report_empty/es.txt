@@ -4,7 +4,7 @@ Informe de analítica diario
 new.example · 22-28 sep 2026
 
 Métricas
--------
+--------
 Páginas vistas:    0 (—)
 Visitantes:     0 (—)
 Porcentaje de rebote:  0,0%

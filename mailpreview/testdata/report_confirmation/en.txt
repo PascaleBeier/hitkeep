@@ -1,7 +1,7 @@
 Subject: Weekly executive summary: confirm reports from Acme Analytics
 
 Confirm scheduled reports
-==================
+=========================
 
 Acme Analytics wants to send you the scheduled report “Weekly executive summary”. Confirm before any analytics data is emailed to you.
 

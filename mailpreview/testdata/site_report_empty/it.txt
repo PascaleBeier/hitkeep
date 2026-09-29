@@ -4,7 +4,7 @@ Report di analitica giornaliero
 new.example · 22-28 set 2026
 
 Metriche
--------
+--------
 Visualizzazioni pagina:    0 (—)
 Visitatori:     0 (—)
 Frequenza di rimbalzo:  0,0%

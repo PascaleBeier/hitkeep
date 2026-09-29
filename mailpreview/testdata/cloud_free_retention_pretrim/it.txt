@@ -1,7 +1,7 @@
 Subject: I tuoi dati HitKeep più vecchi verranno presto rimossi
 
 I tuoi dati più vecchi verranno presto rimossi
-===========================
+==============================================
 
 Il piano Free conserva 60 giorni di dati. A partire dal October 6, 2026, gli hit più vecchi di shop.example verranno rimossi.
 

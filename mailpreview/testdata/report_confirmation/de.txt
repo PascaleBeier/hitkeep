@@ -1,7 +1,7 @@
 Subject: Weekly executive summary: Berichte von Acme Analytics bestätigen
 
 Geplante Berichte bestätigen
-==================
+============================
 
 Acme Analytics möchte dir den geplanten Bericht „Weekly executive summary“ senden. Bestätige dies, bevor Analysedaten per E-Mail an dich gesendet werden.
 

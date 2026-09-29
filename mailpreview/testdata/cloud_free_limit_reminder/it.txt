@@ -1,7 +1,7 @@
 Subject: Hai raggiunto i limiti del piano gratuito
 
 Il tuo team è al limite del piano gratuito
-===========================
+==========================================
 
 Acme Analytics ha raggiunto la capacità del piano gratuito (1 siti, 1 membri).
 

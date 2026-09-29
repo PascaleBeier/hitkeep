@@ -13,6 +13,7 @@ import (
 	"strings"
 	texttpl "text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Boostport/mjml-go"
 	"golang.org/x/text/language"
@@ -104,6 +105,10 @@ func textTemplateFuncsForLocale(locale string) texttpl.FuncMap {
 		"t":              htmlFuncs["t"],
 		"tf":             htmlFuncs["tf"],
 		"roleLabel":      htmlFuncs["roleLabel"],
+		// rule underlines a plain-text heading to its visible length in any locale.
+		"rule": func(char, heading string) string {
+			return strings.Repeat(char, utf8.RuneCountInString(heading))
+		},
 	}
 }
 

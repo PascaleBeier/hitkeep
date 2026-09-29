@@ -12,7 +12,7 @@ Gem. duur: 2 min. 34 sec.
 
 
 Top pagina's
----------
+------------
 /blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
 /: 2.040
 
@@ -29,7 +29,7 @@ duckduckgo.com: 301
 
 
 Doelconversies
-----------------
+--------------
 Signup: 312
 Checkout: 88
 

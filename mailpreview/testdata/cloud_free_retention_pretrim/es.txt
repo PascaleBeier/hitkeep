@@ -1,7 +1,7 @@
 Subject: Tus datos más antiguos de HitKeep empezarán a eliminarse pronto
 
 Tus datos más antiguos empezarán a eliminarse pronto
-===========================
+====================================================
 
 El plan Free conserva 60 días de datos. A partir del October 6, 2026, se eliminarán los hits más antiguos de shop.example.
 

@@ -1,7 +1,7 @@
 Subject: Keep more than 60 days of HitKeep data
 
 Your Free plan keeps 60 days of data
-===========================
+====================================
 
 Acme Analytics is receiving traffic from shop.example. On the Free plan, hits are retained for 60 days.
 

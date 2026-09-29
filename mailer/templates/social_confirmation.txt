@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "auth.social_confirmation.heading" }}
-==================
+{{ rule "=" (t "auth.social_confirmation.heading") }}
 
 {{ t "common.hello" }}
 

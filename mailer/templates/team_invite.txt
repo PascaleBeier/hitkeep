@@ -1,6 +1,6 @@
 {{ define "content" -}}
 {{ t "invite.team.heading" }}
-=============================
+{{ rule "=" (t "invite.team.heading") }}
 
 {{ t "common.hello" }}
 

@@ -1,7 +1,7 @@
 Subject: Verifica tu correo - HitKeep
 
 Verifica tu correo
-=================
+==================
 
 Estás a un paso de crear tu espacio de trabajo Acme Analytics en HitKeep.
 

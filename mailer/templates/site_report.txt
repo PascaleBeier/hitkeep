@@ -2,7 +2,7 @@
 {{ .SiteDomain }} · {{ .PeriodLabel }}
 
 {{ t "reports.metrics_section" }}
--------
+{{ rule "-" (t "reports.metrics_section") }}
 {{ t "reports.pageviews" }}:    {{ formatInt .Current.Pageviews }} ({{ percentChange .Current.Pageviews .Previous.Pageviews }})
 {{ t "reports.visitors" }}:     {{ formatInt .Current.Visitors }} ({{ percentChange .Current.Visitors .Previous.Visitors }})
 {{ t "reports.bounce_rate" }}:  {{ formatPercent .Current.BounceRate }}
@@ -10,19 +10,19 @@
 
 {{ if .Current.TopPages }}
 {{ t "reports.top_pages" }}
----------
+{{ rule "-" (t "reports.top_pages") }}
 {{ range $i, $p := .Current.TopPages }}{{ if lt $i 5 }}{{ $p.Name }}: {{ formatInt $p.Value }}
 {{ end }}{{ end }}
 {{ end }}
 {{ if .Current.TopReferrers }}
 {{ t "reports.top_referrers" }}
--------------
+{{ rule "-" (t "reports.top_referrers") }}
 {{ range $i, $r := .Current.TopReferrers }}{{ if lt $i 5 }}{{ $r.Name }}: {{ formatInt $r.Value }}
 {{ end }}{{ end }}
 {{ end }}
 {{ if .Current.Goals }}
 {{ t "reports.goal_completions" }}
-----------------
+{{ rule "-" (t "reports.goal_completions") }}
 {{ range .Current.Goals }}{{ .Name }}: {{ formatInt .Conversions }}
 {{ end }}
 {{ end }}

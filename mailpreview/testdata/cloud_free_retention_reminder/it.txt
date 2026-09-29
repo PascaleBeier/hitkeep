@@ -1,7 +1,7 @@
 Subject: Conserva più di 60 giorni di dati HitKeep
 
 Il tuo piano Free conserva 60 giorni di dati
-===========================
+============================================
 
 Acme Analytics sta ricevendo traffico da shop.example. Nel piano Free, gli hit vengono conservati per 60 giorni.
 

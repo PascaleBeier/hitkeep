@@ -1,7 +1,7 @@
 Subject: Setze dein HitKeep-Passwort zurück
 
 Passwort zurücksetzen
-==============
+=====================
 
 Hallo,
 

@@ -1,7 +1,7 @@
 Subject: Je oudste HitKeep-data worden binnenkort verwijderd
 
 Je oudste gegevens worden binnenkort verwijderd
-===========================
+===============================================
 
 Het Free-abonnement bewaart 60 dagen aan data. Vanaf October 6, 2026 worden de oudste hits van shop.example verwijderd.
 

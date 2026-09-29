@@ -1,3 +1,4 @@
+{{ define "preheader" }}{{ tf "reports.confirmation.body" .TeamName .ReportName }}{{ end }}
 {{ define "content" }}
 <mj-text font-size="20px" font-weight="600" padding-bottom="10px">
   {{ t "reports.confirmation.heading" }}
@@ -16,16 +17,16 @@
   {{ t "reports.confirmation.button" }}
 </mj-button>
 
-<mj-text font-size="13px" color="#64748b">
+<mj-text css-class="muted" font-size="13px" color="#64748b">
   {{ t "common.copy_link" }}
-  <a href="{{ .Link }}" style="color: #33d399">{{ .Link }}</a>
+  <a href="{{ .Link }}" style="color: #047857">{{ .Link }}</a>
 </mj-text>
 
-<mj-text font-size="13px" color="#64748b" padding-top="10px">
+<mj-text css-class="muted" font-size="13px" color="#64748b" padding-top="10px">
   {{ tf "reports.confirmation.expires" .ExpiresInDays }}
 </mj-text>
 
-<mj-text font-size="13px" color="#64748b" padding-top="4px">
+<mj-text css-class="muted" font-size="13px" color="#64748b" padding-top="4px">
   {{ t "reports.confirmation.disclaimer" }}
 </mj-text>
 {{ end }}

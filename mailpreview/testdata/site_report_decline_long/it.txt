@@ -4,7 +4,7 @@ Report di analitica mensile
 docs.a-rather-long-subdomain.example.com · 22-28 set 2026
 
 Metriche
--------
+--------
 Visualizzazioni pagina:    9.120 (−78%)
 Visitatori:     3.021 (−77%)
 Frequenza di rimbalzo:  41,3%
@@ -12,14 +12,14 @@ Durata media: 2 min 34 s
 
 
 Pagine principali
----------
+-----------------
 /blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
 /: 2.040
 
 
 
 Referrer principali
--------------
+-------------------
 google.com: 5.120
 news.ycombinator.com: 2.230
 chatgpt.com: 812
@@ -29,7 +29,7 @@ duckduckgo.com: 301
 
 
 Obiettivi completati
-----------------
+--------------------
 Signup: 312
 Checkout: 88
 

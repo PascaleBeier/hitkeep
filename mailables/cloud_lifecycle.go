@@ -88,7 +88,7 @@ func NewCloudFreeRetentionReminder(locale, teamName, siteDomain string, retentio
 }
 
 func (m *CloudFreeRetentionReminder) Subject() string {
-	return mailer.Translate(m.LocaleCode, "subject.cloud_free_retention_reminder")
+	return mailer.Translatef(m.LocaleCode, "subject.cloud_free_retention_reminder", m.RetentionDays)
 }
 
 func (m *CloudFreeRetentionReminder) Template() string {

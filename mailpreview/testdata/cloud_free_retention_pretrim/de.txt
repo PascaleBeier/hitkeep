@@ -1,7 +1,7 @@
 Subject: Deine ältesten HitKeep-Daten laufen bald ab
 
 Deine ältesten Daten laufen bald ab
-===========================
+===================================
 
 Der Free-Plan speichert 60 Tage an Daten. Ab dem October 6, 2026 werden die ältesten Hits von shop.example entfernt.
 

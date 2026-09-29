@@ -1,7 +1,7 @@
 Subject: You've reached the Free plan limits
 
 Your team is at the Free plan limit
-===========================
+===================================
 
 Acme Analytics has reached the capacity of the Free plan (1 sites, 1 team members).
 

@@ -1,7 +1,7 @@
 Subject: Weekly executive summary: bevestig rapporten van Acme Analytics
 
 Geplande rapporten bevestigen
-==================
+=============================
 
 Acme Analytics wil je het geplande rapport ‘Weekly executive summary’ sturen. Bevestig dit voordat analytische gegevens per e-mail naar je worden verzonden.
 

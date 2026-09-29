@@ -4,7 +4,7 @@ Relatório de Análise do Semanal
 shop.example · 22-28 Set 2026
 
 Métricas
--------
+--------
 Visualizações de Página:    48.213 (+18%)
 Visitantes:     12.877 (−3%)
 Taxa de Rejeição:  41,3%
@@ -12,7 +12,7 @@ Duração Média: 2 min 34 s
 
 
 Principais Páginas
----------
+------------------
 /: 12.040
 /pricing: 6.120
 /docs/getting-started: 3.302
@@ -22,7 +22,7 @@ Principais Páginas
 
 
 Principais Referenciadores
--------------
+--------------------------
 google.com: 5.120
 news.ycombinator.com: 2.230
 chatgpt.com: 812
@@ -32,7 +32,7 @@ duckduckgo.com: 301
 
 
 Conversões de Metas
-----------------
+-------------------
 Signup: 312
 Checkout: 88
 

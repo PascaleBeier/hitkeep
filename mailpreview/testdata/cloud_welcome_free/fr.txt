@@ -1,7 +1,7 @@
 Subject: Bienvenue dans HitKeep
 
 Bienvenue dans HitKeep
-==================
+======================
 
 Votre espace de travail Acme Analytics reçoit du trafic de shop.example. La configuration fonctionne.
 

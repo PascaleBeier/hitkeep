@@ -1,7 +1,7 @@
 Subject: Réinitialisez votre mot de passe HitKeep
 
 Réinitialiser le mot de passe
-==============
+=============================
 
 Bonjour,
 

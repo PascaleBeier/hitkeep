@@ -4,7 +4,7 @@ Monatlicher Analytics-Bericht
 docs.a-rather-long-subdomain.example.com · 22.-28. September 2026
 
 Kennzahlen
--------
+----------
 Seitenaufrufe:    9.120 (−78%)
 Besucher:     3.021 (−77%)
 Absprungrate:  41,3%
@@ -12,14 +12,14 @@ Durchschn. Dauer: 2 Min. 34 Sek.
 
 
 Top-Seiten
----------
+----------
 /blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
 /: 2.040
 
 
 
 Top-Referrer
--------------
+------------
 google.com: 5.120
 news.ycombinator.com: 2.230
 chatgpt.com: 812
@@ -29,7 +29,7 @@ duckduckgo.com: 301
 
 
 Zielabschlüsse
-----------------
+--------------
 Signup: 312
 Checkout: 88
 
