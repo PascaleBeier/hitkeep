@@ -467,6 +467,9 @@ func cleanupUserRows(ctx context.Context, tx *sql.Tx, userID uuid.UUID) error {
 	if err := execIfTableExists("traffic_exclusions", "UPDATE traffic_exclusions SET created_by = NULL WHERE created_by = ?", userID); err != nil {
 		return fmt.Errorf("could not null traffic exclusion created_by: %w", err)
 	}
+	if err := execIfTableExists("site_annotations", "UPDATE site_annotations SET created_by = NULL WHERE created_by = ?", userID); err != nil {
+		return fmt.Errorf("could not null site annotation created_by: %w", err)
+	}
 	if err := execIfTableExists("team_invites", "UPDATE team_invites SET created_by = NULL WHERE created_by = ?", userID); err != nil {
 		return fmt.Errorf("could not null team invite created_by: %w", err)
 	}

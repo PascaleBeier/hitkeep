@@ -1765,6 +1765,24 @@ type IPExclusion struct {
 	Inherited   bool       `json:"inherited"`
 }
 
+// Annotation is a team-visible note on a site's timeline. EndsAt is nil for a
+// single point in time.
+type Annotation struct {
+	ID        uuid.UUID  `json:"id"`
+	SiteID    uuid.UUID  `json:"site_id"`
+	StartsAt  time.Time  `json:"starts_at"`
+	EndsAt    *time.Time `json:"ends_at,omitempty"`
+	Body      string     `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// AnnotationInput is the writable part of an Annotation.
+type AnnotationInput struct {
+	StartsAt time.Time  `json:"starts_at"`
+	EndsAt   *time.Time `json:"ends_at,omitempty"`
+	Body     string     `json:"body"`
+}
+
 // ReportFrequency is the cadence for scheduled analytics emails.
 type ReportFrequency string
 
