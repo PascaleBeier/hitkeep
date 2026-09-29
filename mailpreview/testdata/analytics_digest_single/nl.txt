@@ -1,0 +1,34 @@
+Subject: Je wekelijkse Analytics-overzicht - sep 22–28, 2026
+
+Wekelijks Analytics-overzicht
+sep 22–28, 2026
+Verandering: Pageviews · Bezoekers · Doelconversies
+
+Site
+----------
+shop.example: 48.213 Pageviews (+18%), 12.877 Bezoekers (−3%), 0 Doelconversies (—)
+  Dashboard: https://app.hitkeep.example/dashboard
+
+Dashboard bekijken →: https://app.hitkeep.example/dashboard
+
+
+---
+Je ontvangt deze e-mail omdat je analytics-rapporten hebt ingeschakeld.
+Voorkeuren beheren: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

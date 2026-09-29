@@ -1,0 +1,24 @@
+Subject: Verifieer je e-mail - HitKeep
+
+Verifieer je e-mail
+=================
+
+Je bent nog een stap verwijderd van het maken van je Acme Analytics-workspace op HitKeep.
+
+E-mail verifieren: https://app.hitkeep.example/signup/verify?token=preview
+
+Deze link verloopt over 24 uur.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

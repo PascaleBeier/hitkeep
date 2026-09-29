@@ -1,0 +1,40 @@
+Subject: Welcome to HitKeep
+
+Welcome to HitKeep
+==================
+
+Your Acme Analytics workspace is receiving traffic from shop.example. The setup is working.
+
+Open dashboard: https://app.hitkeep.example/dashboard
+
+The documentation has setup, reporting, and privacy guides when you want to go deeper.
+Read the docs: https://hitkeep.com/docs/
+
+Running WordPress? The first-party plugin installs HitKeep without editing a theme.
+WordPress plugin: https://wordpress.org/plugins/hitkeep/
+
+Reminder: the Free plan keeps hits for 60 days. Upgrade when you need longer retention.
+See plans: https://app.hitkeep.example/settings/billing
+
+Send feedback when something feels rough; it helps us improve the product.
+Send feedback: mailto:feedback@hitkeep.com
+
+--
+
+HitKeep is fully open source — including every paid feature. Paid plans fund hosting and ongoing development.
+Prefer to support us another way? Sponsor the open-source development: https://github.com/sponsors/pascalebeier
+Or simply spread the word — it helps more than you think.
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

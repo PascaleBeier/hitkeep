@@ -1,0 +1,38 @@
+Subject: Report giornaliero per new.example - 22-28 set 2026
+
+Report di analitica giornaliero
+new.example · 22-28 set 2026
+
+Metriche
+-------
+Visualizzazioni pagina:    0 (—)
+Visitatori:     0 (—)
+Frequenza di rimbalzo:  0,0%
+Durata media: 0 s
+
+
+
+
+Apri la dashboard completa →: https://app.hitkeep.example/dashboard
+
+
+---
+Hai ricevuto questa email perché hai attivato i report di analitica.
+Gestisci preferenze: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

@@ -1,0 +1,28 @@
+Subject: Weekly executive summary: bevestig rapporten van Acme Analytics
+
+Geplande rapporten bevestigen
+==================
+
+Acme Analytics wil je het geplande rapport ‘Weekly executive summary’ sturen. Bevestig dit voordat analytische gegevens per e-mail naar je worden verzonden.
+
+Planning: Wekelijks
+Sites: shop.example, blog.example.org
+
+Rapportmails bevestigen: https://app.hitkeep.example/reports/confirm?token=preview
+
+Deze bevestigingslink verloopt over 7 dagen.
+Bevestigen maakt geen account aan en geeft geen toegang tot HitKeep of het team.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

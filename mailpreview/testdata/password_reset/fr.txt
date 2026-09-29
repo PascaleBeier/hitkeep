@@ -1,0 +1,24 @@
+Subject: Réinitialisez votre mot de passe HitKeep
+
+Réinitialiser le mot de passe
+==============
+
+Bonjour,
+
+Nous avons reçu une demande de réinitialisation du mot de passe pour votre instance d'analytique HitKeep.
+
+Réinitialiser le mot de passe: https://app.hitkeep.example/reset-password?token=preview
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

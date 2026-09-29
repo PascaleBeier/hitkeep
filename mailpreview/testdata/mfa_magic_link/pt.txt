@@ -1,0 +1,26 @@
+Subject: Conclua seu login no HitKeep
+
+Concluir login
+==================
+
+Olá,
+
+Recebemos uma solicitação para concluir o login na sua conta do HitKeep.
+
+Concluir Login: https://app.hitkeep.example/mfa/magic?token=preview
+
+Este link de login expira em 15 minutos.
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

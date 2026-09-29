@@ -1,0 +1,28 @@
+Subject: Je bent uitgenodigd voor Acme Analytics op HitKeep
+
+Je bent uitgenodigd voor een team
+=============================
+
+Hallo,
+
+Jane Doe heeft je uitgenodigd voor Acme Analytics op HitKeep als member.
+
+Je moet een wachtwoord maken om je account te activeren voordat je toegang hebt tot het team.
+
+Maak een wachtwoord om je account te activeren en lid te worden van dit team.
+
+Wachtwoord instellen en lid worden: https://app.hitkeep.example/accept-invite?token=preview
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

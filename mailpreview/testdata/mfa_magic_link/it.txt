@@ -1,0 +1,26 @@
+Subject: Completa il tuo accesso a HitKeep
+
+Completa l'accesso
+==================
+
+Ciao,
+
+Abbiamo ricevuto una richiesta per completare l'accesso al tuo account HitKeep.
+
+Completa l'accesso: https://app.hitkeep.example/mfa/magic?token=preview
+
+Questo link di accesso scade tra 15 minuti.
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

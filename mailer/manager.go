@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	htmltpl "html/template"
+	"io/fs"
 	"math"
+	"path"
 	"strings"
 	texttpl "text/template"
 	"time"
@@ -155,11 +157,49 @@ func (m *Mailer) SendWithOptions(to string, email Mailable, options SendOptions)
 		return ErrMailerDisabled
 	}
 
+	rendered, err := Render(email, RenderOptions{})
+	if err != nil {
+		return err
+	}
+
+	if driver, ok := m.driver.(HeaderDriver); ok && (options.MessageID != "" || len(options.Headers) > 0) {
+		return wrapSendError(SendStageTransport, driver.SendWithHeaders([]string{to}, rendered.Subject, rendered.HTML, rendered.Text, options.MessageID, options.Headers))
+	}
+	return wrapSendError(SendStageTransport, m.driver.Send([]string{to}, rendered.Subject, rendered.HTML, rendered.Text))
+}
+
+// RenderOptions controls rendering for previews and tests. The zero value
+// matches production sends.
+type RenderOptions struct {
+	// Now stamps template metadata such as the footer year; zero uses time.Now.
+	Now time.Time
+	// Validation sets the MJML validation level; empty keeps the MJML default.
+	Validation mjml.ValidationLevel
+	// Beautify emits readable HTML instead of minified HTML.
+	Beautify bool
+}
+
+// Rendered is a fully rendered email, ready for a transport.
+type Rendered struct {
+	Subject string
+	Locale  string
+	MJML    string
+	HTML    string
+	Text    string
+}
+
+// Render executes a mailable's MJML and plain-text templates without sending.
+func Render(email Mailable, opts RenderOptions) (Rendered, error) {
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+
 	ctx := templateContext{
 		Data: email.Data(),
 	}
 	ctx.Meta.Subject = email.Subject()
-	ctx.Meta.Year = time.Now().Year()
+	ctx.Meta.Year = now.Year()
 	locale := defaultMailLocale
 	if localized, ok := email.(LocalizedMailable); ok {
 		locale = NormalizeLocale(localized.Locale())
@@ -169,33 +209,52 @@ func (m *Mailer) SendWithOptions(to string, email Mailable, options SendOptions)
 	// Render MJML → HTML
 	htmlTmpl, err := htmltpl.New("layout.mjml").Funcs(templateFuncsForLocale(locale)).ParseFS(templateFS, "templates/layout.mjml", "templates/"+email.Template())
 	if err != nil {
-		return wrapSendError(SendStageHTMLTemplateParse, fmt.Errorf("failed to parse html templates: %w", err))
+		return Rendered{}, wrapSendError(SendStageHTMLTemplateParse, fmt.Errorf("failed to parse html templates: %w", err))
 	}
 
 	var mjmlBuffer bytes.Buffer
 	if err := htmlTmpl.Execute(&mjmlBuffer, ctx); err != nil {
-		return wrapSendError(SendStageHTMLTemplateExecute, fmt.Errorf("failed to execute html template: %w", err))
+		return Rendered{}, wrapSendError(SendStageHTMLTemplateExecute, fmt.Errorf("failed to execute html template: %w", err))
 	}
 
-	htmlContent, err := mjml.ToHTML(context.Background(), mjmlBuffer.String(), mjml.WithMinify(true))
+	mjmlOptions := []mjml.ToHTMLOption{mjml.WithMinify(!opts.Beautify), mjml.WithBeautify(opts.Beautify)}
+	if opts.Validation != "" {
+		mjmlOptions = append(mjmlOptions, mjml.WithValidationLevel(opts.Validation))
+	}
+	htmlContent, err := mjml.ToHTML(context.Background(), mjmlBuffer.String(), mjmlOptions...)
 	if err != nil {
-		return wrapSendError(SendStageMJMLRender, fmt.Errorf("mjml render error: %w", err))
+		return Rendered{}, wrapSendError(SendStageMJMLRender, fmt.Errorf("mjml render error: %w", err))
 	}
 
 	// Render plain-text
 	textTemplateName := strings.TrimSuffix(email.Template(), ".mjml") + ".txt"
 	textTmpl, err := texttpl.New("layout.txt").Funcs(textTemplateFuncsForLocale(locale)).ParseFS(templateFS, "templates/layout.txt", "templates/"+textTemplateName)
 	if err != nil {
-		return wrapSendError(SendStageTextTemplateParse, fmt.Errorf("failed to parse text templates: %w", err))
+		return Rendered{}, wrapSendError(SendStageTextTemplateParse, fmt.Errorf("failed to parse text templates: %w", err))
 	}
 
 	var textBuffer bytes.Buffer
 	if err := textTmpl.Execute(&textBuffer, ctx); err != nil {
-		return wrapSendError(SendStageTextTemplateExecute, fmt.Errorf("failed to execute text template: %w", err))
+		return Rendered{}, wrapSendError(SendStageTextTemplateExecute, fmt.Errorf("failed to execute text template: %w", err))
 	}
 
-	if driver, ok := m.driver.(HeaderDriver); ok && (options.MessageID != "" || len(options.Headers) > 0) {
-		return wrapSendError(SendStageTransport, driver.SendWithHeaders([]string{to}, email.Subject(), htmlContent, textBuffer.String(), options.MessageID, options.Headers))
+	return Rendered{
+		Subject: ctx.Meta.Subject,
+		Locale:  locale,
+		MJML:    mjmlBuffer.String(),
+		HTML:    htmlContent,
+		Text:    textBuffer.String(),
+	}, nil
+}
+
+// TemplateNames lists the embedded mailable templates, excluding the layout.
+func TemplateNames() []string {
+	matches, _ := fs.Glob(templateFS, "templates/*.mjml")
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if name := path.Base(match); name != "layout.mjml" {
+			names = append(names, name)
+		}
 	}
-	return wrapSendError(SendStageTransport, m.driver.Send([]string{to}, email.Subject(), htmlContent, textBuffer.String()))
+	return names
 }

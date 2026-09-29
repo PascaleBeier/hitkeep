@@ -1,0 +1,38 @@
+Subject: Relatório Diário de new.example - 22-28 Set 2026
+
+Relatório de Análise do Diário
+new.example · 22-28 Set 2026
+
+Métricas
+-------
+Visualizações de Página:    0 (—)
+Visitantes:     0 (—)
+Taxa de Rejeição:  0,0%
+Duração Média: 0 s
+
+
+
+
+Ver Painel Completo →: https://app.hitkeep.example/dashboard
+
+
+---
+Você recebeu este e-mail porque os relatórios de análise estão ativados.
+Gerenciar preferências: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

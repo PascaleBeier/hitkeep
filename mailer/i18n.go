@@ -108,6 +108,11 @@ func SupportedLocales() []string {
 	return sortedMapKeys(mailCatalogs)
 }
 
+// MessageKeys lists every translation key in the default locale catalog.
+func MessageKeys() []string {
+	return sortedMapKeys(mailCatalogs[defaultMailLocale].Messages)
+}
+
 func NormalizeLocale(locale string) string {
 	locale = strings.TrimSpace(locale)
 	if locale == "" {

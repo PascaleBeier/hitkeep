@@ -1,0 +1,26 @@
+Subject: Terminez votre connexion HitKeep
+
+Terminer la connexion
+==================
+
+Bonjour,
+
+Nous avons reçu une demande pour terminer la connexion à votre compte HitKeep.
+
+Terminer la connexion: https://app.hitkeep.example/mfa/magic?token=preview
+
+Ce lien de connexion expire dans 15 minutes.
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

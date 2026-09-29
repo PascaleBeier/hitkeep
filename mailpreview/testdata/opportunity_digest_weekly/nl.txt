@@ -1,0 +1,37 @@
+Subject: 1 wekelijkse kans voor shop.example - sep 22–28, 2026
+
+Wekelijks kansenoverzicht
+sep 22–28, 2026
+Belangrijkste aanbevelingen voor shop.example.
+
+Bekijk checkout-uitval
+De checkout-conversie is 42%.
+Impact: $1,200 | Score: 91 | Vertrouwen: high
+Volgende actie: Onderzoek checkoutfrictie voordat je meer verkeer toevoegt.
+Bewijs:
+- Checkout-conversieratio: 42%
+https://app.hitkeep.example/opportunities#00000000-0000-0000-0000-000000000014
+
+Bekijk kansen →: https://app.hitkeep.example/opportunities
+
+
+---
+Je ontvangt deze e-mail omdat kansendigesten zijn ingeschakeld.
+Voorkeuren beheren: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

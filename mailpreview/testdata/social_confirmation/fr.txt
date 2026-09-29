@@ -1,0 +1,26 @@
+Subject: Confirmez votre adresse e-mail pour HitKeep
+
+Confirmez votre adresse e-mail
+==================
+
+Bonjour,
+
+Utilisez ce lien pour confirmer que cette adresse e-mail vous appartient et continuer avec GitHub.
+
+Confirmer l’adresse e-mail: https://app.hitkeep.example/signup/social/confirm?token=preview
+
+Ce lien de confirmation expire dans 30 minutes.
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

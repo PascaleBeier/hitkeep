@@ -1,0 +1,33 @@
+Subject: Je oudste HitKeep-data worden binnenkort verwijderd
+
+Je oudste gegevens worden binnenkort verwijderd
+===========================
+
+Het Free-abonnement bewaart 60 dagen aan data. Vanaf October 6, 2026 worden de oudste hits van shop.example verwijderd.
+
+Upgrade vóór die tijd om je volledige historie te bewaren voor trendvergelijkingen, audits en rapportages.
+
+Bekijk abonnementen & upgrade: https://app.hitkeep.example/settings/billing
+
+Je kunt actuele data nog steeds exporteren en bekijken vanuit het dashboard.
+Dashboard openen: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep is volledig open source – inclusief alle betaalde functies. Betaalde abonnementen financieren hosting en ontwikkeling.
+Wil je ons liever op een andere manier steunen? Sponsor de opensource-ontwikkeling: https://github.com/sponsors/pascalebeier
+Of vertel het gewoon door – dat helpt meer dan je denkt.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

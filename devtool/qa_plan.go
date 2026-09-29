@@ -29,6 +29,7 @@ const (
 	changeDocumentation = "documentation"
 	changeDelivery      = "delivery"
 	changeDependencies  = "dependencies"
+	changeEmail         = "email"
 )
 
 func applyGateMetadata(gate *Gate) {
@@ -59,6 +60,12 @@ func applyGateMetadata(gate *Gate) {
 		gate.ChangeAreas = []string{changeDashboard}
 	case "tracker-package":
 		gate.ChangeAreas = []string{changeTracker}
+	case "cloud-email-render":
+		gate.ChangeAreas = []string{changeEmail}
+	case "email-clients":
+		gate.ChangeAreas = []string{changeEmail}
+		gate.Volatility = "integration"
+		gate.ReuseTTL = "2h"
 	case "frontend-e2e":
 		gate.ChangeAreas = []string{changeDashboard, changeAPI}
 		gate.Volatility = "integration"
@@ -70,7 +77,7 @@ func applyGateMetadata(gate *Gate) {
 		gate.Volatility = "release"
 		gate.ReuseTTL = ""
 	}
-	if slices.Contains([]string{"go-format", "go-fix", "go-lint", "go-vet", "go-staticcheck", "developer-mcp", "developer-docs", "frontend-format", "frontend-audit", "frontend-lint", "frontend-i18n", "frontend-unit", "tracker-package", "mcp-audit", "mcp-schema"}, gate.ID) {
+	if slices.Contains([]string{"go-format", "go-fix", "go-lint", "go-vet", "go-staticcheck", "developer-mcp", "developer-docs", "frontend-format", "frontend-audit", "frontend-lint", "frontend-i18n", "frontend-unit", "tracker-package", "mcp-audit", "mcp-schema", "cloud-email-render"}, gate.ID) {
 		gate.Depth = "changed"
 	}
 }
@@ -100,6 +107,8 @@ func classifyChangedPath(path string) ([]string, bool) {
 		return []string{changeDocumentation}, true
 	case strings.HasPrefix(path, ".github/") || strings.HasPrefix(path, "charts/") || path == ".goreleaser.yaml" || path == "Dockerfile" || strings.HasPrefix(path, "scripts/") || strings.HasPrefix(path, "compose"):
 		return []string{changeDelivery}, true
+	case strings.HasPrefix(path, "mailer/") || strings.HasPrefix(path, "mailables/") || strings.HasPrefix(path, "mailpreview/") || strings.HasPrefix(path, "cmd/email-preview/"):
+		return []string{changeEmail, changeBackend}, true
 	case strings.HasSuffix(path, ".go") || strings.HasSuffix(path, ".sql") || strings.HasPrefix(path, "cmd/"):
 		return []string{changeBackend}, true
 	default:

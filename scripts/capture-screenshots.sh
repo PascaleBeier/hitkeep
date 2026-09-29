@@ -6,8 +6,10 @@
 #   3. Wait for it to become healthy
 #   4. Run screenshot.mjs to capture all dashboard views
 #   5. Sync the selected README screenshots into GitHub assets
-#   6. Run preview-emails to deliver all report types to Mailpit
-#   7. Clean up
+#   6. Clean up
+#
+# Email previews are not part of this pipeline; run `./hk ci email-clients`
+# to render every email fixture into Mailpit with a contact sheet.
 #
 # Usage:
 #   ./scripts/capture-screenshots.sh
@@ -21,24 +23,19 @@
 #   --output-dir <dir>    Screenshot output directory (default: ../hitkeep-docs/src/assets/screenshots)
 #   --scale <n>           Device pixel ratio for screenshots (default: 2)
 #   --data-path <dir>     Base directory for per-tenant data files (default: directory containing --db)
-#   --mailpit-host <h>    Mailpit SMTP host (default: localhost)
-#   --mailpit-port <p>    Mailpit SMTP port (default: 1025)
-#   --mailpit-ui <p>      Mailpit web UI port (default: 8025)
 #   --no-seed             Skip seeding — use the --db database as-is
 #   --no-build            Skip 'go build' and use an existing binary at ./hitkeep-bin
-#   --no-emails           Skip the email preview step even if Mailpit is reachable
 #
 # Environment-variable equivalents (flags take precedence):
 #   DB, PORT, HITKEEP_EMAIL, HITKEEP_PASSWORD, SEED_DAYS,
-#   OUTPUT_DIR, SCALE, DATA_PATH, MAILPIT_HOST, MAILPIT_PORT, MAILPIT_UI,
-#   SKIP_SEED, SKIP_BUILD, SKIP_EMAILS
+#   OUTPUT_DIR, SCALE, DATA_PATH,
+#   SKIP_SEED, SKIP_BUILD
 #   SCREENSHOT_TARGET=ask-ai limits screenshot.mjs to the Ask AI docs states
 #
 # Prerequisites:
 #   npm install playwright && npx playwright install chromium
-#   mailpit (optional — brew install mailpit) for email previews
 #
-# Example — full rebuild + fresh data + email previews:
+# Example — full rebuild + fresh data:
 #   ./scripts/capture-screenshots.sh
 #
 # Example — re-shoot existing instance (no seed):
@@ -61,12 +58,8 @@ DAYS="${SEED_DAYS:-90}"
 OUTPUT_DIR="${OUTPUT_DIR:-${REPO_DIR}/../hitkeep-docs/src/assets/screenshots}"
 SCALE="${SCALE:-2}"
 DATA_PATH="${DATA_PATH:-$(dirname "$DB")}"
-MAILPIT_HOST="${MAILPIT_HOST:-localhost}"
-MAILPIT_PORT="${MAILPIT_PORT:-1025}"
-MAILPIT_UI="${MAILPIT_UI:-8025}"
 SKIP_SEED="${SKIP_SEED:-}"
 SKIP_BUILD="${SKIP_BUILD:-}"
-SKIP_EMAILS="${SKIP_EMAILS:-}"
 BIN_PATH="${REPO_DIR}/.screenshot-hitkeep"   # temp binary; deleted on exit
 README_SCREENSHOTS=(
   "dashboard-overview.png"
@@ -88,12 +81,8 @@ while [[ $# -gt 0 ]]; do
     --output-dir)    OUTPUT_DIR="$2";    shift 2 ;;
     --scale)         SCALE="$2";         shift 2 ;;
     --data-path)     DATA_PATH="$2";     shift 2 ;;
-    --mailpit-host)  MAILPIT_HOST="$2";  shift 2 ;;
-    --mailpit-port)  MAILPIT_PORT="$2";  shift 2 ;;
-    --mailpit-ui)    MAILPIT_UI="$2";    shift 2 ;;
     --no-seed)       SKIP_SEED=1;        shift   ;;
     --no-build)      SKIP_BUILD=1;       shift   ;;
-    --no-emails)     SKIP_EMAILS=1;      shift   ;;
     *) echo "Unknown flag: $1" >&2; exit 1       ;;
   esac
 done
@@ -129,14 +118,11 @@ echo "  Output   : $OUTPUT_DIR"
 echo "  Scale    : ${SCALE}x"
 echo "  Data     : $DATA_PATH"
 echo "  Email    : $EMAIL"
-if [[ -z "$SKIP_EMAILS" ]]; then
-  echo "  Mailpit  : ${MAILPIT_HOST}:${MAILPIT_PORT} (UI :${MAILPIT_UI})"
-fi
 echo ""
 
 # ─── Step 1: Seed demo data ───────────────────────────────────────────────────
 if [[ -z "$SKIP_SEED" ]]; then
-  echo "  [1/6] Seeding demo data (${DAYS} days)…"
+  echo "  [1/5] Seeding demo data (${DAYS} days)…"
   rm -f "$DB"
   (cd "$REPO_DIR" && go run ./cmd/seed \
     -db      "$DB"      \
@@ -146,12 +132,12 @@ if [[ -z "$SKIP_SEED" ]]; then
     -days    "$DAYS")
   echo "  ✓ Seed complete"
 else
-  echo "  [1/6] Skipping seed — using existing DB: $DB"
+  echo "  [1/5] Skipping seed — using existing DB: $DB"
 fi
 
 # ─── Step 2: Build frontend + HitKeep binary ─────────────────────────────────
 echo ""
-echo "  [2/6] Building dashboard assets and HitKeep…"
+echo "  [2/5] Building dashboard assets and HitKeep…"
 if [[ -z "$SKIP_BUILD" ]]; then
   (cd "$REPO_DIR/frontend/dashboard" && npm run build:prod)
   (cd "$REPO_DIR" && go build -trimpath -tags "$("$REPO_DIR/hk" ci go-config tags --output plain)" -o "$BIN_PATH" ./cmd/hitkeep/)
@@ -166,7 +152,7 @@ fi
 
 # ─── Step 3: Start HitKeep ───────────────────────────────────────────────────
 echo ""
-echo "  [3/6] Starting HitKeep on ${BASE_URL}…"
+echo "  [3/5] Starting HitKeep on ${BASE_URL}…"
 
 # Use process substitution so $! is the hitkeep PID, not sed's.
 # With a plain pipe (cmd | sed &) $! would be sed's PID and cleanup
@@ -209,7 +195,7 @@ fi
 
 # ─── Step 4: Capture screenshots ─────────────────────────────────────────────
 echo ""
-echo "  [4/6] Capturing screenshots…"
+echo "  [4/5] Capturing screenshots…"
 echo ""
 
 HITKEEP_URL="$BASE_URL"      \
@@ -221,7 +207,7 @@ SCALE="$SCALE"               \
 
 # ─── Step 5: Sync README assets ───────────────────────────────────────────────
 echo ""
-echo "  [5/6] Syncing README screenshot assets…"
+echo "  [5/5] Syncing README screenshot assets…"
 if [[ -n "${SCREENSHOT_TARGET:-}" ]]; then
   echo "  Skipped for targeted screenshot run (${SCREENSHOT_TARGET})"
 else
@@ -239,28 +225,4 @@ else
     cp "$source_path" "$REPO_DIR/.github/assets/$screenshot"
   done
   echo "  ✓ Synced ${#README_SCREENSHOTS[@]} README screenshots to $REPO_DIR/.github/assets"
-fi
-
-# ─── Step 6: Preview emails ───────────────────────────────────────────────────
-echo ""
-echo "  [6/6] Email previews…"
-
-if [[ -n "$SKIP_EMAILS" ]]; then
-  echo "  Skipped (--no-emails)"
-elif ! nc -z "$MAILPIT_HOST" "$MAILPIT_PORT" 2>/dev/null; then
-  echo "  ⚠  Mailpit not reachable on ${MAILPIT_HOST}:${MAILPIT_PORT} — skipping."
-  echo "     Start it with:  mailpit"
-  echo "     Then re-run with:  --no-seed --no-build"
-else
-  echo ""
-  (cd "$REPO_DIR" && go run ./cmd/preview-emails \
-    -host          "$BASE_URL"     \
-    -email         "$EMAIL"        \
-    -password      "$PASSWORD"     \
-    -mailpit-host  "$MAILPIT_HOST" \
-    -mailpit-port  "$MAILPIT_PORT" \
-    -mailpit-ui    "$MAILPIT_UI"   \
-  2>&1 | sed 's/^/    [preview-emails] /')
-  echo ""
-  echo "  ✓ Emails delivered — open Mailpit: http://${MAILPIT_HOST}:${MAILPIT_UI}"
 fi

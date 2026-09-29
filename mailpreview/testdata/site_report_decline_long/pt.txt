@@ -1,0 +1,59 @@
+Subject: Relatório Mensal de docs.a-rather-long-subdomain.example.com - 22-28 Set 2026
+
+Relatório de Análise do Mensal
+docs.a-rather-long-subdomain.example.com · 22-28 Set 2026
+
+Métricas
+-------
+Visualizações de Página:    9.120 (−78%)
+Visitantes:     3.021 (−77%)
+Taxa de Rejeição:  41,3%
+Duração Média: 2 min 34 s
+
+
+Principais Páginas
+---------
+/blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
+/: 2.040
+
+
+
+Principais Referenciadores
+-------------
+google.com: 5.120
+news.ycombinator.com: 2.230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Conversões de Metas
+----------------
+Signup: 312
+Checkout: 88
+
+
+Ver Painel Completo →: https://app.hitkeep.example/dashboard
+
+
+---
+Você recebeu este e-mail porque os relatórios de análise estão ativados.
+Gerenciar preferências: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

@@ -1,0 +1,33 @@
+Subject: Your oldest HitKeep data starts rolling off soon
+
+Your oldest data starts rolling off soon
+===========================
+
+The Free plan keeps 60 days of data. Starting October 6, 2026, the oldest hits from shop.example will be removed.
+
+Upgrade before then to keep your full history for trend comparisons, audits, and reporting.
+
+See plans & upgrade: https://app.hitkeep.example/settings/billing
+
+You can still export and review current data from the dashboard.
+Open dashboard: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep is fully open source — including every paid feature. Paid plans fund hosting and ongoing development.
+Prefer to support us another way? Sponsor the open-source development: https://github.com/sponsors/pascalebeier
+Or simply spread the word — it helps more than you think.
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

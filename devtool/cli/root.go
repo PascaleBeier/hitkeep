@@ -688,6 +688,16 @@ func ciCommand(options *options) *cobra.Command {
 	cloudTest := &cobra.Command{Use: "cloud-test", Short: "Test cloud-tagged packages outside the developer platform", Args: cobra.NoArgs, RunE: withApp(options, "ci cloud-test", func(ctx context.Context, app *devtool.App) (any, error) {
 		return app.RunCloudTests(ctx, options.stderr)
 	})}
+	var updateEmailBaseline bool
+	emailClients := &cobra.Command{Use: "email-clients", Short: "Render email fixtures into Mailpit and check client compatibility", Args: cobra.NoArgs, RunE: withApp(options, "ci email-clients", func(ctx context.Context, app *devtool.App) (any, error) {
+		return app.RunEmailClients(ctx, options.stderr, updateEmailBaseline)
+	})}
+	emailClients.Flags().BoolVar(&updateEmailBaseline, "update", false, "rewrite the client compatibility baseline instead of checking it")
+	var emailReviewBase string
+	emailReview := &cobra.Command{Use: "email-review", Short: "Screenshot email fixtures for review, with before/after diffs against a base ref", Args: cobra.NoArgs, RunE: withApp(options, "ci email-review", func(ctx context.Context, app *devtool.App) (any, error) {
+		return app.RunEmailReview(ctx, options.stderr, emailReviewBase)
+	})}
+	emailReview.Flags().StringVar(&emailReviewBase, "base", "", "git ref to compare against, for example origin/main")
 	var verifyBuildVariant string
 	verifyBuild := &cobra.Command{Use: "verify-build", Short: "Compile one canonical variant into temporary workspace state", Args: cobra.NoArgs, RunE: withApp(options, "ci verify-build", func(ctx context.Context, app *devtool.App) (any, error) {
 		err := app.VerifyVariantBuild(ctx, verifyBuildVariant, options.stderr)
@@ -706,6 +716,8 @@ func ciCommand(options *options) *cobra.Command {
 		build,
 		race,
 		cloudTest,
+		emailClients,
+		emailReview,
 		verifyBuild,
 		&cobra.Command{Use: "build-dashboard", Short: "Build a deterministic dashboard asset archive", Args: cobra.NoArgs, RunE: withApp(options, "ci build-dashboard", func(ctx context.Context, app *devtool.App) (any, error) {
 			return app.BuildDashboardArchive(ctx, options.stderr)

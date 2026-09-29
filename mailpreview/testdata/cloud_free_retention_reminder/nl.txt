@@ -1,0 +1,33 @@
+Subject: Bewaar meer dan 60 dagen HitKeep-data
+
+Je Free-abonnement bewaart 60 dagen data
+===========================
+
+Acme Analytics ontvangt verkeer van shop.example. In het Free-abonnement worden hits 60 dagen bewaard.
+
+Upgrade om meer historie te bewaren voor trendvergelijkingen, audits en rapportages.
+
+Bekijk abonnementen & upgrade: https://app.hitkeep.example/settings/billing
+
+Je kunt actuele data nog steeds exporteren en bekijken vanuit het dashboard.
+Dashboard openen: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep is volledig open source – inclusief alle betaalde functies. Betaalde abonnementen financieren hosting en ontwikkeling.
+Wil je ons liever op een andere manier steunen? Sponsor de opensource-ontwikkeling: https://github.com/sponsors/pascalebeier
+Of vertel het gewoon door – dat helpt meer dan je denkt.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

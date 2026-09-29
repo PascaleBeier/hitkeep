@@ -1,0 +1,62 @@
+Subject: Rapport hebdomadaire pour shop.example - 22-28 sept. 2026
+
+Rapport d'analytique hebdomadaire
+shop.example · 22-28 sept. 2026
+
+Indicateurs
+-------
+Pages vues:    48 213 (+18%)
+Visiteurs:     12 877 (−3%)
+Taux de rebond:  41,3%
+Durée moyenne: 2 min 34 s
+
+
+Pages principales
+---------
+/: 12 040
+/pricing: 6 120
+/docs/getting-started: 3 302
+/blog/privacy-first-analytics: 2 210
+/about: 1 201
+
+
+
+Référents principaux
+-------------
+google.com: 5 120
+news.ycombinator.com: 2 230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Objectifs atteints
+----------------
+Signup: 312
+Checkout: 88
+
+
+Voir le tableau de bord complet →: https://app.hitkeep.example/dashboard
+
+
+---
+Vous recevez cet e-mail parce que les rapports d'analytique sont activés.
+Gérer les préférences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com
