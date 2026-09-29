@@ -41,5 +41,6 @@ Read this reference only when the change touches the Go runtime, HTTP contracts,
 - Every template needs a deterministic fixture in `mailpreview`. Add variants for empty data, long strings, and each branch the template renders.
 - The `mailpreview` tests enforce strict MJML validation, email lint, and golden files. Regenerate goldens with the test `-update` flag and review the diff as part of the change; the lint allowlist may only shrink.
 - The `email-clients` gate renders every fixture into the workspace Mailpit, writes a contact sheet with forced light and dark previews, and compares Mailpit's HTML compatibility check with `mailpreview/testdata/client-compat.json`. A new warning needs a template fix or a baseline update with a written justification.
+- Visual review is not a gate. The email review CI job (and the matching `hk ci` action) screenshots every fixture at desktop and mobile widths in light and dark and, against a base ref, produces before/after/diff images. Attach or inspect them for any visible change.
 
 Run focused behavior tests while iterating, then delegate completion-gate selection to `$hitkeep-qa`.

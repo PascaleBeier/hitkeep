@@ -242,3 +242,68 @@ jobs:
             ~/.cache/hitkeep/hk/workspaces/*/e2e/report
             ~/.cache/hitkeep/hk/workspaces/*/e2e/results
           if-no-files-found: ignore
+
+  email-review:
+    name: Email visual review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Detect email changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(mailer|mailables|mailpreview|cmd/email-preview)/|^frontend/dashboard/scripts/email-screenshots\.mjs$'; then
+            echo "email=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Go
+        if: steps.changes.outputs.email == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - if: steps.changes.outputs.email == 'true'
+        uses: $/.github/actions/setup-node-npm
+      - name: Restore Playwright browser cache
+        if: steps.changes.outputs.email == 'true'
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('frontend/dashboard/package-lock.json') }}
+      - name: Install dashboard dependencies
+        if: steps.changes.outputs.email == 'true'
+        working-directory: frontend/dashboard
+        run: npm ci --no-audit --no-fund
+      - name: Install Playwright system dependencies
+        if: steps.changes.outputs.email == 'true'
+        working-directory: frontend/dashboard
+        run: npx playwright install-deps chromium
+      - name: Install Playwright browser
+        if: steps.changes.outputs.email == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: frontend/dashboard
+        run: npx playwright install chromium
+      - name: Screenshot emails against the base branch
+        if: steps.changes.outputs.email == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          ./hk ci email-review --base "$BASE_SHA" --output json > email-review.json
+          {
+            echo "### Email visual review"
+            jq -r '.data.counts | to_entries[] | "- \(.key): \(.value)"' email-review.json
+            echo
+            echo "Download the \`email-review\` artifact and open \`index.html\` for before/after/diff images."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload email review
+        if: steps.changes.outputs.email == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: email-review
+          path: ~/.cache/hitkeep/hk/workspaces/*/artifacts/email-review/screenshots
+          if-no-files-found: error
