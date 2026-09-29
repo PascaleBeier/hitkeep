@@ -12,11 +12,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
-	"sort"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -119,13 +119,13 @@ func run(out, mailpitURL, baselinePath string, check, update bool) error {
 			HTMLFile: filepath.ToSlash(filepath.Join(fixture.ID, locale+".html")),
 			TextFile: filepath.ToSlash(filepath.Join(fixture.ID, locale+".txt")),
 		}
-		if err := writeFile(filepath.Join(out, e.HTMLFile), rendered.HTML); err != nil {
+		if err := writeFile(filepath.Join(out, e.HTMLFile), rendered.PreviewHTML()); err != nil {
 			return err
 		}
 		if err := writeFile(filepath.Join(out, e.TextFile), "Subject: "+rendered.Subject+"\n\n"+rendered.Text); err != nil {
 			return err
 		}
-		htmlByKey[fixture.ID+"/"+locale] = rendered.HTML
+		htmlByKey[fixture.ID+"/"+locale] = rendered.PreviewHTML()
 
 		if mp != nil {
 			id, err := mp.send(rendered, []string{previewTag, "tpl:" + fixture.ID, "loc:" + locale})
@@ -144,7 +144,7 @@ func run(out, mailpitURL, baselinePath string, check, update bool) error {
 					e.Warnings = append(e.Warnings, warning.Slug)
 					warningFixtures[warning.Slug] = append(warningFixtures[warning.Slug], fixture.ID)
 				}
-				sort.Strings(e.Warnings)
+				slices.Sort(e.Warnings)
 			}
 		}
 		entries = append(entries, e)
@@ -194,7 +194,7 @@ func checkBaseline(path string, seen map[string][]string) error {
 		return err
 	}
 	var problems []string
-	for _, slug := range sortedKeys(seen) {
+	for _, slug := range slices.Sorted(maps.Keys(seen)) {
 		justification, ok := baseline[slug]
 		switch {
 		case !ok:
@@ -203,7 +203,7 @@ func checkBaseline(path string, seen map[string][]string) error {
 			problems = append(problems, fmt.Sprintf("warning %q has no justification in %s", slug, path))
 		}
 	}
-	for _, slug := range sortedKeys(baseline) {
+	for _, slug := range slices.Sorted(maps.Keys(baseline)) {
 		if _, ok := seen[slug]; !ok {
 			problems = append(problems, fmt.Sprintf("warning %q no longer occurs; remove it from %s", slug, path))
 		}
@@ -240,13 +240,4 @@ func writeFile(path, content string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(content), 0o600)
-}
-
-func sortedKeys[V any](values map[string]V) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }

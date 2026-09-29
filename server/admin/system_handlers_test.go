@@ -1311,7 +1311,7 @@ func TestHandleMailTestRejectsInvalidRecipient(t *testing.T) {
 // failMailDriver returns an error on Send to simulate a broken mail transport.
 type failMailDriver struct{}
 
-func (d *failMailDriver) Send(_ []string, _, _, _ string) error {
+func (d *failMailDriver) Send(message mailer.Message) error {
 	return errors.New("provider response password=super-secret token=top-secret https://mail.example.test/reject")
 }
 func (d *failMailDriver) Close() error { return nil }

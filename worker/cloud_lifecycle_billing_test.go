@@ -31,7 +31,8 @@ type cloudLifecycleWorkerSend struct {
 	textBody string
 }
 
-func (d *cloudLifecycleWorkerMailDriver) Send(to []string, subject, htmlBody, textBody string) error {
+func (d *cloudLifecycleWorkerMailDriver) Send(message mailer.Message) error {
+	to, subject, htmlBody, textBody := message.To, message.Subject, message.HTML, message.Text
 	d.sends = append(d.sends, cloudLifecycleWorkerSend{
 		to:       append([]string(nil), to...),
 		subject:  subject,

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,13 +26,23 @@ type mailpitAddress struct {
 	Name  string `json:"Name,omitempty"`
 }
 
+type mailpitAttachment struct {
+	Content     string `json:"Content"`
+	Filename    string `json:"Filename"`
+	ContentType string `json:"ContentType"`
+	ContentID   string `json:"ContentID"`
+}
+
 type mailpitSendRequest struct {
 	From    mailpitAddress   `json:"From"`
 	To      []mailpitAddress `json:"To"`
 	Subject string           `json:"Subject"`
 	HTML    string           `json:"HTML"`
-	Text    string           `json:"Text"`
-	Tags    []string         `json:"Tags"`
+	// Attachments carry inline images so Mailpit sees the cid: HTML that
+	// SMTP delivers, not a preview rewrite.
+	Attachments []mailpitAttachment `json:"Attachments,omitempty"`
+	Text        string              `json:"Text"`
+	Tags        []string            `json:"Tags"`
 }
 
 type htmlCheckResult struct {
@@ -57,17 +68,31 @@ func (m *mailpit) deleteTag(tag string) error {
 
 func (m *mailpit) send(rendered mailer.Rendered, tags []string) (string, error) {
 	request := mailpitSendRequest{
-		From:    mailpitAddress{Email: "noreply@hitkeep.example", Name: "HitKeep Preview"},
-		To:      []mailpitAddress{{Email: "preview@hitkeep.example"}},
-		Subject: rendered.Subject,
-		HTML:    rendered.HTML,
-		Text:    rendered.Text,
-		Tags:    tags,
+		From:        mailpitAddress{Email: "noreply@hitkeep.example", Name: "HitKeep Preview"},
+		To:          []mailpitAddress{{Email: "preview@hitkeep.example"}},
+		Subject:     rendered.Subject,
+		HTML:        rendered.HTML,
+		Attachments: inlineAttachments(rendered.Inline),
+		Text:        rendered.Text,
+		Tags:        tags,
 	}
 	var response struct {
 		ID string `json:"ID"`
 	}
 	return response.ID, m.do(http.MethodPost, "/api/v1/send", request, &response)
+}
+
+func inlineAttachments(images []mailer.InlineImage) []mailpitAttachment {
+	attachments := make([]mailpitAttachment, 0, len(images))
+	for _, image := range images {
+		attachments = append(attachments, mailpitAttachment{
+			Content:     base64.StdEncoding.EncodeToString(image.Data),
+			Filename:    image.CID + ".png",
+			ContentType: image.ContentType,
+			ContentID:   image.CID,
+		})
+	}
+	return attachments
 }
 
 func (m *mailpit) htmlCheck(id string) (htmlCheckResult, error) {

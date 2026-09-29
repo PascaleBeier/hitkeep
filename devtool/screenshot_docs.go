@@ -10,8 +10,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // readmeScreenshots are the docs screenshots mirrored into the repository
@@ -59,7 +58,7 @@ func (a *App) CaptureDocsScreenshots(ctx context.Context, request DocsScreenshot
 		return DocsScreenshotResult{}, errors.New("development must be ready before docs screenshots; start a seeded workspace session")
 	}
 
-	captureID := "docs-" + time.Now().UTC().Format("20060102T150405") + "-" + uuid.NewString()[:8]
+	captureID := "docs-" + time.Now().UTC().Format("20060102T150405") + "-" + uuid.New().String()[:8]
 	outputDir := filepath.Join(a.workspace.StateDir, "artifacts", "screenshots", captureID)
 	if err := os.MkdirAll(outputDir, 0o700); err != nil {
 		return DocsScreenshotResult{}, fmt.Errorf("create docs screenshot directory: %w", err)

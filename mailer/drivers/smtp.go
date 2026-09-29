@@ -1,6 +1,7 @@
 package drivers
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -86,12 +87,27 @@ func heloNameFromPublicURL(publicURL string) string {
 	return publicURL
 }
 
-func (s *SMTPDriver) Send(to []string, subject string, htmlBody string, textBody string) error {
-	return s.SendWithHeaders(to, subject, htmlBody, textBody, "", nil)
+// Message is one rendered email ready for transport.
+type Message struct {
+	To        []string
+	Subject   string
+	HTML      string
+	Text      string
+	MessageID string
+	Headers   map[string]string
+	// Inline images are embedded in the HTML part and referenced as cid:<CID>.
+	Inline []InlineImage
 }
 
-func (s *SMTPDriver) SendWithHeaders(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) error {
-	msg, err := s.buildMessage(to, subject, htmlBody, textBody, messageID, headers)
+// InlineImage is an image embedded in the message instead of fetched remotely.
+type InlineImage struct {
+	CID         string
+	ContentType string
+	Data        []byte
+}
+
+func (s *SMTPDriver) Send(message Message) error {
+	msg, err := s.buildMessage(message)
 	if err != nil {
 		return err
 	}
@@ -99,27 +115,32 @@ func (s *SMTPDriver) SendWithHeaders(to []string, subject string, htmlBody strin
 	return s.client.DialAndSend(msg)
 }
 
-func (s *SMTPDriver) buildMessage(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) (*mail.Msg, error) {
+func (s *SMTPDriver) buildMessage(message Message) (*mail.Msg, error) {
 	msg := mail.NewMsg()
 	if err := msg.FromFormat(s.name, s.from); err != nil {
 		return nil, err
 	}
-	if err := msg.To(to...); err != nil {
+	if err := msg.To(message.To...); err != nil {
 		return nil, err
 	}
 
-	msg.Subject(subject)
-	if strings.TrimSpace(messageID) != "" {
-		msg.SetGenHeader(mail.HeaderMessageID, strings.TrimSpace(messageID))
+	msg.Subject(message.Subject)
+	if strings.TrimSpace(message.MessageID) != "" {
+		msg.SetGenHeader(mail.HeaderMessageID, strings.TrimSpace(message.MessageID))
 	}
-	for key, value := range headers {
+	for key, value := range message.Headers {
 		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
 			continue
 		}
 		msg.SetGenHeader(mail.Header(key), value)
 	}
-	msg.SetBodyString(mail.TypeTextPlain, textBody)
-	msg.AddAlternativeString(mail.TypeTextHTML, htmlBody)
+	msg.SetBodyString(mail.TypeTextPlain, message.Text)
+	msg.AddAlternativeString(mail.TypeTextHTML, message.HTML)
+	for _, image := range message.Inline {
+		if err := msg.EmbedReader(image.CID, bytes.NewReader(image.Data), mail.WithFileContentID("<"+image.CID+">"), mail.WithFileContentType(mail.ContentType(image.ContentType))); err != nil {
+			return nil, err
+		}
+	}
 
 	return msg, nil
 }

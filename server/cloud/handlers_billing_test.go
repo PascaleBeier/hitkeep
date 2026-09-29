@@ -89,8 +89,8 @@ func (f *fakeStripeClient) GetCharge(_ context.Context, chargeID string) (*strip
 
 type noopMailDriver struct{}
 
-func (noopMailDriver) Send(_ []string, _ string, _ string, _ string) error { return nil }
-func (noopMailDriver) Close() error                                        { return nil }
+func (noopMailDriver) Send(mailer.Message) error { return nil }
+func (noopMailDriver) Close() error              { return nil }
 
 type captureMailDriver struct {
 	recipients []string
@@ -101,7 +101,8 @@ type captureMailDriver struct {
 	err        error
 }
 
-func (d *captureMailDriver) Send(recipients []string, subject, htmlBody, textBody string) error {
+func (d *captureMailDriver) Send(message mailer.Message) error {
+	recipients, subject, htmlBody, textBody := message.To, message.Subject, message.HTML, message.Text
 	d.recipients = append([]string(nil), recipients...)
 	d.subject = subject
 	d.htmlBody = htmlBody

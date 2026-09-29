@@ -31,13 +31,8 @@ type reportCaptureDriver struct {
 	sendErr   error
 }
 
-func (d *reportCaptureDriver) Send(_ []string, subject, htmlBody, textBody string) error {
-	d.subject, d.htmlBody, d.textBody = subject, htmlBody, textBody
-	return d.sendErr
-}
-
-func (d *reportCaptureDriver) SendWithHeaders(_ []string, subject, htmlBody, textBody, messageID string, headers map[string]string) error {
-	d.subject, d.htmlBody, d.textBody, d.messageID, d.headers = subject, htmlBody, textBody, messageID, headers
+func (d *reportCaptureDriver) Send(message mailer.Message) error {
+	d.subject, d.htmlBody, d.textBody, d.messageID, d.headers = message.Subject, message.HTML, message.Text, message.MessageID, message.Headers
 	return d.sendErr
 }
 

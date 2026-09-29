@@ -327,7 +327,8 @@ func (h *handler) handlePreviewReport() http.HandlerFunc {
 			PendingRecipientCount: len(req.Definition.ExternalRecipientEmails),
 			PeriodStart:           start, PeriodEnd: end, Suppressed: !shouldSend,
 			ScheduledFor: next, Audience: req.Audience,
-			Preheader: rendered.Preheader, HTML: rendered.HTML, Text: rendered.Text,
+			// Browsers cannot resolve cid: images, so previews inline them.
+			Preheader: rendered.Preheader, HTML: rendered.PreviewHTML(), Text: rendered.Text,
 		}
 		if h.ctx.Config != nil {
 			preview.FromName, preview.FromAddress = h.ctx.Config.MailFromName, h.ctx.Config.MailFromAddress

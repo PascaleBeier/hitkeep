@@ -14,14 +14,14 @@ func TestBuildMessageUsesSingleProvidedMessageID(t *testing.T) {
 		from: "noreply@example.com",
 		name: "HitKeep",
 	}
-	msg, err := driver.buildMessage(
-		[]string{"recipient@example.com"},
-		"Test report",
-		"<p>Test report</p>",
-		"Test report",
-		messageID,
-		nil,
-	)
+	msg, err := driver.buildMessage(Message{
+		To:        []string{"recipient@example.com"},
+		Subject:   "Test report",
+		HTML:      `<p><img src="cid:hk-brand" alt="HitKeep"> Test report</p>`,
+		Text:      "Test report",
+		MessageID: messageID,
+		Inline:    []InlineImage{{CID: "hk-brand", ContentType: "image/png", Data: []byte("png")}},
+	})
 	if err != nil {
 		t.Fatalf("buildMessage() error = %v", err)
 	}
@@ -38,6 +38,9 @@ func TestBuildMessageUsesSingleProvidedMessageID(t *testing.T) {
 	}
 	if !strings.Contains(message, "Message-ID: "+messageID) {
 		t.Fatalf("serialized message does not contain provided Message-ID %q:\n%s", messageID, message)
+	}
+	if !strings.Contains(message, "multipart/related") || !regexp.MustCompile(`(?im)^Content-ID: <hk-brand>`).MatchString(message) {
+		t.Fatalf("inline image must be embedded as a related Content-ID part:\n%s", message)
 	}
 }
 

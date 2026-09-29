@@ -50,14 +50,10 @@ type scheduledReportDriver struct {
 	failRemaining int
 }
 
-func (d *scheduledReportDriver) Send(to []string, _ string, _ string, _ string) error {
-	return d.SendWithHeaders(to, "", "", "", "", nil)
-}
-
-func (d *scheduledReportDriver) SendWithHeaders(to []string, _ string, _ string, _ string, messageID string, headers map[string]string) error {
-	copiedHeaders := make(map[string]string, len(headers))
-	maps.Copy(copiedHeaders, headers)
-	d.messages = append(d.messages, capturedScheduledReport{to: append([]string(nil), to...), messageID: messageID, headers: copiedHeaders})
+func (d *scheduledReportDriver) Send(message mailer.Message) error {
+	copiedHeaders := make(map[string]string, len(message.Headers))
+	maps.Copy(copiedHeaders, message.Headers)
+	d.messages = append(d.messages, capturedScheduledReport{to: append([]string(nil), message.To...), messageID: message.MessageID, headers: copiedHeaders})
 	if d.failRemaining > 0 {
 		d.failRemaining--
 		return errors.New("smtp unavailable")

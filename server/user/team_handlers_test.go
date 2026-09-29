@@ -39,7 +39,8 @@ type teamTestMailDriver struct {
 	sendErr  error
 }
 
-func (d *teamTestMailDriver) Send(_ []string, subject, htmlBody, textBody string) error {
+func (d *teamTestMailDriver) Send(message mailer.Message) error {
+	subject, htmlBody, textBody := message.Subject, message.HTML, message.Text
 	d.subject = subject
 	d.htmlBody = htmlBody
 	d.textBody = textBody

@@ -1,17 +1,20 @@
 package mailer
 
+import "hitkeep/mailer/drivers"
+
+// Message is one rendered email ready for transport, including its stable
+// identity headers and inline images.
+type Message = drivers.Message
+
+// InlineImage is an image embedded in a message and referenced as cid:<CID>.
+type InlineImage = drivers.InlineImage
+
 // Driver represents the underlying transport mechanism (SMTP, Vendor, etc.)
 type Driver interface {
-	// Send transmits the constructed message.
-	Send(to []string, subject string, htmlBody string, textBody string) error
+	// Send transmits the message, preserving its headers and inline images.
+	Send(message Message) error
 	// Close cleans up connections if necessary (e.g., SMTP pool).
 	Close() error
-}
-
-// HeaderDriver is implemented by transports that can preserve message
-// identity and standards-based delivery headers across retries.
-type HeaderDriver interface {
-	SendWithHeaders(to []string, subject string, htmlBody string, textBody string, messageID string, headers map[string]string) error
 }
 
 type SendOptions struct {
