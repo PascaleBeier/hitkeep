@@ -1,0 +1,38 @@
+Subject: Rapport quotidien pour new.example - 22-28 sept. 2026
+
+Rapport d'analytique quotidien
+new.example · 22-28 sept. 2026
+
+Indicateurs
+-------
+Pages vues:    0 (—)
+Visiteurs:     0 (—)
+Taux de rebond:  0,0%
+Durée moyenne: 0 s
+
+
+
+
+Voir le tableau de bord complet →: https://app.hitkeep.example/dashboard
+
+
+---
+Vous recevez cet e-mail parce que les rapports d'analytique sont activés.
+Gérer les préférences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

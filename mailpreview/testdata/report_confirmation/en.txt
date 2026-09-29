@@ -1,0 +1,28 @@
+Subject: Weekly executive summary: confirm reports from Acme Analytics
+
+Confirm scheduled reports
+==================
+
+Acme Analytics wants to send you the scheduled report “Weekly executive summary”. Confirm before any analytics data is emailed to you.
+
+Schedule: Weekly
+Sites: shop.example, blog.example.org
+
+Confirm report emails: https://app.hitkeep.example/reports/confirm?token=preview
+
+This confirmation link expires in 7 days.
+Confirming does not create an account or grant access to HitKeep or the team.
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

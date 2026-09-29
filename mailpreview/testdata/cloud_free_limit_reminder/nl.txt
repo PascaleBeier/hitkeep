@@ -1,0 +1,30 @@
+Subject: Je hebt de limieten van het gratis abonnement bereikt
+
+Je team zit aan de limiet van het gratis abonnement
+===========================
+
+Acme Analytics heeft de capaciteit van het gratis abonnement bereikt (1 sites, 1 teamleden).
+
+Upgrade naar Pro om zonder onderbreking meer sites en teamleden toe te voegen.
+
+Bekijk abonnementen & upgrade: https://app.hitkeep.example/settings/billing
+
+--
+
+HitKeep is volledig open source – inclusief alle betaalde functies. Betaalde abonnementen financieren hosting en ontwikkeling.
+Wil je ons liever op een andere manier steunen? Sponsor de opensource-ontwikkeling: https://github.com/sponsors/pascalebeier
+Of vertel het gewoon door – dat helpt meer dan je denkt.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

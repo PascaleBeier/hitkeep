@@ -1,0 +1,37 @@
+Subject: 1 oportunidade de Semanal para shop.example - 22-28 Set 2026
+
+Resumo de Oportunidades Semanal
+22-28 Set 2026
+Principais recomendações para shop.example.
+
+Revisar abandono do checkout
+A conversão do checkout é de 42%.
+Impacto: $1,200 | Pontuação: 91 | Confiança: high
+Próxima ação: Inspecione a fricção no checkout antes de enviar mais tráfego.
+Evidência:
+- Taxa de conversão do checkout: 42%
+https://app.hitkeep.example/opportunities#00000000-0000-0000-0000-000000000014
+
+Ver oportunidades →: https://app.hitkeep.example/opportunities
+
+
+---
+Você recebeu este e-mail porque os resumos de oportunidades estão ativados.
+Gerenciar preferências: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

@@ -1,0 +1,33 @@
+Subject: Deine ältesten HitKeep-Daten laufen bald ab
+
+Deine ältesten Daten laufen bald ab
+===========================
+
+Der Free-Plan speichert 60 Tage an Daten. Ab dem October 6, 2026 werden die ältesten Hits von shop.example entfernt.
+
+Upgrade vorher, um deine gesamte Historie für Trendvergleiche, Audits und Berichte zu behalten.
+
+Tarife ansehen & upgraden: https://app.hitkeep.example/settings/billing
+
+Aktuelle Daten kannst du weiterhin im Dashboard exportieren und prüfen.
+Dashboard öffnen: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep ist vollständig Open Source – einschließlich aller Bezahlfunktionen. Bezahlte Tarife finanzieren Hosting und Weiterentwicklung.
+Möchtest du uns anders unterstützen? Unterstütze die Open-Source-Entwicklung: https://github.com/sponsors/pascalebeier
+Oder erzähle einfach weiter von HitKeep – das hilft mehr, als du denkst.
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

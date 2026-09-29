@@ -1,0 +1,38 @@
+Subject: Daily Report for new.example - Sep 22–28, 2026
+
+Daily Analytics Report
+new.example · Sep 22–28, 2026
+
+Metrics
+-------
+Pageviews:    0 (—)
+Visitors:     0 (—)
+Bounce Rate:  0.0%
+Avg. Duration: 0 sec
+
+
+
+
+View Full Dashboard →: https://app.hitkeep.example/dashboard
+
+
+---
+You received this email because you have analytics reports enabled.
+Manage preferences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

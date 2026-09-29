@@ -1,0 +1,26 @@
+Subject: Bevestig je e-mailadres voor HitKeep
+
+Bevestig je e-mailadres
+==================
+
+Hallo,
+
+Gebruik deze link om te bevestigen dat dit e-mailadres van jou is en ga verder met GitHub.
+
+E-mailadres bevestigen: https://app.hitkeep.example/signup/social/confirm?token=preview
+
+Deze bevestigingslink verloopt over 30 minuten.
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

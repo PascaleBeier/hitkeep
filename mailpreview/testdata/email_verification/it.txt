@@ -1,0 +1,24 @@
+Subject: Verifica la tua email - HitKeep
+
+Verifica la tua email
+=================
+
+Ti manca solo un passo per creare il tuo workspace Acme Analytics su HitKeep.
+
+Verifica email: https://app.hitkeep.example/signup/verify?token=preview
+
+Questo link scade tra 24 ore.
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

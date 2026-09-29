@@ -1,0 +1,34 @@
+Subject: Il tuo riepilogo settimanale di analitica - 22-28 set 2026
+
+Riepilogo di analitica settimanale
+22-28 set 2026
+Variazione: Visualizzazioni pagina · Visitatori · Obiettivi completati
+
+Sito
+----------
+shop.example: 48.213 Visualizzazioni pagina (+18%), 12.877 Visitatori (−3%), 0 Obiettivi completati (—)
+  Dashboard: https://app.hitkeep.example/dashboard
+
+Apri la dashboard →: https://app.hitkeep.example/dashboard
+
+
+---
+Hai ricevuto questa email perché hai attivato i report di analitica.
+Gestisci preferenze: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

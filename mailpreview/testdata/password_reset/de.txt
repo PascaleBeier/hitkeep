@@ -1,0 +1,24 @@
+Subject: Setze dein HitKeep-Passwort zurück
+
+Passwort zurücksetzen
+==============
+
+Hallo,
+
+Wir haben eine Anfrage zum Zurücksetzen des Passworts für deine HitKeep-Analytics-Instanz erhalten.
+
+Passwort zurücksetzen: https://app.hitkeep.example/reset-password?token=preview
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

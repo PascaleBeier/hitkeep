@@ -1,0 +1,24 @@
+Subject: Bestätige deine E-Mail-Adresse - HitKeep
+
+Bestätige deine E-Mail-Adresse
+=================
+
+Du bist nur noch einen Schritt davon entfernt, deinen Workspace Acme Analytics auf HitKeep zu erstellen.
+
+E-Mail bestätigen: https://app.hitkeep.example/signup/verify?token=preview
+
+Dieser Link läuft in 24 Stunden ab.
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

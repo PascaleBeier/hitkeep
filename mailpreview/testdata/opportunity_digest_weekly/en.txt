@@ -1,0 +1,37 @@
+Subject: 1 Weekly opportunity for shop.example - Sep 22–28, 2026
+
+Weekly Opportunities Digest
+Sep 22–28, 2026
+Top recommendations for shop.example.
+
+Review checkout drop-off
+Checkout conversion is 42%.
+Impact: $1,200 | Score: 91 | Confidence: high
+Next action: Inspect checkout friction before adding more traffic.
+Evidence:
+- Checkout conversion rate: 42%
+https://app.hitkeep.example/opportunities#00000000-0000-0000-0000-000000000014
+
+View opportunities →: https://app.hitkeep.example/opportunities
+
+
+---
+You received this email because opportunity digests are enabled.
+Manage preferences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

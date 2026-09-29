@@ -1,0 +1,26 @@
+Subject: Du wurdest eingeladen, shop.example auf HitKeep beizutreten
+
+Du wurdest eingeladen!
+====================
+
+Hallo,
+
+Jane Doe hat dich eingeladen, shop.example auf HitKeep beizutreten.
+
+Klicke auf die Schaltfläche unten, um die Einladung anzunehmen und dein Konto einzurichten.
+
+Einladung annehmen: https://app.hitkeep.example/accept-invite?token=preview
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

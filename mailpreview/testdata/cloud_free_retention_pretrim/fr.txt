@@ -1,0 +1,33 @@
+Subject: Vos données HitKeep les plus anciennes seront bientôt supprimées
+
+Vos données les plus anciennes seront bientôt supprimées
+===========================
+
+L'offre Free conserve 60 jours de données. À partir du October 6, 2026, les hits les plus anciens de shop.example seront supprimés.
+
+Passez à une offre supérieure avant cette date pour conserver tout votre historique pour les comparaisons de tendances, les audits et les rapports.
+
+Voir les offres et mettre à niveau: https://app.hitkeep.example/settings/billing
+
+Vous pouvez toujours exporter et consulter les données actuelles depuis le tableau de bord.
+Ouvrir le tableau de bord: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep est entièrement open source – y compris toutes les fonctionnalités payantes. Les offres payantes financent l'hébergement et le développement.
+Vous préférez nous soutenir autrement ? Sponsorisez le développement open source: https://github.com/sponsors/pascalebeier
+Ou parlez simplement de HitKeep autour de vous – cela aide plus que vous ne le pensez.
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

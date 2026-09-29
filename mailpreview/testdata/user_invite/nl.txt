@@ -1,0 +1,26 @@
+Subject: Je bent uitgenodigd om shop.example op HitKeep te gebruiken
+
+Je bent uitgenodigd!
+====================
+
+Hallo,
+
+Jane Doe heeft je uitgenodigd om shop.example op HitKeep te gebruiken.
+
+Klik op de knop hieronder om de uitnodiging te accepteren en je account in te stellen.
+
+Uitnodiging accepteren: https://app.hitkeep.example/accept-invite?token=preview
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

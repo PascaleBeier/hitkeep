@@ -1,0 +1,26 @@
+Subject: Schließe deine HitKeep-Anmeldung ab
+
+Anmeldung abschließen
+==================
+
+Hallo,
+
+Wir haben eine Anfrage erhalten, deine Anmeldung bei HitKeep abzuschließen.
+
+Anmeldung abschließen: https://app.hitkeep.example/mfa/magic?token=preview
+
+Dieser Anmeldelink läuft in 15 Minuten ab.
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

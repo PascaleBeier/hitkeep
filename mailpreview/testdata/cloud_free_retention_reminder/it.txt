@@ -1,0 +1,33 @@
+Subject: Conserva più di 60 giorni di dati HitKeep
+
+Il tuo piano Free conserva 60 giorni di dati
+===========================
+
+Acme Analytics sta ricevendo traffico da shop.example. Nel piano Free, gli hit vengono conservati per 60 giorni.
+
+Fai upgrade per conservare più storico per confronti di trend, audit e report.
+
+Vedi i piani e fai l'upgrade: https://app.hitkeep.example/settings/billing
+
+Puoi comunque esportare e rivedere i dati attuali dalla dashboard.
+Apri dashboard: https://app.hitkeep.example/dashboard
+
+--
+
+HitKeep è completamente open source, incluse tutte le funzionalità a pagamento. I piani a pagamento finanziano hosting e sviluppo.
+Preferisci sostenerci in un altro modo? Sponsorizza lo sviluppo open source: https://github.com/sponsors/pascalebeier
+Oppure spargi la voce: aiuta più di quanto pensi.
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

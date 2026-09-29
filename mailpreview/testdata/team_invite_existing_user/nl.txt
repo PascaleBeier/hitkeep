@@ -1,0 +1,26 @@
+Subject: Je bent toegevoegd aan Acme Analytics op HitKeep
+
+Je bent uitgenodigd voor een team
+=============================
+
+Hallo,
+
+Jane Doe heeft je uitgenodigd voor Acme Analytics op HitKeep als admin.
+
+Meld je aan om je teamworkspace te openen.
+
+HitKeep openen: https://app.hitkeep.example/dashboard
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

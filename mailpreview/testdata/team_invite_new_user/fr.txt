@@ -1,0 +1,28 @@
+Subject: Vous avez été invité à rejoindre Acme Analytics sur HitKeep
+
+Vous êtes invité à rejoindre une équipe
+=============================
+
+Bonjour,
+
+Jane Doe vous a invité à rejoindre l'équipe Acme Analytics sur HitKeep en tant que membre.
+
+Vous devrez créer un mot de passe pour activer votre compte avant de pouvoir accéder à l'équipe.
+
+Créez un mot de passe pour activer votre compte et rejoindre cette équipe.
+
+Créer un mot de passe et rejoindre l'équipe: https://app.hitkeep.example/accept-invite?token=preview
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

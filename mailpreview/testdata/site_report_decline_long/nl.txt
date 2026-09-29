@@ -1,0 +1,59 @@
+Subject: Maandelijks rapport voor docs.a-rather-long-subdomain.example.com - sep 22–28, 2026
+
+Maandelijks Analytics-rapport
+docs.a-rather-long-subdomain.example.com · sep 22–28, 2026
+
+Metrics
+-------
+Pageviews:    9.120 (−78%)
+Bezoekers:     3.021 (−77%)
+Bouncepercentage:  41,3%
+Gem. duur: 2 min. 34 sec.
+
+
+Top pagina's
+---------
+/blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4.210
+/: 2.040
+
+
+
+Top referrers
+-------------
+google.com: 5.120
+news.ycombinator.com: 2.230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Doelconversies
+----------------
+Signup: 312
+Checkout: 88
+
+
+Volledig dashboard bekijken →: https://app.hitkeep.example/dashboard
+
+
+---
+Je ontvangt deze e-mail omdat je analytics-rapporten hebt ingeschakeld.
+Voorkeuren beheren: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Gemaakt met HitKeep
+Het privacyvriendelijke single-binary analyticsplatform.
+https://hitkeep.com
+
+Colofon: https://hitkeep.com/legal/imprint/
+Privacybeleid: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep op sociale media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

@@ -1,0 +1,24 @@
+Subject: Reset your HitKeep Password
+
+Reset Password
+==============
+
+Hello,
+
+We received a request to reset the password for your HitKeep analytics instance.
+
+Reset Password: https://app.hitkeep.example/reset-password?token=preview
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

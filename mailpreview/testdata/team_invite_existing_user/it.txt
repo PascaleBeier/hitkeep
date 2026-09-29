@@ -1,0 +1,26 @@
+Subject: Sei stato aggiunto a Acme Analytics su HitKeep
+
+Sei stato invitato a un team
+=============================
+
+Ciao,
+
+Jane Doe ti ha invitato a unirti al team Acme Analytics su HitKeep come amministratore.
+
+Accedi per entrare nel workspace del tuo team.
+
+Apri HitKeep: https://app.hitkeep.example/dashboard
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

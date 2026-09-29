@@ -1,0 +1,30 @@
+Subject: Hai raggiunto i limiti del piano gratuito
+
+Il tuo team è al limite del piano gratuito
+===========================
+
+Acme Analytics ha raggiunto la capacità del piano gratuito (1 siti, 1 membri).
+
+Passa a Pro per aggiungere altri siti e membri senza interruzioni.
+
+Vedi i piani e fai l'upgrade: https://app.hitkeep.example/settings/billing
+
+--
+
+HitKeep è completamente open source, incluse tutte le funzionalità a pagamento. I piani a pagamento finanziano hosting e sviluppo.
+Preferisci sostenerci in un altro modo? Sponsorizza lo sviluppo open source: https://github.com/sponsors/pascalebeier
+Oppure spargi la voce: aiuta più di quanto pensi.
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

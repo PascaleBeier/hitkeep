@@ -1,0 +1,38 @@
+Subject: Täglicher Bericht für new.example - 22.-28. September 2026
+
+Täglicher Analytics-Bericht
+new.example · 22.-28. September 2026
+
+Kennzahlen
+-------
+Seitenaufrufe:    0 (—)
+Besucher:     0 (—)
+Absprungrate:  0,0%
+Durchschn. Dauer: 0 Sek.
+
+
+
+
+Vollständiges Dashboard ansehen →: https://app.hitkeep.example/dashboard
+
+
+---
+Du hast diese E-Mail erhalten, weil Analytics-Berichte für dich aktiviert sind.
+Einstellungen verwalten: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

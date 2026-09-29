@@ -1,0 +1,59 @@
+Subject: Monthly Report for docs.a-rather-long-subdomain.example.com - Sep 22–28, 2026
+
+Monthly Analytics Report
+docs.a-rather-long-subdomain.example.com · Sep 22–28, 2026
+
+Metrics
+-------
+Pageviews:    9,120 (−78%)
+Visitors:     3,021 (−77%)
+Bounce Rate:  41.3%
+Avg. Duration: 2 min 34 sec
+
+
+Top Pages
+---------
+/blog/a-very-long-article-slug-about-privacy-first-analytics-without-cookies-and-consent-banners: 4,210
+/: 2,040
+
+
+
+Top Referrers
+-------------
+google.com: 5,120
+news.ycombinator.com: 2,230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Goal Completions
+----------------
+Signup: 312
+Checkout: 88
+
+
+View Full Dashboard →: https://app.hitkeep.example/dashboard
+
+
+---
+You received this email because you have analytics reports enabled.
+Manage preferences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

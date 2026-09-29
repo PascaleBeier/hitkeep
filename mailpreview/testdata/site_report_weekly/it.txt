@@ -1,0 +1,62 @@
+Subject: Report settimanale per shop.example - 22-28 set 2026
+
+Report di analitica settimanale
+shop.example · 22-28 set 2026
+
+Metriche
+-------
+Visualizzazioni pagina:    48.213 (+18%)
+Visitatori:     12.877 (−3%)
+Frequenza di rimbalzo:  41,3%
+Durata media: 2 min 34 s
+
+
+Pagine principali
+---------
+/: 12.040
+/pricing: 6.120
+/docs/getting-started: 3.302
+/blog/privacy-first-analytics: 2.210
+/about: 1.201
+
+
+
+Referrer principali
+-------------
+google.com: 5.120
+news.ycombinator.com: 2.230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Obiettivi completati
+----------------
+Signup: 312
+Checkout: 88
+
+
+Apri la dashboard completa →: https://app.hitkeep.example/dashboard
+
+
+---
+Hai ricevuto questa email perché hai attivato i report di analitica.
+Gestisci preferenze: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Offerto da HitKeep
+La piattaforma di analitica privacy-first in un unico binario.
+https://hitkeep.com
+
+Note legali: https://hitkeep.com/legal/imprint/
+Informativa sulla privacy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sui social media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

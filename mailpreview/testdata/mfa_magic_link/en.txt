@@ -1,0 +1,26 @@
+Subject: Finish your HitKeep sign-in
+
+Finish sign-in
+==================
+
+Hello,
+
+We received a request to finish signing in to your HitKeep account.
+
+Finish sign-in: https://app.hitkeep.example/mfa/magic?token=preview
+
+This sign-in link expires in 15 minutes.
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

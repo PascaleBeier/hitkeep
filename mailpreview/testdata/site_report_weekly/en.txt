@@ -1,0 +1,62 @@
+Subject: Weekly Report for shop.example - Sep 22–28, 2026
+
+Weekly Analytics Report
+shop.example · Sep 22–28, 2026
+
+Metrics
+-------
+Pageviews:    48,213 (+18%)
+Visitors:     12,877 (−3%)
+Bounce Rate:  41.3%
+Avg. Duration: 2 min 34 sec
+
+
+Top Pages
+---------
+/: 12,040
+/pricing: 6,120
+/docs/getting-started: 3,302
+/blog/privacy-first-analytics: 2,210
+/about: 1,201
+
+
+
+Top Referrers
+-------------
+google.com: 5,120
+news.ycombinator.com: 2,230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Goal Completions
+----------------
+Signup: 312
+Checkout: 88
+
+
+View Full Dashboard →: https://app.hitkeep.example/dashboard
+
+
+---
+You received this email because you have analytics reports enabled.
+Manage preferences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

@@ -1,0 +1,62 @@
+Subject: Relatório Semanal de shop.example - 22-28 Set 2026
+
+Relatório de Análise do Semanal
+shop.example · 22-28 Set 2026
+
+Métricas
+-------
+Visualizações de Página:    48.213 (+18%)
+Visitantes:     12.877 (−3%)
+Taxa de Rejeição:  41,3%
+Duração Média: 2 min 34 s
+
+
+Principais Páginas
+---------
+/: 12.040
+/pricing: 6.120
+/docs/getting-started: 3.302
+/blog/privacy-first-analytics: 2.210
+/about: 1.201
+
+
+
+Principais Referenciadores
+-------------
+google.com: 5.120
+news.ycombinator.com: 2.230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Conversões de Metas
+----------------
+Signup: 312
+Checkout: 88
+
+
+Ver Painel Completo →: https://app.hitkeep.example/dashboard
+
+
+---
+Você recebeu este e-mail porque os relatórios de análise estão ativados.
+Gerenciar preferências: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

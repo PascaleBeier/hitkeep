@@ -86,6 +86,16 @@ func TestAnalyticsToolBridgeSelectsProductionMCPArea(t *testing.T) {
 	}
 }
 
+func TestEmailTemplatesSelectEmailAndBackendAreas(t *testing.T) {
+	want := []string{changeEmail, changeBackend}
+	for _, path := range []string{"mailer/templates/layout.mjml", "mailer/locales/de.json", "mailables/reports.go", "mailpreview/testdata/password_reset/en.html"} {
+		got, known := classifyChangedPath(path)
+		if !known || !slices.Equal(got, want) {
+			t.Fatalf("classifyChangedPath(%q) = %v, known = %t, want %v", path, got, known, want)
+		}
+	}
+}
+
 func TestFrontendManifestsSelectDependencyAndDashboardAreas(t *testing.T) {
 	want := []string{changeDependencies, changeDashboard}
 	for _, path := range []string{"frontend/dashboard/package.json", "frontend/dashboard/package-lock.json"} {

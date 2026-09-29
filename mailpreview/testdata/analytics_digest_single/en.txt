@@ -1,0 +1,34 @@
+Subject: Your Weekly Analytics Digest - Sep 22–28, 2026
+
+Weekly Analytics Digest
+Sep 22–28, 2026
+Change: Pageviews · Visitors · Goal Completions
+
+Site
+----------
+shop.example: 48,213 Pageviews (+18%), 12,877 Visitors (−3%), 0 Goal Completions (—)
+  Dashboard: https://app.hitkeep.example/dashboard
+
+View Dashboard →: https://app.hitkeep.example/dashboard
+
+
+---
+You received this email because you have analytics reports enabled.
+Manage preferences: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Powered by HitKeep
+The privacy-first, single-binary analytics platform.
+https://hitkeep.com
+
+Imprint: https://hitkeep.com/legal/imprint/
+Privacy Policy: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep on Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

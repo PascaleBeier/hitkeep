@@ -1,0 +1,40 @@
+Subject: Bem-vindo ao HitKeep
+
+Bem-vindo ao HitKeep
+==================
+
+Seu espaço de trabalho Acme Analytics está recebendo tráfego de shop.example. A configuração está funcionando.
+
+Abrir painel: https://app.hitkeep.example/dashboard
+
+A documentação tem guias de configuração, relatórios e privacidade para quando você quiser se aprofundar.
+Ler a documentação: https://hitkeep.com/docs/
+
+Usa WordPress? O plugin first-party instala o HitKeep sem editar o tema.
+Plugin WordPress: https://wordpress.org/plugins/hitkeep/
+
+Lembrete: o plano Free mantém hits por 60 dias. Faça upgrade quando precisar de retenção mais longa.
+Ver planos: https://app.hitkeep.example/settings/billing
+
+Envie feedback quando algo parecer difícil; isso nos ajuda a melhorar o produto.
+Enviar feedback: mailto:feedback@hitkeep.com
+
+--
+
+O HitKeep é totalmente open source – incluindo todos os recursos pagos. Os planos pagos financiam a hospedagem e o desenvolvimento.
+Prefere nos apoiar de outra forma? Patrocine o desenvolvimento open source: https://github.com/sponsors/pascalebeier
+Ou simplesmente espalhe a palavra – ajuda mais do que você imagina.
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

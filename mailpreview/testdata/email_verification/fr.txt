@@ -1,0 +1,24 @@
+Subject: Vérifiez votre e-mail - HitKeep
+
+Vérifiez votre e-mail
+=================
+
+Vous êtes à une étape de créer votre espace de travail Acme Analytics sur HitKeep.
+
+Vérifier l'e-mail: https://app.hitkeep.example/signup/verify?token=preview
+
+Ce lien expire dans 24 heures.
+
+-- 
+Propulsé par HitKeep
+La plateforme d'analytique respectueuse de la vie privée en binaire unique.
+https://hitkeep.com
+
+Mentions légales: https://hitkeep.com/legal/imprint/
+Politique de confidentialité: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep sur les réseaux sociaux:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

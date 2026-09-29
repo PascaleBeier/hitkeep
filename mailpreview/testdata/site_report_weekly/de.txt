@@ -1,0 +1,62 @@
+Subject: Wöchentlicher Bericht für shop.example - 22.-28. September 2026
+
+Wöchentlicher Analytics-Bericht
+shop.example · 22.-28. September 2026
+
+Kennzahlen
+-------
+Seitenaufrufe:    48.213 (+18%)
+Besucher:     12.877 (−3%)
+Absprungrate:  41,3%
+Durchschn. Dauer: 2 Min. 34 Sek.
+
+
+Top-Seiten
+---------
+/: 12.040
+/pricing: 6.120
+/docs/getting-started: 3.302
+/blog/privacy-first-analytics: 2.210
+/about: 1.201
+
+
+
+Top-Referrer
+-------------
+google.com: 5.120
+news.ycombinator.com: 2.230
+chatgpt.com: 812
+github.com: 640
+duckduckgo.com: 301
+
+
+
+Zielabschlüsse
+----------------
+Signup: 312
+Checkout: 88
+
+
+Vollständiges Dashboard ansehen →: https://app.hitkeep.example/dashboard
+
+
+---
+Du hast diese E-Mail erhalten, weil Analytics-Berichte für dich aktiviert sind.
+Einstellungen verwalten: https://app.hitkeep.example/settings
+
+
+
+
+-- 
+Bereitgestellt von HitKeep
+Die datenschutzfreundliche Analytics-Plattform als Single Binary.
+https://hitkeep.com
+
+Impressum: https://hitkeep.com/legal/imprint/
+Datenschutzerklärung: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep auf Social Media:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com

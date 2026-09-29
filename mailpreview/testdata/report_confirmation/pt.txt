@@ -1,0 +1,28 @@
+Subject: Weekly executive summary: confirme os relatórios de Acme Analytics
+
+Confirmar relatórios agendados
+==================
+
+Acme Analytics pretende enviar-lhe o relatório agendado «Weekly executive summary». Confirme antes de receber dados analíticos por e-mail.
+
+Agendamento: Semanal
+Sites: shop.example, blog.example.org
+
+Confirmar e-mails de relatórios: https://app.hitkeep.example/reports/confirm?token=preview
+
+Este link de confirmação expira dentro de 7 dias.
+A confirmação não cria uma conta nem concede acesso ao HitKeep ou à equipa.
+
+-- 
+Desenvolvido por HitKeep
+A plataforma de análise focada em privacidade em um único binário.
+https://hitkeep.com
+
+Aviso legal: https://hitkeep.com/legal/imprint/
+Política de privacidade: https://hitkeep.com/legal/privacy-policy/
+
+HitKeep nas redes sociais:
+GitHub: https://github.com/pascalebeier/hitkeep
+LinkedIn: https://www.linkedin.com/company/hitkeep
+X: https://x.com/gethitkeep
+Bluesky: https://bsky.app/profile/hitkeep.com
