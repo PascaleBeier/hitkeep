@@ -6,11 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"hitkeep/api"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -21,9 +18,8 @@ func (h *handler) parseWebVitalsParams(w http.ResponseWriter, r *http.Request, r
 		return api.WebVitalsParams{}, false
 	}
 
-	siteID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.Error(w, "Invalid site_id", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+	if !ok {
 		return api.WebVitalsParams{}, false
 	}
 
@@ -121,10 +117,7 @@ func (h *handler) handleGetSiteWebVitalsBreakdown() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, payload); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, payload)
 	}
 }
 
@@ -154,9 +147,6 @@ func (h *handler) handleGetSiteWebVitals(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, payload); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, payload)
 	}
 }

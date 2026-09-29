@@ -58,10 +58,7 @@ func (h *handler) handleGetUserSecurityStatus() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user security status", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -106,11 +103,7 @@ func (h *handler) handleStartTOTPSetup() http.HandlerFunc {
 			ExpiresAt:  expiresAt,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		//nolint:gosec // TOTP bootstrap secret is intentionally returned to the authenticated user during setup.
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode pending totp setup", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -161,10 +154,7 @@ func (h *handler) handleVerifyTOTPSetup() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after enabling totp", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -209,10 +199,7 @@ func (h *handler) handleDisableTOTP() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after disabling totp", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -265,10 +252,7 @@ func (h *handler) handleStartPasskeyRegistration() http.HandlerFunc {
 			PublicKey: creation.Response,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode passkey registration start response", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -352,10 +336,7 @@ func (h *handler) handleFinishPasskeyRegistration() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode security status after passkey registration", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -367,9 +348,8 @@ func (h *handler) handleDeleteUserPasskey() http.HandlerFunc {
 			return
 		}
 
-		passkeyID, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "Invalid passkey ID", http.StatusBadRequest)
+		passkeyID, ok := shared.PathUUID(w, r, "id", "Invalid passkey ID")
+		if !ok {
 			return
 		}
 
@@ -438,13 +418,10 @@ func (h *handler) handleRegenerateRecoveryCodes() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.UserRecoveryCodesResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.UserRecoveryCodesResponse{
 			Codes:     codes,
 			Remaining: len(codes),
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode recovery code response", "error", err, "user_id", userID)
-		}
+		})
 	}
 }
 

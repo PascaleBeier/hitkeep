@@ -10,7 +10,6 @@ import (
 
 	"hitkeep/api"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -67,10 +66,7 @@ func (h *handler) handleGetShareDefinitions(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, definitions); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, definitions)
 	}
 }
 
@@ -125,10 +121,7 @@ func (h *handler) handleGetShareFunnelStats() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, stats); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, stats)
 	}
 }
 
@@ -221,10 +214,7 @@ func (h *handler) handleTimeseries(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, series); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, series)
 	}
 }
 
@@ -243,16 +233,6 @@ func parseUUIDQueryParam(q url.Values, key string) ([]uuid.UUID, error) {
 		ids = append(ids, id)
 	}
 	return ids, nil
-}
-
-func parsePathUUID(w http.ResponseWriter, r *http.Request, key string, invalidMessage string) (uuid.UUID, bool) {
-	value := strings.TrimSpace(r.PathValue(key))
-	id, err := uuid.Parse(value)
-	if err != nil {
-		http.Error(w, invalidMessage, http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return id, true
 }
 
 func parseFilters(q url.Values) ([]api.Filter, error) {

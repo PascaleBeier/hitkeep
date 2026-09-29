@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"hitkeep/api"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -75,9 +74,6 @@ func (h *handler) handleGetShareAIActivity() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, report); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, report)
 	}
 }

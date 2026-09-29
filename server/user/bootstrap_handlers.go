@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/access"
 	"hitkeep/server/shared"
 )
@@ -41,10 +40,7 @@ func (h *handler) handleGetUserBootstrap() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, bootstrap); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user bootstrap", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, bootstrap)
 	}
 }
 

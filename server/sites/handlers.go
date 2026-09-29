@@ -221,10 +221,7 @@ func (h *handler) handleGetSites() http.HandlerFunc {
 			sites = filtered
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, sites); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, sites)
 	}
 }
 
@@ -320,10 +317,7 @@ func (h *handler) handleCreateSite() http.HandlerFunc {
 			SiteID: &site.ID,
 			Data:   map[string]any{"site_id": site.ID.String(), "domain": site.Domain},
 		})
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, site); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, site)
 	}
 }
 
@@ -402,9 +396,8 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -469,10 +462,7 @@ func (h *handler) handleResetSiteStats() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, result); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 
@@ -487,9 +477,8 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -568,10 +557,7 @@ func (h *handler) handleRenameSiteDomain() http.HandlerFunc {
 			site.Domain = domain
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, site); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, site)
 	}
 }
 
@@ -666,9 +652,8 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -726,15 +711,12 @@ func (h *handler) handleTransferSiteTeam() http.HandlerFunc {
 		}
 		h.refreshIPFilter(r.Context())
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, map[string]any{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]any{
 			"status":              "ok",
 			"site_id":             siteID,
 			"source_team_id":      sourceTeamID,
 			"destination_team_id": destinationTeamID,
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode site transfer response", "error", err, "site_id", siteID, "user_id", userID)
-		}
+		})
 	}
 }
 

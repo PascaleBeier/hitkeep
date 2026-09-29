@@ -33,7 +33,7 @@ func (h *handler) handleRefreshSpamFilter() http.HandlerFunc {
 
 		if h.ctx.SpamFilter == nil {
 			h.appendAudit(r, "spam_filter.refresh", "system", "", "", "failure", "Spam filter not available")
-			writeJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error", "message": "Spam filter not available",
 			})
 			return
@@ -42,14 +42,14 @@ func (h *handler) handleRefreshSpamFilter() http.HandlerFunc {
 		if err := h.ctx.SpamFilter.Update(ctx); err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to refresh spam filter", "error", err)
 			h.appendAudit(r, "spam_filter.refresh", "system", "", "", "failure", err.Error())
-			writeJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
 				"status": "error", "message": "Failed to refresh spam filter: " + err.Error(),
 			})
 			return
 		}
 
 		h.appendAudit(r, "spam_filter.refresh", "system", "", "", "success", "Spam filter refreshed manually")
-		writeJSON(r.Context(), w, http.StatusOK, map[string]string{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 			"status": "ok", "message": "Spam filter refreshed successfully",
 		})
 	}
@@ -59,14 +59,14 @@ func (h *handler) handleRunImportStageCleanup() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Store == nil {
 			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", "Store not available")
-			writeJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error", "message": "Store not available",
 			})
 			return
 		}
 		if h.ctx.Config.ImportStageRetentionDays <= 0 {
 			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", "Import stage cleanup is disabled")
-			writeJSON(r.Context(), w, http.StatusConflict, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusConflict, map[string]string{
 				"status": "error", "message": "Import stage cleanup is disabled",
 			})
 			return
@@ -82,7 +82,7 @@ func (h *handler) handleRunImportStageCleanup() http.HandlerFunc {
 		if err != nil {
 			shared.LoggerFromContext(r.Context()).Error("Failed to clean import staging files", "error", err)
 			h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "failure", err.Error())
-			writeJSON(r.Context(), w, http.StatusInternalServerError, api.SystemImportStageCleanupRunResponse{
+			shared.WriteJSON(r.Context(), w, http.StatusInternalServerError, api.SystemImportStageCleanupRunResponse{
 				Status:  "error",
 				Message: "Import stage cleanup failed: " + err.Error(),
 				Result:  result,
@@ -97,7 +97,7 @@ func (h *handler) handleRunImportStageCleanup() http.HandlerFunc {
 			result.ImportsMarkedFailed,
 		)
 		h.appendAudit(r, "import_stage_cleanup.run", "system", "", "", "success", details)
-		writeJSON(r.Context(), w, http.StatusOK, api.SystemImportStageCleanupRunResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.SystemImportStageCleanupRunResponse{
 			Status:  "ok",
 			Message: "Import stage cleanup completed",
 			Result:  result,
@@ -113,7 +113,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h.ctx.Mailer == nil {
 			h.appendAudit(r, "mail.test", "system", "", "", "failure", "Mailer not configured")
-			writeJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusServiceUnavailable, map[string]string{
 				"status": "error", "message": "Mailer not configured",
 			})
 			return
@@ -131,7 +131,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 		var req request
 		if r.Body != nil && r.ContentLength != 0 {
 			if err := json.UnmarshalRead(r.Body, &req); err != nil {
-				writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
+				shared.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 					"status": "error", "message": "Invalid request body",
 				})
 				return
@@ -145,7 +145,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 		parsedRecipient, err := mail.ParseAddress(recipient)
 		if err != nil || parsedRecipient == nil || strings.TrimSpace(parsedRecipient.Address) == "" {
 			h.appendAudit(r, "mail.test", "mail", "", recipient, "failure", "Invalid test email recipient")
-			writeJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusBadRequest, map[string]string{
 				"status": "error", "message": "Enter a valid email address",
 			})
 			return
@@ -166,7 +166,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 			if h.ctx.MailTestTracker != nil {
 				h.ctx.MailTestTracker.SetResult(false)
 			}
-			writeJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
+			shared.WriteJSON(r.Context(), w, http.StatusInternalServerError, map[string]string{
 				"status": "error", "message": failureMessage,
 			})
 			return
@@ -176,7 +176,7 @@ func (h *handler) handleTestMail() http.HandlerFunc {
 		if h.ctx.MailTestTracker != nil {
 			h.ctx.MailTestTracker.SetResult(true)
 		}
-		writeJSON(r.Context(), w, http.StatusOK, map[string]string{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{
 			"status": "ok", "message": "Test email sent successfully to " + recipient,
 		})
 	}

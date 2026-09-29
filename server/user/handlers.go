@@ -316,10 +316,7 @@ func (h *handler) handleGetUserProfile() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user profile", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -398,10 +395,7 @@ func (h *handler) handleUpdateUserProfile() http.HandlerFunc {
 			AvatarURL:   "/api/user/avatar?s=96",
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode updated user profile", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -471,10 +465,7 @@ func (h *handler) handleGetUserPreferences() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, prefs); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, prefs)
 	}
 }
 
@@ -507,10 +498,7 @@ func (h *handler) handleGetCurrentIP() http.HandlerFunc {
 			CIDR: parsedIP.String() + cidrSuffix,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode current IP response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -540,10 +528,7 @@ func (h *handler) handleUpdateUserPreferences() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, prefs); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user preferences", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, prefs)
 	}
 }
 

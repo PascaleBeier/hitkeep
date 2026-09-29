@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -31,10 +30,7 @@ func (h *handler) handleGetUserOnboarding() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, onboarding); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode user onboarding response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, onboarding)
 	}
 }
 

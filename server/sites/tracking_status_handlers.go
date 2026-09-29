@@ -4,9 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
-
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -17,9 +14,8 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -40,10 +36,7 @@ func (h *handler) handleGetSiteTrackingStatus() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, status); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode tracking status response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -54,9 +47,8 @@ func (h *handler) handleGetSiteSetupState() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -77,9 +69,6 @@ func (h *handler) handleGetSiteSetupState() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, state); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode setup state response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, state)
 	}
 }

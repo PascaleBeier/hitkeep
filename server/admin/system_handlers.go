@@ -46,7 +46,7 @@ func (h *handler) handleGetSystem() http.HandlerFunc {
 			ConfigFlags:     map[string]any{},
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, info)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, info)
 	}
 }
 
@@ -222,7 +222,7 @@ func (h *handler) handleGetHealth() http.HandlerFunc {
 			}
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, health)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, health)
 	}
 }
 
@@ -241,14 +241,14 @@ func (h *handler) handleGetSearchConsole() http.HandlerFunc {
 		}
 
 		status := googleSearchConsoleSystemStatus(h.ctx.Config, h.ctx.TenantStores != nil, storeStatus)
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
 func (h *handler) handleGetAI() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := aiSystemStatus(r.Context(), h.ctx.Config, h.ctx.Store)
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -449,7 +449,7 @@ func (h *handler) handleGetStorage() http.HandlerFunc {
 			shared.LoggerFromContext(ctx).Debug("Failed to read filesystem usage", "path", diskPath, "error", err)
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, storage)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, storage)
 	}
 }
 
@@ -482,7 +482,7 @@ func (h *handler) handleGetIngestStats() http.HandlerFunc {
 			stats.HitsPerSecond = float64(stats.RecentHits) / secs
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, stats)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, stats)
 	}
 }
 
@@ -493,7 +493,7 @@ func (h *handler) handleGetBackups() http.HandlerFunc {
 			status = h.ctx.BackupStatus.Status()
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -503,7 +503,7 @@ func (h *handler) handleGetDatabase() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, systemDatabaseStatus(h.ctx.Store.DatabaseStatus()))
 	}
 }
 
@@ -518,7 +518,7 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 		if err := h.ctx.Store.Checkpoint(ctx, "manual"); err != nil {
 			shared.LoggerFromContext(ctx).Error("Manual database checkpoint failed", "error", err)
 			h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "failure", "checkpoint_failed")
-			writeJSON(r.Context(), w, http.StatusInternalServerError, api.SystemActionResponse{
+			shared.WriteJSON(r.Context(), w, http.StatusInternalServerError, api.SystemActionResponse{
 				Status:  "error",
 				Message: "Database checkpoint failed",
 			})
@@ -526,7 +526,7 @@ func (h *handler) handleRunDatabaseCheckpoint() http.HandlerFunc {
 		}
 
 		h.appendAudit(r, "database.checkpoint_requested", "database", "", "shared", "success", "checkpoint_completed")
-		writeJSON(r.Context(), w, http.StatusOK, api.SystemActionResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.SystemActionResponse{
 			Status:  "ok",
 			Message: "Database checkpoint completed",
 		})
@@ -559,7 +559,7 @@ func (h *handler) handleGetSpamFilter() http.HandlerFunc {
 			status.LastRefresh = h.ctx.SpamFilter.LastRefresh()
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -594,7 +594,7 @@ func (h *handler) handleGetImportStageCleanup() http.HandlerFunc {
 			status = h.ctx.ImportStageCleanupStatus.Status(estimate)
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -634,7 +634,7 @@ func (h *handler) handleGetCaches() http.HandlerFunc {
 			status.RateLimiterCache.Size = h.ctx.ApiLimiter.Len()
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -664,7 +664,7 @@ func (h *handler) handleGetMail() http.HandlerFunc {
 			status.LastTestAt, status.LastTestOK = h.ctx.MailTestTracker.Status()
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 
@@ -748,7 +748,7 @@ func (h *handler) handleListAudit() http.HandlerFunc {
 			HasMore: offset+len(entries) < total,
 		}
 
-		writeJSON(r.Context(), w, http.StatusOK, resp)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -829,13 +829,5 @@ func (h *handler) handleExportAudit() http.HandlerFunc {
 		if err := json.MarshalWrite(w, entries); err != nil {
 			shared.LoggerFromContext(ctx).Error("Failed to encode instance audit export", "error", err)
 		}
-	}
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, data); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
 	}
 }

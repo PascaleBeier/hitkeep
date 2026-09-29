@@ -143,7 +143,7 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 
 func (h *handler) handleList() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok || !h.ensureStore(w) {
 			return
 		}
@@ -155,13 +155,13 @@ func (h *handler) handleList() http.HandlerFunc {
 			return
 		}
 		h.withRedirectURLs(qrs)
-		writeJSON(r.Context(), w, qrs)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qrs)
 	}
 }
 
 func (h *handler) handleCreate() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok || !h.ensureStore(w) {
 			return
 		}
@@ -177,15 +177,14 @@ func (h *handler) handleCreate() http.HandlerFunc {
 			return
 		}
 		qr.RedirectURL = h.redirectURL(token)
-		w.WriteHeader(http.StatusCreated)
-		writeJSON(r.Context(), w, qr)
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, qr)
 	}
 }
 
 func (h *handler) handleGet() http.HandlerFunc {
 	return h.qrHandler(func(w http.ResponseWriter, r *http.Request, qr *api.QRCode) {
 		h.withRedirectURL(qr)
-		writeJSON(r.Context(), w, qr)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qr)
 	})
 }
 
@@ -210,7 +209,7 @@ func (h *handler) handleUpdate() http.HandlerFunc {
 			return
 		}
 		h.withRedirectURL(qr)
-		writeJSON(r.Context(), w, qr)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qr)
 	}
 }
 
@@ -275,7 +274,7 @@ func (h *handler) handlePutAsset() http.HandlerFunc {
 				shared.LoggerFromContext(r.Context()).Warn("Failed to delete replaced QR asset file", "error", err, "site_id", siteID, "qr_code_id", qrID, "storage_key", previous.StorageKey)
 			}
 		}
-		writeJSON(r.Context(), w, saved)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, saved)
 	}
 }
 
@@ -347,7 +346,7 @@ func (h *handler) handleListShares() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, links)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, links)
 	}
 }
 
@@ -368,8 +367,7 @@ func (h *handler) handleCreateShare() http.HandlerFunc {
 			return
 		}
 		link.URL = appurl.Path(h.ctx.Config.PublicURL, "/qr-share/"+token)
-		w.WriteHeader(http.StatusCreated)
-		writeJSON(r.Context(), w, response{QRCodeShareLink: *link, Token: token})
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, response{QRCodeShareLink: *link, Token: token})
 	}
 }
 
@@ -379,7 +377,7 @@ func (h *handler) handleDeleteShare() http.HandlerFunc {
 		if !ok || !h.ensureStore(w) {
 			return
 		}
-		shareID, ok := parseUUIDPath(w, r, "shareID", "Invalid share_id")
+		shareID, ok := shared.PathUUID(w, r, "shareID", "Invalid share_id")
 		if !ok {
 			return
 		}
@@ -443,14 +441,14 @@ func (h *handler) handleShareList() http.HandlerFunc {
 			return
 		}
 		h.withRedirectURLs(qrs)
-		writeJSON(r.Context(), w, qrs)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qrs)
 	}
 }
 
 func (h *handler) handleShareGet() http.HandlerFunc {
 	return h.shareQRHandler(func(w http.ResponseWriter, r *http.Request, qr *api.QRCode) {
 		h.withRedirectURL(qr)
-		writeJSON(r.Context(), w, qr)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qr)
 	})
 }
 
@@ -479,7 +477,7 @@ func (h *handler) handleQRShareGet() http.HandlerFunc {
 			return
 		}
 		h.withRedirectURL(qr)
-		writeJSON(r.Context(), w, qr)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, qr)
 	}
 }
 
@@ -529,7 +527,7 @@ func (h *handler) summaryHandler(load loadQRFunc) http.HandlerFunc {
 			return
 		}
 		h.withRedirectURL(qr)
-		writeJSON(r.Context(), w, api.QRCodeSummary{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.QRCodeSummary{
 			QRCode:       *qr,
 			OpenCount:    opens,
 			Pageviews:    stats.TotalPageviews,
@@ -561,7 +559,7 @@ func (h *handler) openSeriesHandler(load loadQRFunc) http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, points)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, points)
 	}
 }
 
@@ -707,7 +705,7 @@ func (h *handler) loadSiteSharedQR(w http.ResponseWriter, r *http.Request) (*api
 	if !ok {
 		return nil, false
 	}
-	qrID, ok := parseUUIDPath(w, r, "qrID", "Invalid qr_code_id")
+	qrID, ok := shared.PathUUID(w, r, "qrID", "Invalid qr_code_id")
 	if !ok {
 		return nil, false
 	}
@@ -769,7 +767,7 @@ func (h *handler) loadSiteShare(w http.ResponseWriter, r *http.Request) (*api.Si
 		http.Error(w, "Not found", http.StatusNotFound)
 		return nil, false
 	}
-	pathSiteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+	pathSiteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 	if !ok {
 		return nil, false
 	}
@@ -1086,24 +1084,15 @@ func (h *handler) serveAsset(w http.ResponseWriter, r *http.Request, asset *api.
 }
 
 func parseSiteQR(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUID, bool) {
-	siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
-	qrID, ok := parseUUIDPath(w, r, "qrID", "Invalid qr_code_id")
+	qrID, ok := shared.PathUUID(w, r, "qrID", "Invalid qr_code_id")
 	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
 	return siteID, qrID, true
-}
-
-func parseUUIDPath(w http.ResponseWriter, r *http.Request, key, message string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(strings.TrimSpace(r.PathValue(key)))
-	if err != nil {
-		http.Error(w, message, http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return id, true
 }
 
 func normalizeCustomParams(params map[string]string) map[string]string {
@@ -1154,11 +1143,4 @@ func (h *handler) ensureStore(w http.ResponseWriter) bool {
 		return false
 	}
 	return true
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
-	}
 }

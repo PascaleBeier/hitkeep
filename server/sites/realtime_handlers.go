@@ -3,8 +3,6 @@ package sites
 import (
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"hitkeep/server/shared"
 )
 
@@ -15,9 +13,8 @@ func (h *handler) handleGetSiteRealtime() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 

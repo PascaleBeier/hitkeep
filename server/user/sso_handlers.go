@@ -55,7 +55,7 @@ func (h *handler) handleGetTeamSSO() http.HandlerFunc {
 			http.Error(w, "Could not load SSO configuration", http.StatusInternalServerError)
 			return
 		}
-		writeTeamSSOConfig(r.Context(), w, h.teamSSOResponse(config))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, h.teamSSOResponse(config))
 	}
 }
 
@@ -137,7 +137,7 @@ func (h *handler) handleUpsertTeamSSO() http.HandlerFunc {
 			return
 		}
 		h.appendTeamSSOAudit(r, teamID, actorID, "sso.configuration_updated", "success", fmt.Sprintf("SSO configuration updated (enabled=%t, domains=%d)", config.Enabled, len(config.AllowedDomains)))
-		writeTeamSSOConfig(r.Context(), w, h.teamSSOResponse(stored))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, h.teamSSOResponse(stored))
 	}
 }
 
@@ -170,8 +170,7 @@ func (h *handler) handleTestTeamSSO() http.HandlerFunc {
 			return
 		}
 		h.appendTeamSSOAudit(r, teamID, actorID, "sso.connection_tested", "success", "SSO discovery test succeeded")
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.MarshalWrite(w, map[string]string{"status": "ok"})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "ok"})
 	}
 }
 
@@ -332,13 +331,6 @@ func (h *handler) teamSSOResponse(config *database.TeamSSOConfig) api.TeamSSOCon
 	resp.Enabled = config.Enabled
 	resp.UpdatedAt = config.UpdatedAt
 	return resp
-}
-
-func writeTeamSSOConfig(ctx context.Context, w http.ResponseWriter, config api.TeamSSOConfig) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, config); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode team SSO response", "error", err)
-	}
 }
 
 func (h *handler) appendTeamSSOAudit(r *http.Request, teamID, actorID uuid.UUID, action, outcome, details string) {

@@ -240,10 +240,7 @@ func (h *handler) handleSSOAvailability() http.HandlerFunc {
 			reason = ssoReasonAvailabilityEnabled
 		}
 		shared.LoggerFromContext(r.Context()).Debug("SSO availability evaluated", "flow", ssoAuditFlowAvailability, "outcome", enabled, "reason", reason, "configured_teams", len(teamIDs), "eligible_teams", eligibleTeams)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, api.SSOAvailability{Enabled: enabled}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode SSO availability", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.SSOAvailability{Enabled: enabled})
 	}
 }
 
@@ -317,13 +314,9 @@ func (h *handler) handleCreateInitialUser() http.HandlerFunc {
 
 		shared.LoggerFromContext(r.Context()).Info("Initial admin user created", "user_id", userID)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, map[string]string{
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, map[string]string{
 			"token": token,
-		}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		})
 	}
 }
 
@@ -390,11 +383,7 @@ func (h *handler) handleLogin() http.HandlerFunc {
 			h.appendAuthAuditForUserTeams(r, user.ID, "auth.login_succeeded", "success", "Login succeeded", true)
 		}
 		shared.LoggerFromContext(r.Context()).Info("User logged in", "user_id", user.ID)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.MarshalWrite(w, resp); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -435,7 +424,7 @@ func (h *handler) handleGetSession() http.HandlerFunc {
 			return
 		}
 
-		writeSessionResponse(r.Context(), w, h.ctx.AuthSessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, h.ctx.AuthSessionResponseForRequest(r, shared.GetUserIDFromContext(r), session))
 	}
 }
 
@@ -466,7 +455,7 @@ func (h *handler) handleExtendSession() http.HandlerFunc {
 			resp.RememberExpiresAt = rememberExpiresAt
 		}
 		h.appendAuthAuditForUserTeams(r, userID, "auth.session_extended", "success", "Session extended", true)
-		writeSessionResponse(r.Context(), w, resp)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -494,13 +483,6 @@ func (h *handler) renewRememberedSession(r *http.Request, w http.ResponseWriter,
 	}
 	authcore.SetRememberMeCookieWithDuration(w, rememberToken, isSecure, rememberDuration)
 	return &rememberExpiresAt
-}
-
-func writeSessionResponse(ctx context.Context, w http.ResponseWriter, resp api.AuthSession) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, resp); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode auth session response", "error", err)
-	}
 }
 
 func HashPassword(password string) (string, error) {

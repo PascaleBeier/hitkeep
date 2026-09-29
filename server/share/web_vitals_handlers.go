@@ -8,7 +8,6 @@ import (
 
 	"hitkeep/api"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -116,10 +115,7 @@ func (h *handler) handleGetShareWebVitalsBreakdown() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, payload); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, payload)
 	}
 }
 
@@ -157,9 +153,6 @@ func (h *handler) handleGetShareWebVitals(
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, payload); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, payload)
 	}
 }

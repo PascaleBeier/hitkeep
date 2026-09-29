@@ -1,12 +1,10 @@
 package permissions
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/google/uuid"
 
-	json "hitkeep/jsonapi"
 	"hitkeep/server/access"
 	"hitkeep/server/shared"
 )
@@ -43,7 +41,7 @@ func (h *handler) handleGetUserPermissions() http.HandlerFunc {
 			return
 		}
 
-		writeJSON(r.Context(), w, resp)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, resp)
 	}
 }
 
@@ -53,11 +51,4 @@ func (h *handler) accessBuilder(w http.ResponseWriter) (access.Builder, bool) {
 		return access.Builder{}, false
 	}
 	return access.Builder{Store: h.ctx.Store, Limits: h.ctx.Limits()}, true
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, resp any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, resp); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
-	}
 }

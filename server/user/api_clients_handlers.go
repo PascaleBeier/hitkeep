@@ -59,10 +59,7 @@ func (h *handler) handleListAPIClients() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, clients); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode api clients response", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, clients)
 	}
 }
 
@@ -140,11 +137,7 @@ func (h *handler) handleCreateAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode create api client response", "error", err, "user_id", userID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, apiClientTokenResponse{Client: *client, Token: token})
 	}
 }
 
@@ -156,9 +149,8 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "id", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -247,10 +239,7 @@ func (h *handler) handleUpdateAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, updated); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode api client update response", "error", err, "user_id", userID, "client_id", clientID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, updated)
 	}
 }
 
@@ -262,9 +251,8 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "id", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -293,10 +281,7 @@ func (h *handler) handleRotateAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate api client response", "error", err, "user_id", userID, "client_id", clientID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, apiClientTokenResponse{Client: *client, Token: token})
 	}
 }
 
@@ -308,9 +293,8 @@ func (h *handler) handleDeleteAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "id", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -359,10 +343,7 @@ func (h *handler) handleListTeamAPIClients() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, clients); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api clients response", "error", err, "team_id", teamID, "actor_id", actorID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, clients)
 	}
 }
 
@@ -418,11 +399,7 @@ func (h *handler) handleCreateTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode create team api client response", "error", err, "team_id", teamID, "actor_id", actorID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, apiClientTokenResponse{Client: *client, Token: token})
 	}
 }
 
@@ -433,9 +410,8 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("clientId")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "clientId", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -506,10 +482,7 @@ func (h *handler) handleUpdateTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, updated); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode team api client update response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, updated)
 	}
 }
 
@@ -520,9 +493,8 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("clientId")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "clientId", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -551,10 +523,7 @@ func (h *handler) handleRotateTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, apiClientTokenResponse{Client: *client, Token: token}); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode rotate team api client response", "error", err, "team_id", teamID, "actor_id", actorID, "client_id", clientID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, apiClientTokenResponse{Client: *client, Token: token})
 	}
 }
 
@@ -565,9 +534,8 @@ func (h *handler) handleDeleteTeamAPIClient() http.HandlerFunc {
 			return
 		}
 
-		clientID, err := uuid.Parse(strings.TrimSpace(r.PathValue("clientId")))
-		if err != nil {
-			http.Error(w, "Invalid client ID", http.StatusBadRequest)
+		clientID, ok := shared.PathUUID(w, r, "clientId", "Invalid client ID")
+		if !ok {
 			return
 		}
 
@@ -727,9 +695,8 @@ func (h *handler) resolveTeamAPIClientScope(w http.ResponseWriter, r *http.Reque
 		return uuid.Nil, uuid.Nil, false
 	}
 
-	teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid team ID", http.StatusBadRequest)
+	teamID, ok := shared.PathUUID(w, r, "id", "Invalid team ID")
+	if !ok {
 		return uuid.Nil, uuid.Nil, false
 	}
 

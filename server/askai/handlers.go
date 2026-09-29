@@ -109,7 +109,7 @@ func (h *handler) handleAsk() http.HandlerFunc {
 		}) {
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, apiAskAIResponse(result))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, apiAskAIResponse(result))
 	}
 }
 
@@ -305,7 +305,7 @@ func (h *handler) handleHistory() http.HandlerFunc {
 		}) {
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, apiAskAIHistoryResponse(entries, total, limit, offset))
+		shared.WriteJSON(r.Context(), w, http.StatusOK, apiAskAIHistoryResponse(entries, total, limit, offset))
 	}
 }
 
@@ -328,9 +328,8 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 		return prepared, false
 	}
-	siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site ID")
+	if !ok {
 		return prepared, false
 	}
 	userID := shared.GetUserIDFromContext(r)
@@ -428,7 +427,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		}) {
 			return prepared, false
 		}
-		writeJSON(r.Context(), w, code, status)
+		shared.WriteJSON(r.Context(), w, code, status)
 		return prepared, false
 	}
 	if h.ctx.AI == nil {
@@ -556,7 +555,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 			}) {
 				return prepared, false
 			}
-			writeJSON(r.Context(), w, code, quotaStatus)
+			shared.WriteJSON(r.Context(), w, code, quotaStatus)
 			return prepared, false
 		}
 		if quotaStatus.DailyLimit == nil {
@@ -619,9 +618,8 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 		http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 		return prepared, false
 	}
-	siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site ID")
+	if !ok {
 		return prepared, false
 	}
 	userID := shared.GetUserIDFromContext(r)
@@ -703,7 +701,7 @@ func (h *handler) prepareAskAIHistory(w http.ResponseWriter, r *http.Request) (a
 		}) {
 			return prepared, false
 		}
-		writeJSON(r.Context(), w, code, status)
+		shared.WriteJSON(r.Context(), w, code, status)
 		return prepared, false
 	}
 	return askAIHistoryPrepared{SiteID: siteID, AuditContext: auditCtx}, true
@@ -1549,12 +1547,4 @@ func mustAuditJSON(value any) string {
 
 func safeAuditValue(value string) string {
 	return strings.NewReplacer(" ", "_", "\n", "_", "\r", "_", "\t", "_").Replace(strings.TrimSpace(value))
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode Ask AI response", "error", err)
-	}
 }

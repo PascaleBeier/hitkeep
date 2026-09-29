@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/api"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/filterparams"
 	"hitkeep/server/shared"
 )
@@ -29,9 +28,8 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(r.PathValue("id"))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -77,9 +75,6 @@ func (h *handler) handleGetSiteAIActivity() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, report); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, report)
 	}
 }

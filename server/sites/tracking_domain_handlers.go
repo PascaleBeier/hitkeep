@@ -2,14 +2,12 @@ package sites
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 
 	"hitkeep/api"
 	"hitkeep/appurl"
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -19,15 +17,12 @@ func (h *handler) handleGetSiteTrackingDomainOptions() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, options); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode site tracking domain options", "error", err, "site_id", options.SiteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, options)
 	}
 }
 
 func (h *handler) siteTrackingDomainOptions(w http.ResponseWriter, r *http.Request) (api.SiteTrackingDomainOptions, bool) {
-	siteID, ok := parseSiteIDPath(w, r)
+	siteID, ok := shared.PathUUID(w, r, "id", "Invalid site ID")
 	if !ok {
 		return api.SiteTrackingDomainOptions{}, false
 	}
@@ -79,13 +74,4 @@ func (h *handler) buildSiteTrackingDomainOptions(r *http.Request, siteID, teamID
 		DefaultURL: defaultURL,
 		Domains:    domains,
 	}, true
-}
-
-func parseSiteIDPath(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
-	siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid site ID", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return siteID, true
 }

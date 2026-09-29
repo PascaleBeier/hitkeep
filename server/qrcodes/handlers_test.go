@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,6 +102,43 @@ func TestRecordOpenBestEffortDropsPathAndUserAgentExclusions(t *testing.T) {
 				t.Fatalf("expected exclusion to suppress QR open, got %d", count)
 			}
 		})
+	}
+}
+
+func TestHandleCreateRespondsCreatedJSON(t *testing.T) {
+	ctx := t.Context()
+	store := database.NewStore(":memory:")
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	userID, err := store.CreateUser(ctx, "qr-create@example.test", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "qr-create.example.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+
+	h := &handler{ctx: &shared.Context{Store: store, Config: &config.Config{PublicURL: "http://localhost:8080"}}}
+	req := httptest.NewRequest(http.MethodPost, "/api/sites/"+site.ID.String()+"/qr-codes", strings.NewReader(`{"name":"Flyer","destination_url":"https://qr-create.example.test/"}`))
+	req.SetPathValue("id", site.ID.String())
+	req = req.WithContext(context.WithValue(req.Context(), shared.UserIDKey, userID))
+	rec := httptest.NewRecorder()
+	h.handleCreate().ServeHTTP(rec, req)
+
+	// The status used to be committed before the JSON Content-Type was set;
+	// Result() reports the headers as sent, not the live header map.
+	res := rec.Result()
+	if res.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", res.StatusCode, http.StatusCreated, rec.Body.String())
+	}
+	if got := res.Header.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
 	}
 }
 

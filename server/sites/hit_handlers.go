@@ -14,7 +14,6 @@ import (
 
 	"hitkeep/api"
 	"hitkeep/exportfmt"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -118,10 +117,7 @@ func (h *handler) handleGetSiteHits() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, result); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode response", "error", err)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, result)
 	}
 }
 

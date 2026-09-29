@@ -155,12 +155,7 @@ func (c *Context) RequireActiveTeamCapability(capability auth.Capability) func(h
 }
 
 func teamIDFromRequest(r *http.Request, w http.ResponseWriter) (uuid.UUID, bool) {
-	teamID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-	if err != nil {
-		http.Error(w, "Invalid team ID", http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return teamID, true
+	return PathUUID(w, r, "id", "Invalid team ID")
 }
 
 func (c *Context) userHasTeamCapability(ctx context.Context, teamID, userID uuid.UUID, capability auth.Capability) bool {

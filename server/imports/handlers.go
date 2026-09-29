@@ -140,7 +140,7 @@ func importActorID(job *api.ImportJob) uuid.UUID {
 
 func (h *handler) handleListImporters() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(r.Context(), w, h.registry.Descriptors())
+		shared.WriteJSON(r.Context(), w, http.StatusOK, h.registry.Descriptors())
 	}
 }
 
@@ -151,7 +151,7 @@ func (h *handler) handleCreateUpload() http.HandlerFunc {
 			return
 		}
 
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
@@ -227,7 +227,7 @@ func (h *handler) handleCreateUpload() http.HandlerFunc {
 		}
 		h.appendImportAudit(r.Context(), r, siteID, job.ID, actorID, job.Provider, "import.upload_created", "success", fmt.Sprintf("%s import upload created with %d file(s)", job.Provider, len(job.Files)))
 
-		writeJSON(r.Context(), w, api.ImportUploadCreateResponse{
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.ImportUploadCreateResponse{
 			ImportID:  job.ID,
 			Provider:  job.Provider,
 			Status:    job.Status,
@@ -243,15 +243,15 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
-		importID, ok := parseUUIDPath(w, r, "importID", "Invalid import_id")
+		importID, ok := shared.PathUUID(w, r, "importID", "Invalid import_id")
 		if !ok {
 			return
 		}
-		fileID, ok := parseUUIDPath(w, r, "fileID", "Invalid file_id")
+		fileID, ok := shared.PathUUID(w, r, "fileID", "Invalid file_id")
 		if !ok {
 			return
 		}
@@ -291,12 +291,12 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 				http.Error(w, "Chunk overlaps uploaded boundary", http.StatusConflict)
 				return
 			}
-			writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: file.BytesReceived >= file.SizeBytes})
+			shared.WriteJSON(r.Context(), w, http.StatusOK, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: file.BytesReceived >= file.SizeBytes})
 			return
 		}
 		remaining := file.SizeBytes - offset
 		if remaining <= 0 {
-			writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: true})
+			shared.WriteJSON(r.Context(), w, http.StatusOK, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: file.BytesReceived, Complete: true})
 			return
 		}
 
@@ -344,17 +344,17 @@ func (h *handler) handleUploadChunk() http.HandlerFunc {
 			}
 			h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.file_uploaded", "success", fmt.Sprintf("Import file %s uploaded", file.Filename))
 		}
-		writeJSON(r.Context(), w, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: bytesReceived, Complete: bytesReceived >= file.SizeBytes})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.ImportChunkResponse{ImportID: importID, FileID: fileID, BytesReceived: bytesReceived, Complete: bytesReceived >= file.SizeBytes})
 	}
 }
 
 func (h *handler) handleValidateUpload() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
-		importID, ok := parseUUIDPath(w, r, "importID", "Invalid import_id")
+		importID, ok := shared.PathUUID(w, r, "importID", "Invalid import_id")
 		if !ok {
 			return
 		}
@@ -438,17 +438,17 @@ func (h *handler) handleValidateUpload() http.HandlerFunc {
 		}
 		h.appendImportAudit(r.Context(), r, siteID, importID, actorID, job.Provider, "import.validated", "success", fmt.Sprintf("%s import validated with %d accepted row(s)", job.Provider, manifest.RowsAccepted))
 		job, _ = h.ctx.Store.GetSiteImport(r.Context(), siteID, importID)
-		writeJSON(r.Context(), w, job)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, job)
 	}
 }
 
 func (h *handler) handleGetImport() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
-		importID, ok := parseUUIDPath(w, r, "importID", "Invalid import_id")
+		importID, ok := shared.PathUUID(w, r, "importID", "Invalid import_id")
 		if !ok {
 			return
 		}
@@ -457,13 +457,13 @@ func (h *handler) handleGetImport() http.HandlerFunc {
 			http.Error(w, "Import not found", http.StatusNotFound)
 			return
 		}
-		writeJSON(r.Context(), w, job)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, job)
 	}
 }
 
 func (h *handler) handleListImports() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
@@ -473,17 +473,17 @@ func (h *handler) handleListImports() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, api.ImportListResponse{Imports: imports})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, api.ImportListResponse{Imports: imports})
 	}
 }
 
 func (h *handler) handleStartImport() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
-		importID, ok := parseUUIDPath(w, r, "importID", "Invalid import_id")
+		importID, ok := shared.PathUUID(w, r, "importID", "Invalid import_id")
 		if !ok {
 			return
 		}
@@ -531,17 +531,17 @@ func (h *handler) handleStartImport() http.HandlerFunc {
 		}
 
 		job, _ = h.ctx.Store.GetSiteImport(r.Context(), siteID, importID)
-		writeJSON(r.Context(), w, job)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, job)
 	}
 }
 
 func (h *handler) handleDeleteImport() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		siteID, ok := parseUUIDPath(w, r, "id", "Invalid site_id")
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
 		if !ok {
 			return
 		}
-		importID, ok := parseUUIDPath(w, r, "importID", "Invalid import_id")
+		importID, ok := shared.PathUUID(w, r, "importID", "Invalid import_id")
 		if !ok {
 			return
 		}
@@ -583,7 +583,7 @@ func (h *handler) handleDeleteImport() http.HandlerFunc {
 			h.publishImportChange(siteID, deletedRows)
 		}
 		h.cleanupStagedFiles(importID)
-		writeJSON(r.Context(), w, map[string]string{"status": "deleted"})
+		shared.WriteJSON(r.Context(), w, http.StatusOK, map[string]string{"status": "deleted"})
 	}
 }
 
@@ -865,20 +865,4 @@ func sanitizeUploadFilename(filename string) string {
 		return ""
 	}
 	return base
-}
-
-func parseUUIDPath(w http.ResponseWriter, r *http.Request, name, message string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(strings.TrimSpace(r.PathValue(name)))
-	if err != nil {
-		http.Error(w, message, http.StatusBadRequest)
-		return uuid.Nil, false
-	}
-	return id, true
-}
-
-func writeJSON(ctx context.Context, w http.ResponseWriter, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.MarshalWrite(w, value); err != nil {
-		shared.LoggerFromContext(ctx).Error("Failed to encode response", "error", err)
-	}
 }

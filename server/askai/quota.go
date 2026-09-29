@@ -3,7 +3,6 @@ package askai
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,9 +17,8 @@ func (h *handler) handleStatus() http.HandlerFunc {
 			http.Error(w, "Service not available on this node", http.StatusServiceUnavailable)
 			return
 		}
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site ID")
+		if !ok {
 			return
 		}
 		userID := shared.GetUserIDFromContext(r)
@@ -64,7 +62,7 @@ func (h *handler) handleStatus() http.HandlerFunc {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
-		writeJSON(r.Context(), w, http.StatusOK, status)
+		shared.WriteJSON(r.Context(), w, http.StatusOK, status)
 	}
 }
 

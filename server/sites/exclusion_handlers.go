@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 
 	"hitkeep/database"
-	json "hitkeep/jsonapi"
 	"hitkeep/server/shared"
 )
 
@@ -21,9 +20,8 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -51,10 +49,7 @@ func (h *handler) handleListSiteExclusions() http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.MarshalWrite(w, rules); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusions response", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusOK, rules)
 	}
 }
 
@@ -65,9 +60,8 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
@@ -110,11 +104,7 @@ func (h *handler) handleCreateSiteExclusion() http.HandlerFunc {
 			})
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.MarshalWrite(w, createdRule); err != nil {
-			shared.LoggerFromContext(r.Context()).Error("Failed to encode site exclusion response", "error", err, "site_id", siteID)
-		}
+		shared.WriteJSON(r.Context(), w, http.StatusCreated, createdRule)
 	}
 }
 
@@ -125,15 +115,13 @@ func (h *handler) handleDeleteSiteExclusion() http.HandlerFunc {
 			return
 		}
 
-		siteID, err := uuid.Parse(strings.TrimSpace(r.PathValue("id")))
-		if err != nil {
-			http.Error(w, "Invalid site_id", http.StatusBadRequest)
+		siteID, ok := shared.PathUUID(w, r, "id", "Invalid site_id")
+		if !ok {
 			return
 		}
 
-		ruleID, err := uuid.Parse(strings.TrimSpace(r.PathValue("ruleID")))
-		if err != nil {
-			http.Error(w, "Invalid rule_id", http.StatusBadRequest)
+		ruleID, ok := shared.PathUUID(w, r, "ruleID", "Invalid rule_id")
+		if !ok {
 			return
 		}
 
