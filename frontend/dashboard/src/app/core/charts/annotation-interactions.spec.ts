@@ -24,6 +24,7 @@ function fakeChart() {
         convertFromPixel: (_: unknown, x: number) => x / 100,
         convertToPixel: (_: unknown, index: number) => index * 100,
         dispatchAction: vi.fn(),
+        setOption: vi.fn(),
         getWidth: () => 500,
         getHeight: () => 300,
         isDisposed: () => false

@@ -123,10 +123,22 @@ describe('hitkeep chart options', () => {
             }) as unknown as { series: { markLine?: { data: unknown[] }; markArea?: { data: unknown[] } }[] };
 
             expect(option.series[0].markLine?.data).toEqual([{ xAxis: 1, name: 'Launch' }]);
-            expect(option.series[0].markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign' }, { xAxis: 1 }]]);
+            expect(option.series[0].markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign', label: { distance: 6 } }, { xAxis: 1 }]]);
             expect(option.series[1].markLine).toBeUndefined();
             expect(option.series[1].markArea).toBeUndefined();
         }
+    });
+
+    it('stacks the labels of overlapping ranges on separate rows', () => {
+        const areas = [
+            { start: 0, end: 4, label: 'A' },
+            { start: 2, end: 6, label: 'B' },
+            { start: 5, end: 7, label: 'C' }
+        ];
+        const option = buildHitkeepChartOptions({ ariaLabel: 'Chart', labels: [], locale: 'en-US', theme, series: [{ ...baseSeries[0], annotations: { lines: [], areas } }] }) as unknown as {
+            series: { markArea: { data: [{ label: { distance: number } }, unknown][] } }[];
+        };
+        expect(option.series[0].markArea.data.map(([start]) => start.label.distance)).toEqual([6, 22, 6]);
     });
 
     it('omits marker options when a series has no annotations', () => {

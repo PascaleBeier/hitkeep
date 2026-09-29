@@ -83,9 +83,20 @@ export function bindAnnotationInteractions(chart: ECharts, options: AnnotationIn
         }
     };
 
+    // The axis tooltip re-opens on every move; mute it while a range is being drawn.
+    const setTooltipMuted = (muted: boolean): void => {
+        chart.setOption({ tooltip: { triggerOn: muted ? 'none' : 'mousemove|click' } });
+        if (muted) {
+            chart.dispatchAction({ type: 'hideTip' });
+        }
+    };
+
     const stopDrag = (): void => {
         window.removeEventListener('mouseup', finishDrag);
         window.removeEventListener('keydown', onKeydown);
+        if (drag && !chart.isDisposed()) {
+            setTooltipMuted(false);
+        }
         drag = null;
         clearPreview();
     };
@@ -136,7 +147,7 @@ export function bindAnnotationInteractions(chart: ECharts, options: AnnotationIn
         }
         const index = bucketAt(event.offsetX);
         drag = { start: index, current: index };
-        chart.dispatchAction({ type: 'hideTip' });
+        setTooltipMuted(true);
         window.addEventListener('mouseup', finishDrag);
         window.addEventListener('keydown', onKeydown);
     };
@@ -153,7 +164,6 @@ export function bindAnnotationInteractions(chart: ECharts, options: AnnotationIn
             drag.current = index;
             drawPreview();
         }
-        chart.dispatchAction({ type: 'hideTip' });
     };
 
     chart.on('mousedown', onMarkerDown);

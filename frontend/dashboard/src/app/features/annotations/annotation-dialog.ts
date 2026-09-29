@@ -4,7 +4,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
-import { TextareaModule } from '@openng/optimus-ui/textarea';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { formatAnnotationWhen, fromDateTimeInputs, toDateTimeInputs } from '@features/annotations/annotation-dates';
 import { SiteAnnotationsService, type AnnotationDraft } from '@features/annotations/site-annotations.service';
@@ -32,7 +31,9 @@ function toFormModel(draft: AnnotationDraft | null): AnnotationFormModel {
 @Component({
     selector: 'app-annotation-dialog',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DialogShell, FormField, ButtonModule, InputTextModule, TextareaModule, TranslocoPipe],
+    // The note field borrows the input styles without an OptimusUI directive: pTextarea throws under Signal Forms,
+    // and pInputText would show the empty field as invalid before the reader has typed anything.
+    imports: [DialogShell, FormField, ButtonModule, InputTextModule, TranslocoPipe],
     template: `
         <app-dialog-shell
             [title]="title() | transloco"
@@ -52,14 +53,14 @@ function toFormModel(draft: AnnotationDraft | null): AnnotationFormModel {
                     <div class="flex flex-col gap-2">
                         <label for="annotation-body" class="text-sm font-semibold text-[var(--p-text-color)]">{{ 'annotations.dialog.bodyLabel' | transloco }}</label>
                         <textarea
-                            pTextarea
                             id="annotation-body"
                             rows="3"
-                            class="w-full resize-none"
+                            class="p-inputtext p-component w-full resize-none"
+                            [class.p-invalid]="showBodyError()"
                             [formField]="noteForm.body"
                             [placeholder]="'annotations.dialog.bodyPlaceholder' | transloco"
                             [attr.aria-describedby]="showBodyError() ? null : 'annotation-body-hint'"
-                            [attr.aria-invalid]="showBodyError()"
+                            [attr.aria-invalid]="showBodyError() || null"
                             (keydown.control.enter)="save($event)"
                             (keydown.meta.enter)="save($event)"
                         ></textarea>
@@ -87,7 +88,7 @@ function toFormModel(draft: AnnotationDraft | null): AnnotationFormModel {
                                 {{ 'annotations.dialog.endLabel' | transloco }}
                                 <span class="font-normal text-[var(--p-text-muted-color)]">{{ 'annotations.dialog.optional' | transloco }}</span>
                             </label>
-                            <input pInputText id="annotation-end-date" type="date" class="w-full" [formField]="noteForm.endDate" [attr.aria-invalid]="endBeforeStart()" [attr.aria-describedby]="endBeforeStart() ? 'annotation-end-error' : null" />
+                            <input pInputText id="annotation-end-date" type="date" class="w-full" [formField]="noteForm.endDate" [attr.aria-invalid]="endBeforeStart() || null" [attr.aria-describedby]="endBeforeStart() ? 'annotation-end-error' : null" />
                             @if (hourly()) {
                                 <input pInputText type="time" class="w-full" [formField]="noteForm.endTime" [attr.aria-label]="'annotations.dialog.endTimeLabel' | transloco" />
                             }

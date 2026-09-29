@@ -221,7 +221,7 @@ describe('SeriesChart', () => {
             const merge = (component as unknown as { chartMergeOptions: () => { series: { name: string; markLine?: { data: unknown[] }; markArea?: { data: unknown[] } }[] } }).chartMergeOptions();
             const current = merge.series.find((series) => series.name === 'Events');
             expect(current?.markLine?.data).toEqual([{ xAxis: 1, name: 'Launch' }]);
-            expect(current?.markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign' }, { xAxis: 2 }]]);
+            expect(current?.markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign', label: { distance: 6 } }, { xAxis: 2 }]]);
             expect(merge.series.find((series) => series.name !== 'Events')?.markLine).toBeUndefined();
 
             const chips = fixture.debugElement.queryAll(By.css('app-annotation-strip button'));

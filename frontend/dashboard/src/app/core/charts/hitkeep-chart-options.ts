@@ -350,6 +350,7 @@ function buildAnnotationOptions(annotations: HitkeepChartAnnotations | undefined
     }
     const accent = annotationAccentColor();
     const animation = motionDuration(1) > 0;
+    const lanes = rangeLabelLanes(annotations.areas);
     const hoverLabel = {
         show: true,
         color: theme.tooltipTextColor,
@@ -368,7 +369,8 @@ function buildAnnotationOptions(annotations: HitkeepChartAnnotations | undefined
             silent: false,
             animation,
             symbol: ['none', 'circle'],
-            symbolSize: [0, 9],
+            symbolSize: 8,
+            itemStyle: { color: accent },
             lineStyle: { color: accent, type: 'dashed', width: 1.25 },
             label: { ...hoverLabel, show: false, position: 'end' },
             emphasis: { lineStyle: { width: 2, type: 'solid' }, label: hoverLabel },
@@ -380,9 +382,22 @@ function buildAnnotationOptions(annotations: HitkeepChartAnnotations | undefined
             itemStyle: { color: withChartAlpha(accent, 0.1), borderColor: withChartAlpha(accent, 0.45), borderWidth: 1, borderType: 'dashed' },
             label: { show: true, position: 'insideTop', distance: 6, color: theme.textColor, fontSize: 11, width: 140, overflow: 'truncate', formatter: '{b}' },
             emphasis: { itemStyle: { color: withChartAlpha(accent, 0.2) }, label: hoverLabel },
-            data: annotations.areas.map((area) => [{ xAxis: area.start, name: area.label }, { xAxis: area.end }])
+            data: annotations.areas.map((area, i) => [{ xAxis: area.start, name: area.label, label: { distance: 6 + lanes[i] * 16 } }, { xAxis: area.end }])
         }
     };
+}
+
+/** Overlapping ranges put their inline labels on separate rows so the text never collides. */
+function rangeLabelLanes(areas: HitkeepChartAnnotations['areas']): number[] {
+    const laneEnds: number[] = [];
+    return areas.map((area) => {
+        let lane = laneEnds.findIndex((end) => end < area.start);
+        if (lane === -1) {
+            lane = laneEnds.length;
+        }
+        laneEnds[lane] = area.end;
+        return lane;
+    });
 }
 
 function resolveSeriesDesign(series: HitkeepChartSeries, defaultDesign: HitkeepChartDesign): HitkeepChartDesign {
