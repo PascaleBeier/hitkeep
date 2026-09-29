@@ -302,6 +302,19 @@ func screenshotCommand(options *options) *cobra.Command {
 	command.Flags().BoolVar(&request.FullPage, "full-page", false, "capture the complete document instead of the viewport")
 	command.Flags().StringVar(&request.Selector, "selector", "", "capture one visible CSS selector on a single route")
 	command.Flags().BoolVar(&request.Anonymous, "anonymous", false, "capture without signing in to the seeded development account")
+
+	var docsRequest devtool.DocsScreenshotRequest
+	docs := &cobra.Command{
+		Use:   "docs",
+		Short: "Capture the curated docs and README screenshot set from the seeded session",
+		Args:  cobra.NoArgs,
+		RunE: withApp(options, "screenshot docs", func(ctx context.Context, app *devtool.App) (any, error) {
+			return app.CaptureDocsScreenshots(ctx, docsRequest)
+		}),
+	}
+	docs.Flags().StringVar(&docsRequest.Target, "target", "", "optional subset: ask-ai")
+	docs.Flags().BoolVar(&docsRequest.Sync, "sync", false, "copy captures into .github/assets and ../hitkeep-docs (updates tracked files)")
+	command.AddCommand(docs)
 	return command
 }
 
