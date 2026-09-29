@@ -1,6 +1,9 @@
 package mcpserver
 
-import "hitkeep/api"
+import (
+	"hitkeep/analyticstools"
+	"hitkeep/api"
+)
 
 const (
 	defaultRangeDays = 30
@@ -139,6 +142,13 @@ type eventNamesOutput struct {
 	From   string   `json:"from"`
 	To     string   `json:"to"`
 	Names  []string `json:"names"`
+}
+
+type annotationsOutput struct {
+	SiteID      string                          `json:"site_id"`
+	From        string                          `json:"from"`
+	To          string                          `json:"to"`
+	Annotations []analyticstools.AnnotationNote `json:"annotations"`
 }
 
 type eventBreakdownOutput struct {

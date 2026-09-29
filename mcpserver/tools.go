@@ -68,6 +68,13 @@ func (s *service) registerTools(server *mcp.Server) {
 		Description: aiVisibility.MCPDescription,
 		Annotations: readOnly,
 	}, s.getAIVisibility)
+	annotations := analyticscatalog.MustDefinition(analyticscatalog.ToolAnnotations)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        annotations.Name,
+		Title:       annotations.Title,
+		Description: annotations.MCPDescription,
+		Annotations: readOnly,
+	}, s.getAnnotations)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "hitkeep_get_opportunities",
 		Title:       "Get HitKeep Opportunities",
@@ -211,6 +218,26 @@ func (s *service) getEventNames(ctx context.Context, _ *mcp.CallToolRequest, inp
 		return nil, eventNamesOutput{}, err
 	}
 	return nil, eventNamesOutput{SiteID: siteID.String(), From: formatMCPTime(start), To: formatMCPTime(end), Names: names}, nil
+}
+
+func (s *service) getAnnotations(ctx context.Context, _ *mcp.CallToolRequest, input siteRangeInput) (*mcp.CallToolResult, annotationsOutput, error) {
+	siteID, start, end, err := s.parseSiteRange(input.SiteID, input.rangeInput)
+	if err != nil {
+		return nil, annotationsOutput{}, err
+	}
+	if _, err := s.requireSiteView(ctx, siteID); err != nil {
+		return nil, annotationsOutput{}, err
+	}
+	annotations, err := s.store.ListAnnotations(ctx, siteID, start, end)
+	if err != nil {
+		return nil, annotationsOutput{}, err
+	}
+	return nil, annotationsOutput{
+		SiteID:      siteID.String(),
+		From:        formatMCPTime(start),
+		To:          formatMCPTime(end),
+		Annotations: analyticstools.ToAnnotationNotes(annotations),
+	}, nil
 }
 
 func (s *service) getEventBreakdown(ctx context.Context, _ *mcp.CallToolRequest, input eventBreakdownInput) (*mcp.CallToolResult, eventBreakdownOutput, error) {

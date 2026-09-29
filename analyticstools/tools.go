@@ -16,7 +16,11 @@ import (
 )
 
 type Config struct {
-	Analytics     *database.Store
+	Analytics *database.Store
+	// Annotations is the control store holding team notes. Leave it nil to
+	// withhold the annotations tool, as Opportunities does: notes explain
+	// data but must never become cited evidence.
+	Annotations   *database.Store
 	SiteID        uuid.UUID
 	UserID        uuid.UUID
 	From          time.Time
@@ -100,7 +104,7 @@ func (b Bridge) Tools() []goaisdk.Tool {
 	ecommerce := analyticscatalog.MustDefinition(analyticscatalog.ToolEcommerce)
 	webVitals := analyticscatalog.MustDefinition(analyticscatalog.ToolWebVitals)
 	aiVisibility := analyticscatalog.MustDefinition(analyticscatalog.ToolAIVisibility)
-	return []goaisdk.Tool{
+	tools := []goaisdk.Tool{
 		goaisdk.NewTool(siteOverview.Name, siteOverview.AIDescription, b.siteOverview),
 		goaisdk.NewTool(eventNames.Name, eventNames.AIDescription, b.eventNames),
 		goaisdk.NewTool(eventBreakdown.Name, eventBreakdown.AIDescription, b.eventBreakdown),
@@ -108,6 +112,43 @@ func (b Bridge) Tools() []goaisdk.Tool {
 		goaisdk.NewTool(webVitals.Name, webVitals.AIDescription, b.webVitals),
 		goaisdk.NewTool(aiVisibility.Name, aiVisibility.AIDescription, b.aiVisibility),
 	}
+	if b.config.Annotations != nil {
+		annotations := analyticscatalog.MustDefinition(analyticscatalog.ToolAnnotations)
+		tools = append(tools, goaisdk.NewTool(annotations.Name, annotations.AIDescription, b.annotations))
+	}
+	return tools
+}
+
+// AnnotationNote is the model- and MCP-facing shape of a team note: no site
+// or author fields, times in RFC3339 UTC.
+type AnnotationNote struct {
+	ID       string `json:"id"`
+	StartsAt string `json:"starts_at"`
+	EndsAt   string `json:"ends_at,omitempty"`
+	Body     string `json:"body"`
+}
+
+func ToAnnotationNotes(annotations []api.Annotation) []AnnotationNote {
+	notes := make([]AnnotationNote, 0, len(annotations))
+	for _, a := range annotations {
+		note := AnnotationNote{ID: a.ID.String(), StartsAt: a.StartsAt.UTC().Format(time.RFC3339), Body: a.Body}
+		if a.EndsAt != nil {
+			note.EndsAt = a.EndsAt.UTC().Format(time.RFC3339)
+		}
+		notes = append(notes, note)
+	}
+	return notes
+}
+
+func (b Bridge) annotations(ctx context.Context, _ struct{}) (string, error) {
+	if err := b.ready(ctx); err != nil {
+		return "", err
+	}
+	annotations, err := b.config.Annotations.ListAnnotations(ctx, b.config.SiteID, b.config.From, b.config.To)
+	if err != nil {
+		return "", err
+	}
+	return toolJSON(analyticscatalog.ToolAnnotations, b.config.SiteID, b.config.From, b.config.To, ToAnnotationNotes(annotations))
 }
 
 func (b Bridge) siteOverview(ctx context.Context, _ struct{}) (string, error) {

@@ -146,8 +146,13 @@ func TestToolBridgeExposesSharedAggregateCatalogTools(t *testing.T) {
 	for _, tool := range bridge.Tools() {
 		got = append(got, tool.Name)
 	}
+	// Team notes explain data but are never Opportunity evidence, so the
+	// bridge offers every catalog tool except annotations.
 	want := make([]string, 0, len(analyticscatalog.ReadOnlyAggregateTools))
 	for _, definition := range analyticscatalog.ReadOnlyAggregateTools {
+		if definition.Name == analyticscatalog.ToolAnnotations {
+			continue
+		}
 		want = append(want, definition.Name)
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
