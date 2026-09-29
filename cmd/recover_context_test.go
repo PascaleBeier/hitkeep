@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestRecoverUsesRootConfig(t *testing.T) {
@@ -118,7 +120,7 @@ func TestRecoverRestoreBackupHonorsCanceledContext(t *testing.T) {
 	cancel()
 	var stdout, stderr bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	err := Recover(ctx, []string{
+	err := Recover(ctx, afero.NewMemMapFs(), []string{
 		"restore-backup",
 		"-from", backup,
 		"-db", filepath.Join(t.TempDir(), "hitkeep.db"),

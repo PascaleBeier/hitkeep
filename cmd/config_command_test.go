@@ -116,7 +116,7 @@ func TestConfigFallbackUsesPublicRootRuntime(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	configPath := filepath.Join(t.TempDir(), "missing.yaml")
 	args := []string{"config", "foo"}
-	want := run(context.Background(), logger, args, configPath)
+	want := run(context.Background(), afero.NewOsFs(), logger, args, configPath)
 	if want == nil {
 		t.Fatal("legacy runtime accepted missing explicit configuration")
 	}

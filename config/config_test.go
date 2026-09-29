@@ -55,7 +55,7 @@ func loadWithEnv(t *testing.T, args []string, getEnv func(string, string) string
 	if len(loggerArgs) > 0 {
 		logger = loggerArgs[0]
 	}
-	return load(args, fs, configFile, logger)
+	return LoadArgs(fs, args, configFile, logger)
 }
 
 func TestLoadConfig(t *testing.T) {

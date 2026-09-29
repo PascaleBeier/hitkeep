@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
+	"github.com/spf13/afero"
 
 	"hitkeep/config"
 	"hitkeep/database"
@@ -56,6 +57,7 @@ func (r recoveryCommand) confirm(prompt string) bool {
 
 type recoveryCommand struct {
 	ctx        context.Context
+	fs         afero.Fs
 	in         io.Reader
 	out        io.Writer
 	errOut     io.Writer
@@ -66,13 +68,13 @@ type recoveryCommand struct {
 // Recover handles the "hitkeep recover <subcommand>" family of commands.
 // These are offline recovery operations that require HitKeep to be stopped
 // (DuckDB allows only one writer at a time).
-func Recover(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger, configFile string) error {
+func Recover(ctx context.Context, fs afero.Fs, args []string, in io.Reader, out, errOut io.Writer, logger *slog.Logger, configFile string) error {
 	if len(args) == 0 {
 		fmt.Fprintln(errOut, recoverUsage)
 		return recoveryExit(1)
 	}
 
-	r := recoveryCommand{ctx: ctx, in: in, out: out, errOut: errOut, logger: logger, configFile: configFile}
+	r := recoveryCommand{ctx: ctx, fs: fs, in: in, out: out, errOut: errOut, logger: logger, configFile: configFile}
 	switch args[0] {
 	case "disable-2fa":
 		return r.recoverDisable2FA(args[1:])
@@ -172,7 +174,7 @@ func (r recoveryCommand) recoverDisable2FA(args []string) error {
 
 	// Resolve DB path: flag overrides config default
 	if *dbPath == "" {
-		conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+		conf, err := config.LoadArgs(r.fs, nil, r.configFile, r.logger)
 		if err != nil {
 			return fmt.Errorf("load recovery configuration: %w", err)
 		}
@@ -318,7 +320,7 @@ func (r recoveryCommand) recoverRestoreDatabaseBundle(args []string) error {
 		return recoveryExit(1)
 	}
 	if strings.TrimSpace(*dbPath) == "" {
-		conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+		conf, err := config.LoadArgs(r.fs, nil, r.configFile, r.logger)
 		if err != nil {
 			return fmt.Errorf("load recovery configuration: %w", err)
 		}
@@ -541,7 +543,7 @@ func (r recoveryCommand) recoverRestoreBackup(args []string) error {
 	}
 
 	// Resolve defaults from config.
-	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	conf, err := config.LoadArgs(r.fs, nil, r.configFile, r.logger)
 	if err != nil {
 		return fmt.Errorf("load recovery configuration: %w", err)
 	}
@@ -934,7 +936,7 @@ func (r recoveryCommand) recoverRebuildDefaultTenant(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return recoveryFlagExit(err)
 	}
-	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	conf, err := config.LoadArgs(r.fs, nil, r.configFile, r.logger)
 	if err != nil {
 		return fmt.Errorf("load recovery configuration: %w", err)
 	}
@@ -987,7 +989,7 @@ func (r recoveryCommand) recoverImportArchives(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return recoveryFlagExit(err)
 	}
-	conf, err := config.LoadArgs(nil, r.configFile, r.logger)
+	conf, err := config.LoadArgs(r.fs, nil, r.configFile, r.logger)
 	if err != nil {
 		return fmt.Errorf("load recovery configuration: %w", err)
 	}

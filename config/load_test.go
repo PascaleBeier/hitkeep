@@ -132,7 +132,7 @@ func TestLoadArgsReadsExplicitOSFile(t *testing.T) {
 	t.Setenv("HITKEEP_MAIL_PORT", "3030")
 	t.Setenv("HITKEEP_MCP_DOCS_URL", "")
 
-	conf, err := LoadArgs([]string{"--http-addr=:9090"}, configFile, nil)
+	conf, err := LoadArgs(afero.NewOsFs(), []string{"--http-addr=:9090"}, configFile, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,9 +177,9 @@ func TestLoadRejectsInvalidExplicitFiles(t *testing.T) {
 			if err := afero.WriteFile(fs, "config.yaml", []byte(test.content), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			_, err := load(nil, fs, "config.yaml", nil)
+			_, err := LoadArgs(fs, nil, "config.yaml", nil)
 			if err == nil || !strings.Contains(err.Error(), test.want) {
-				t.Fatalf("load() error = %v, want substring %q", err, test.want)
+				t.Fatalf("LoadArgs() error = %v, want substring %q", err, test.want)
 			}
 			for _, value := range []string{"top-secret", "not-a-number"} {
 				if strings.Contains(err.Error(), value) {
@@ -195,7 +195,7 @@ func TestLoadDoesNotDiscoverFilesImplicitly(t *testing.T) {
 	if err := afero.WriteFile(fs, "hitkeep.yaml", []byte("http-addr: ':6060'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	conf, err := load([]string{"--healthcheck"}, fs, "", nil)
+	conf, err := LoadArgs(fs, []string{"--healthcheck"}, "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

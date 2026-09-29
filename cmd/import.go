@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 
 	"hitkeep/api"
@@ -48,7 +49,7 @@ type importCLIOptions struct {
 
 type importOperation func(importCommand, importCLIOptions, []string) error
 
-func newImportCommandRoute(logger *slog.Logger) *cobra.Command {
+func newImportCommandRoute(fs afero.Fs, logger *slog.Logger) *cobra.Command {
 	command := &cobra.Command{
 		Use:           "import",
 		Short:         "Import historical analytics data",
@@ -56,39 +57,39 @@ func newImportCommandRoute(logger *slog.Logger) *cobra.Command {
 		SilenceUsage:  true,
 	}
 	command.AddCommand(
-		newImportOperationCommand("validate <provider>", "Validate an import", cobra.ExactArgs(1), logger, func(c importCommand, opts importCLIOptions, args []string) error {
+		newImportOperationCommand("validate <provider>", "Validate an import", cobra.ExactArgs(1), fs, logger, func(c importCommand, opts importCLIOptions, args []string) error {
 			return c.runValidate(args[0], opts)
 		}),
-		newImportOperationCommand("plausible", "Import Plausible analytics data", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("plausible", "Import Plausible analytics data", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runProvider("plausible", opts)
 		}),
-		newImportOperationCommand("simpleanalytics", "Import Simple Analytics data", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("simpleanalytics", "Import Simple Analytics data", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runProvider("simpleanalytics", opts)
 		}),
-		newImportOperationCommand("start", "Start a validated import", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("start", "Start a validated import", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runStart(opts)
 		}),
-		newImportOperationCommand("status", "Show import status", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("status", "Show import status", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runStatus(opts)
 		}),
-		newImportOperationCommand("list", "List imports", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("list", "List imports", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runList(opts)
 		}),
-		newImportOperationCommand("delete", "Delete an import", cobra.NoArgs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
+		newImportOperationCommand("delete", "Delete an import", cobra.NoArgs, fs, logger, func(c importCommand, opts importCLIOptions, _ []string) error {
 			return c.runDelete(opts)
 		}),
 	)
 	return command
 }
 
-func newImportOperationCommand(use, short string, args cobra.PositionalArgs, logger *slog.Logger, operation importOperation) *cobra.Command {
+func newImportOperationCommand(use, short string, args cobra.PositionalArgs, fs afero.Fs, logger *slog.Logger, operation importOperation) *cobra.Command {
 	var opts importCLIOptions
 	command := &cobra.Command{
 		Use:   use,
 		Short: short,
 		Args:  args,
 		RunE: func(command *cobra.Command, args []string) error {
-			importer, err := newImportExecutor(command.Context(), command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()), logger)
+			importer, err := newImportExecutor(command.Context(), fs, command.InOrStdin(), command.OutOrStdout(), command.ErrOrStderr(), rootConfigFile(command.Context()), logger)
 			if err != nil {
 				return err
 			}
@@ -115,8 +116,8 @@ func bindImportFlags(command *cobra.Command, opts *importCLIOptions) {
 	command.Flags().BoolVar(&opts.yes, "yes", false, "Start without confirmation")
 }
 
-func newImportExecutor(ctx context.Context, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) (importCommand, error) {
-	conf, err := runtimeconfig.LoadArgs(nil, configFile, logger)
+func newImportExecutor(ctx context.Context, fs afero.Fs, in io.Reader, out, errOut io.Writer, configFile string, logger *slog.Logger) (importCommand, error) {
+	conf, err := runtimeconfig.LoadArgs(fs, nil, configFile, logger)
 	if err != nil {
 		return importCommand{}, fmt.Errorf("load import configuration: %w", err)
 	}

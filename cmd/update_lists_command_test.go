@@ -8,14 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
 func TestUpdateListCommandsExposeOutputFlag(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	for _, command := range []*cobra.Command{
-		newUpdateSpamListsCommand(logger),
-		newUpdateAIAgentListsCommand(logger),
+		newUpdateSpamListsCommand(afero.NewMemMapFs(), logger),
+		newUpdateAIAgentListsCommand(afero.NewMemMapFs(), logger),
 	} {
 		if command.Flags().Lookup("output") == nil {
 			t.Fatalf("%s has no --output flag", command.Name())
@@ -33,13 +34,13 @@ func TestUpdateListCommandMetadata(t *testing.T) {
 		outputDescription string
 	}{
 		{
-			command:           newUpdateSpamListsCommand(logger),
+			command:           newUpdateSpamListsCommand(afero.NewMemMapFs(), logger),
 			use:               "update-spam-lists",
 			short:             "Update spam filter lists",
 			outputDescription: "Output path for the compiled spam filter cache",
 		},
 		{
-			command:           newUpdateAIAgentListsCommand(logger),
+			command:           newUpdateAIAgentListsCommand(afero.NewMemMapFs(), logger),
 			use:               "update-ai-agent-lists",
 			short:             "Update AI agent lists",
 			outputDefault:     "aianalytics/default_ai_agents.json",
@@ -77,8 +78,8 @@ func TestUpdateListCommandMetadata(t *testing.T) {
 func TestUpdateListCommandsPreserveFlagExitCode(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	for _, command := range []*cobra.Command{
-		newUpdateSpamListsCommand(logger),
-		newUpdateAIAgentListsCommand(logger),
+		newUpdateSpamListsCommand(afero.NewMemMapFs(), logger),
+		newUpdateAIAgentListsCommand(afero.NewMemMapFs(), logger),
 	} {
 		var stdout, stderr bytes.Buffer
 		command.SetOut(&stdout)
@@ -100,8 +101,8 @@ func TestUpdateListCommandsPreserveFlagExitCode(t *testing.T) {
 
 func TestUpdateListCommandsRetainPositionalCompatibility(t *testing.T) {
 	for _, command := range []*cobra.Command{
-		newUpdateSpamListsCommand(slog.Default()),
-		newUpdateAIAgentListsCommand(slog.Default()),
+		newUpdateSpamListsCommand(afero.NewMemMapFs(), slog.Default()),
+		newUpdateAIAgentListsCommand(afero.NewMemMapFs(), slog.Default()),
 	} {
 		if err := command.Args(command, []string{"legacy-positional"}); err != nil {
 			t.Fatalf("%s rejected a legacy positional argument: %v", command.Name(), err)

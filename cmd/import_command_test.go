@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestImportCommandUsesRootConfigurationAndStreams(t *testing.T) {
@@ -48,7 +50,7 @@ func TestImportCommandUsesTypedConfigurationAndFlagOverrides(t *testing.T) {
 	}
 	t.Setenv("HITKEEP_API_URL", "http://api-env.example")
 	t.Setenv("HITKEEP_API_TOKEN", "env-token")
-	command, err := newImportExecutor(t.Context(), nil, io.Discard, io.Discard, path, nil)
+	command, err := newImportExecutor(t.Context(), afero.NewOsFs(), nil, io.Discard, io.Discard, path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +76,7 @@ func TestImportCommandPreservesHelpAndValidationExitSemantics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("HITKEEP_API_TOKEN", "")
 			var stdout, stderr bytes.Buffer
-			command := newImportCommandRoute(nil)
+			command := newImportCommandRoute(afero.NewMemMapFs(), nil)
 			command.SetOut(&stdout)
 			command.SetErr(&stderr)
 			command.SetArgs(tt.args)

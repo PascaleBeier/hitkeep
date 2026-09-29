@@ -14,6 +14,7 @@ import (
 
 	"github.com/nsqio/go-nsq"
 	"github.com/nsqio/nsq/nsqd"
+	"github.com/spf13/afero"
 	"golang.org/x/sync/errgroup"
 
 	"hitkeep/cluster"
@@ -34,8 +35,8 @@ import (
 
 var Version = "snapshot"
 
-func run(ctx context.Context, logger *slog.Logger, args []string, configFile string) (err error) {
-	conf, err := config.LoadArgs(args, configFile, logger)
+func run(ctx context.Context, fs afero.Fs, logger *slog.Logger, args []string, configFile string) (err error) {
+	conf, err := config.LoadArgs(fs, args, configFile, logger)
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}

@@ -52,20 +52,21 @@ type rootActions struct {
 
 // NewRootCommand routes production commands while their existing parsers remain authoritative.
 func NewRootCommand(logger *slog.Logger) *cobra.Command {
+	fs := afero.NewOsFs()
 	actions := rootActions{
 		run: func(ctx context.Context, args []string, configFile string) error {
-			return run(ctx, logger, args, configFile)
+			return run(ctx, fs, logger, args, configFile)
 		},
 		recover: func(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer) error {
-			return Recover(ctx, args, in, out, errOut, logger, rootConfigFile(ctx))
+			return Recover(ctx, fs, args, in, out, errOut, logger, rootConfigFile(ctx))
 		},
 	}
 	root := newRootCommand(actions)
 	root.AddCommand(
-		newImportCommandRoute(logger),
-		newUpdateSpamListsCommand(logger),
-		newUpdateAIAgentListsCommand(logger),
-		newConfigCommand(afero.NewOsFs(), logger, func(command *cobra.Command, args []string) error {
+		newImportCommandRoute(fs, logger),
+		newUpdateSpamListsCommand(fs, logger),
+		newUpdateAIAgentListsCommand(fs, logger),
+		newConfigCommand(fs, logger, func(command *cobra.Command, args []string) error {
 			return actions.run(command.Context(), args, rootConfigFile(command.Context()))
 		}),
 	)
@@ -93,7 +94,7 @@ type updateListCommandSpec struct {
 	run               func(context.Context, string, *runtimeconfig.Config, io.Writer, io.Writer, *slog.Logger) error
 }
 
-func newUpdateListCommand(logger *slog.Logger, spec updateListCommandSpec) *cobra.Command {
+func newUpdateListCommand(fs afero.Fs, logger *slog.Logger, spec updateListCommandSpec) *cobra.Command {
 	outputPath := spec.outputDefault
 	command := &cobra.Command{
 		Use:          spec.use,
@@ -101,7 +102,7 @@ func newUpdateListCommand(logger *slog.Logger, spec updateListCommandSpec) *cobr
 		Args:         cobra.ArbitraryArgs,
 		SilenceUsage: true,
 		RunE: func(command *cobra.Command, _ []string) error {
-			conf, err := runtimeconfig.LoadArgs(nil, rootConfigFile(command.Context()), logger)
+			conf, err := runtimeconfig.LoadArgs(fs, nil, rootConfigFile(command.Context()), logger)
 			if err != nil {
 				return err
 			}
@@ -121,8 +122,8 @@ func newUpdateListCommand(logger *slog.Logger, spec updateListCommandSpec) *cobr
 	return command
 }
 
-func newUpdateSpamListsCommand(logger *slog.Logger) *cobra.Command {
-	return newUpdateListCommand(logger, updateListCommandSpec{
+func newUpdateSpamListsCommand(fs afero.Fs, logger *slog.Logger) *cobra.Command {
+	return newUpdateListCommand(fs, logger, updateListCommandSpec{
 		use:               "update-spam-lists",
 		short:             "Update spam filter lists",
 		outputDescription: "Output path for the compiled spam filter cache",
@@ -135,8 +136,8 @@ func newUpdateSpamListsCommand(logger *slog.Logger) *cobra.Command {
 	})
 }
 
-func newUpdateAIAgentListsCommand(logger *slog.Logger) *cobra.Command {
-	return newUpdateListCommand(logger, updateListCommandSpec{
+func newUpdateAIAgentListsCommand(fs afero.Fs, logger *slog.Logger) *cobra.Command {
+	return newUpdateListCommand(fs, logger, updateListCommandSpec{
 		use:               "update-ai-agent-lists",
 		short:             "Update AI agent lists",
 		outputDefault:     "aianalytics/default_ai_agents.json",
@@ -172,7 +173,7 @@ func newConfigCommand(fs afero.Fs, logger *slog.Logger, fallback func(*cobra.Com
 			return fallback(command, append([]string{"config"}, args...))
 		},
 	}
-	command.AddCommand(newConfigInitCommand(fs), newConfigValidateCommand(logger))
+	command.AddCommand(newConfigInitCommand(fs), newConfigValidateCommand(fs, logger))
 	return command
 }
 
@@ -203,14 +204,14 @@ func newConfigInitCommand(fs afero.Fs) *cobra.Command {
 	return command
 }
 
-func newConfigValidateCommand(logger *slog.Logger) *cobra.Command {
+func newConfigValidateCommand(fs afero.Fs, logger *slog.Logger) *cobra.Command {
 	var configPath string
 	command := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a configuration file",
 		Args:  cobra.NoArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
-			if _, err := runtimeconfig.LoadArgs(nil, configPath, logger); err != nil {
+			if _, err := runtimeconfig.LoadArgs(fs, nil, configPath, logger); err != nil {
 				return err
 			}
 			command.Printf("Configuration file %s is valid\n", configPath)

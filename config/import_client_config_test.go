@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/afero"
 )
 
 func TestImportClientConfigurationUsesCatalogViperPrecedence(t *testing.T) {
@@ -28,7 +30,7 @@ func TestImportClientConfigurationUsesCatalogViperPrecedence(t *testing.T) {
 			for key, value := range tt.env {
 				t.Setenv(key, value)
 			}
-			conf, err := LoadArgs(nil, path, nil)
+			conf, err := LoadArgs(afero.NewOsFs(), nil, path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

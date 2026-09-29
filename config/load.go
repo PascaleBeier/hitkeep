@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,15 +19,13 @@ import (
 )
 
 // LoadArgs assembles runtime configuration from explicit arguments, the process
-// environment, and an optional configuration file. It never reads os.Args.
-func LoadArgs(args []string, configFile string, logger *slog.Logger) (*Config, error) {
-	return load(args, afero.NewOsFs(), configFile, logger)
-}
-
-// load applies the 2.x precedence: changed flag, environment, explicit file,
+// environment, and an optional configuration file read through fsys. It never
+// reads os.Args.
+//
+// It applies the 2.x precedence: changed flag, environment, explicit file,
 // catalog default. Viper owns defaults, file, and environment; pflag owns flags
 // and writes typed values last so the legacy last-occurrence rule holds.
-func load(args []string, fsys afero.Fs, configFile string, logger *slog.Logger) (*Config, error) {
+func LoadArgs(fsys afero.Fs, args []string, configFile string, logger *slog.Logger) (*Config, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -97,13 +96,7 @@ func activeSettings() []ConfigurationSetting {
 	if includeCloudConfigFields() {
 		return settings
 	}
-	active := settings[:0]
-	for _, setting := range settings {
-		if !setting.CloudOnly {
-			active = append(active, setting)
-		}
-	}
-	return active
+	return slices.DeleteFunc(settings, func(setting ConfigurationSetting) bool { return setting.CloudOnly })
 }
 
 // newFlagSet binds every setting's flag to its typed field. Deprecated names are
