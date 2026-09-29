@@ -866,6 +866,26 @@ func openAPIV1AnalyticsSchemas() map[string]any {
 				"created_at": map[string]any{"type": "string", "format": "date-time"},
 			},
 		},
+		"Annotation": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":         map[string]any{"type": "string", "format": "uuid"},
+				"site_id":    map[string]any{"type": "string", "format": "uuid"},
+				"starts_at":  map[string]any{"type": "string", "format": "date-time"},
+				"ends_at":    map[string]any{"type": "string", "format": "date-time", "description": "Omitted for a single point in time."},
+				"body":       map[string]any{"type": "string", "maxLength": 280},
+				"created_at": map[string]any{"type": "string", "format": "date-time"},
+			},
+		},
+		"AnnotationInput": map[string]any{
+			"type":     "object",
+			"required": []string{"starts_at", "body"},
+			"properties": map[string]any{
+				"starts_at": map[string]any{"type": "string", "format": "date-time"},
+				"ends_at":   map[string]any{"type": "string", "format": "date-time", "description": "Set to mark a range; must not be before starts_at."},
+				"body":      map[string]any{"type": "string", "minLength": 1, "maxLength": 280},
+			},
+		},
 		"GoalSeriesPoint": map[string]any{
 			"type": "object",
 			"properties": map[string]any{

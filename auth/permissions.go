@@ -38,12 +38,13 @@ const (
 	PermInstanceManageWebhooks       Permission = "instance.manage_webhooks"
 
 	// Site permissions
-	PermSiteView           Permission = "site.view"
-	PermSiteManageData     Permission = "site.manage_data"
-	PermSiteManageGoals    Permission = "site.manage_goals"
-	PermSiteManageTeam     Permission = "site.manage_team"
-	PermSiteDelete         Permission = "site.delete"
-	PermSiteManageWebhooks Permission = "site.manage_webhooks"
+	PermSiteView              Permission = "site.view"
+	PermSiteManageData        Permission = "site.manage_data"
+	PermSiteManageGoals       Permission = "site.manage_goals"
+	PermSiteManageAnnotations Permission = "site.manage_annotations"
+	PermSiteManageTeam        Permission = "site.manage_team"
+	PermSiteDelete            Permission = "site.delete"
+	PermSiteManageWebhooks    Permission = "site.manage_webhooks"
 )
 
 // Role to permissions mapping
@@ -64,6 +65,7 @@ var instancePermissions = map[InstanceRole][]Permission{
 		PermSiteView,
 		PermSiteManageData,
 		PermSiteManageGoals,
+		PermSiteManageAnnotations,
 		PermSiteManageTeam,
 		PermSiteDelete,
 		PermSiteManageWebhooks,
@@ -88,6 +90,7 @@ var sitePermissions = map[SiteRole][]Permission{
 		PermSiteView,
 		PermSiteManageData,
 		PermSiteManageGoals,
+		PermSiteManageAnnotations,
 		PermSiteManageTeam,
 		PermSiteManageWebhooks,
 		PermSiteDelete,
@@ -96,12 +99,14 @@ var sitePermissions = map[SiteRole][]Permission{
 		PermSiteView,
 		PermSiteManageData,
 		PermSiteManageGoals,
+		PermSiteManageAnnotations,
 		PermSiteManageTeam,
 		PermSiteManageWebhooks,
 	},
 	SiteEditor: {
 		PermSiteView,
 		PermSiteManageGoals,
+		PermSiteManageAnnotations,
 	},
 	SiteViewer: {
 		PermSiteView,

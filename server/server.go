@@ -27,6 +27,7 @@ import (
 	"hitkeep/searchconsole"
 	"hitkeep/server/admin"
 	"hitkeep/server/aifetch"
+	"hitkeep/server/annotations"
 	askaihandlers "hitkeep/server/askai"
 	serverauth "hitkeep/server/auth"
 	cloudhandlers "hitkeep/server/cloud"
@@ -386,6 +387,7 @@ func (s *Server) setupRoutes(mux *http.ServeMux, publicFS fs.FS) {
 	admin.Register(mux, ctx)
 	sites.Register(mux, ctx)
 	goals.Register(mux, ctx)
+	annotations.Register(mux, ctx)
 	webhookhandlers.Register(mux, ctx)
 	s.importRunnerStop = importhandlers.Register(mux, ctx)
 	events.Register(mux, ctx)

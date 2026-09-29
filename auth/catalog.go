@@ -35,6 +35,7 @@ func SiteCapabilityCatalog() []CapabilityEntry {
 		{Key: "view", Value: string(PermSiteView)},
 		{Key: "manageData", Value: string(PermSiteManageData)},
 		{Key: "manageGoals", Value: string(PermSiteManageGoals)},
+		{Key: "manageAnnotations", Value: string(PermSiteManageAnnotations)},
 		{Key: "manageTeam", Value: string(PermSiteManageTeam)},
 		{Key: "delete", Value: string(PermSiteDelete)},
 		{Key: "manageWebhooks", Value: string(PermSiteManageWebhooks)},
