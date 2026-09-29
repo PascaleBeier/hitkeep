@@ -16,6 +16,7 @@ import type { AIActivityReport, AIFetchCorrelationReport } from '@models/analyti
 import { RealtimeEvent, RealtimeService } from '@services/realtime.service';
 import { ShareService } from '@services/share.service';
 import { aiActivityStat, emptyAIActivityComparison, emptyAIActivityReport, emptyAIFetchCorrelation } from '@testing/empty-ai-activity-report';
+import { flushAnnotations } from '@testing/annotations';
 import { flushSetupState } from '@testing/setup-state';
 import { AIAgentsPage } from './ai-agents-page';
 
@@ -231,6 +232,7 @@ describe('AIAgentsPage', () => {
             request.flush({ agents: [], ai_referrers: [] });
         }
         flushSetupState(httpMock, 'site-1');
+        flushAnnotations(httpMock);
         httpMock.verify();
     });
 

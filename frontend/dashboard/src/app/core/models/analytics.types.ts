@@ -166,6 +166,22 @@ export interface TeamAuditListResponse {
     action?: string;
 }
 
+/** A team note on a site's timeline; `ends_at` is absent for a single point in time. */
+export interface Annotation {
+    id: string;
+    site_id: string;
+    starts_at: string;
+    ends_at?: string;
+    body: string;
+    created_at: string;
+}
+
+export interface AnnotationInput {
+    starts_at: string;
+    ends_at?: string;
+    body: string;
+}
+
 export interface IPExclusion {
     id: string;
     scope?: 'instance' | 'team' | 'site';

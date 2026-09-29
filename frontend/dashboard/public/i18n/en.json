@@ -152,6 +152,41 @@
       "goBack": "Go back"
     }
   },
+  "annotations": {
+    "add": "Add note",
+    "addAria": "Add a note to this chart. You can also click the chart, or drag across it to mark a period.",
+    "chart": {
+      "grouped": "{{count}} notes · {{body}}",
+      "aria": "Notes marked on this chart: {{count}}."
+    },
+    "strip": {
+      "label": "Notes in this period",
+      "open": "Open note from {{when}}: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Add note",
+      "editTitle": "Edit note",
+      "viewTitle": "Note",
+      "bodyLabel": "Note",
+      "bodyPlaceholder": "What happened? For example: launched the new pricing page",
+      "bodyHint": "Everyone with access to this site can see notes.",
+      "remaining": "{{count}} left",
+      "whenLegend": "When",
+      "startLabel": "Date",
+      "startTimeLabel": "Start time",
+      "endLabel": "Until",
+      "endTimeLabel": "End time",
+      "optional": "(optional)",
+      "delete": "Delete note",
+      "confirmDelete": "Delete for everyone",
+      "errors": {
+        "bodyRequired": "Write a short note.",
+        "endBeforeStart": "The end must be on or after the start.",
+        "saveFailed": "The note could not be saved. Try again.",
+        "deleteFailed": "The note could not be deleted. Try again."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Ask AI about this site",
@@ -190,6 +225,7 @@
       "ecommerce": "Ecommerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "AI visibility",
+      "annotations": "Notes",
       "analytics": "Analytics"
     },
     "status": {

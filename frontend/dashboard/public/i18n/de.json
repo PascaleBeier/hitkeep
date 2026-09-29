@@ -152,6 +152,41 @@
       "goBack": "Zurück"
     }
   },
+  "annotations": {
+    "add": "Notiz hinzufügen",
+    "addAria": "Diesem Diagramm eine Notiz hinzufügen. Du kannst auch auf das Diagramm klicken oder darüber ziehen, um einen Zeitraum zu markieren.",
+    "chart": {
+      "grouped": "{{count}} Notizen · {{body}}",
+      "aria": "Im Diagramm markierte Notizen: {{count}}."
+    },
+    "strip": {
+      "label": "Notizen in diesem Zeitraum",
+      "open": "Notiz vom {{when}} öffnen: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Notiz hinzufügen",
+      "editTitle": "Notiz bearbeiten",
+      "viewTitle": "Notiz",
+      "bodyLabel": "Notiz",
+      "bodyPlaceholder": "Was ist passiert? Zum Beispiel: neue Preisseite veröffentlicht",
+      "bodyHint": "Alle mit Zugriff auf diese Website sehen Notizen.",
+      "remaining": "Noch {{count}}",
+      "whenLegend": "Wann",
+      "startLabel": "Datum",
+      "startTimeLabel": "Startzeit",
+      "endLabel": "Bis",
+      "endTimeLabel": "Endzeit",
+      "optional": "(optional)",
+      "delete": "Notiz löschen",
+      "confirmDelete": "Für alle löschen",
+      "errors": {
+        "bodyRequired": "Schreib eine kurze Notiz.",
+        "endBeforeStart": "Das Ende muss am oder nach dem Start liegen.",
+        "saveFailed": "Die Notiz konnte nicht gespeichert werden. Versuch es erneut.",
+        "deleteFailed": "Die Notiz konnte nicht gelöscht werden. Versuch es erneut."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Ask AI zu dieser Site fragen",
@@ -190,6 +225,7 @@
       "ecommerce": "E-Commerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "AI-Sichtbarkeit",
+      "annotations": "Notizen",
       "analytics": "Analytics"
     },
     "status": {

@@ -2,11 +2,13 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { SessionExpiryIndicator } from '@components/session-expiry-indicator/session-expiry-indicator';
 import { CreateTeamDialog } from '@components/create-team-dialog/create-team-dialog';
 import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
+import { AnnotationDialog } from '@features/annotations/annotation-dialog';
+import { SiteAnnotationsService } from '@features/annotations/site-annotations.service';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 
 @Component({
     selector: 'app-layout-overlays',
-    imports: [SessionExpiryIndicator, AddSiteDialog, CreateTeamDialog],
+    imports: [SessionExpiryIndicator, AddSiteDialog, AnnotationDialog, CreateTeamDialog],
     templateUrl: './layout-overlays.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -16,4 +18,5 @@ export class LayoutOverlays {
     protected readonly shareService = this.context.shareService;
     protected readonly isAddSiteVisible = this.context.isAddSiteVisible;
     protected readonly isCreateTeamVisible = this.context.isCreateTeamVisible;
+    protected readonly annotationDraft = inject(SiteAnnotationsService).draft;
 }

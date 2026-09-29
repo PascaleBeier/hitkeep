@@ -66,6 +66,13 @@ export interface HitkeepChartSeries {
     dashed?: boolean;
     muted?: boolean;
     smooth?: boolean;
+    /** Team notes drawn on this series, by category index. */
+    annotations?: HitkeepChartAnnotations;
+}
+
+export interface HitkeepChartAnnotations {
+    lines: { index: number; label: string }[];
+    areas: { start: number; end: number; label: string }[];
 }
 
 interface BuildHitkeepChartOptionsInput {
@@ -201,7 +208,7 @@ export function buildHitkeepChartOptions(input: BuildHitkeepChartOptionsInput): 
                 }
             }
         },
-        series: input.series.map((series) => buildSeriesOption(series, design))
+        series: input.series.map((series) => buildSeriesOption(series, design, input.theme))
     };
     return option as EChartsCoreOption;
 }
@@ -236,7 +243,7 @@ export function buildHitkeepChartMergeOptions(input: BuildHitkeepChartOptionsInp
             boundaryGap: hasBarSeries,
             data: input.labels
         },
-        series: input.series.map((series) => buildSeriesOption(series, design))
+        series: input.series.map((series) => buildSeriesOption(series, design, input.theme))
     } as EChartsCoreOption;
 }
 
@@ -274,10 +281,12 @@ export function withChartAlpha(color: string, alpha: number): string {
     return color;
 }
 
-function buildSeriesOption(series: HitkeepChartSeries, defaultDesign: HitkeepChartDesign): object {
+function buildSeriesOption(series: HitkeepChartSeries, defaultDesign: HitkeepChartDesign, theme: HitkeepChartTheme): object {
     const design = resolveSeriesDesign(series, defaultDesign);
+    const annotations = buildAnnotationOptions(series.annotations, theme);
     if (design === 'bar') {
         return {
+            ...annotations,
             id: series.id,
             name: series.label,
             type: 'bar',
@@ -298,6 +307,7 @@ function buildSeriesOption(series: HitkeepChartSeries, defaultDesign: HitkeepCha
 
     const areaStyle = design === 'area' && !series.muted && !series.dashed ? { color: gradientFill(series) } : undefined;
     return {
+        ...annotations,
         id: series.id,
         name: series.label,
         type: 'line',
@@ -320,6 +330,57 @@ function buildSeriesOption(series: HitkeepChartSeries, defaultDesign: HitkeepCha
         emphasis: {
             focus: 'series',
             scale: 1.35
+        }
+    };
+}
+
+/** The accent every note marker shares, so notes read as one layer across charts. */
+export function annotationAccentColor(): string {
+    return HITKEEP_CHART_PALETTE.warning;
+}
+
+/**
+ * Notes are ECharts markers on the series that carries them: a dashed line
+ * with a pin for a point, a tinted band for a range. Labels stay out of the
+ * way until hover; range labels are short enough to show inline.
+ */
+function buildAnnotationOptions(annotations: HitkeepChartAnnotations | undefined, theme: HitkeepChartTheme): object {
+    if (!annotations || (annotations.lines.length === 0 && annotations.areas.length === 0)) {
+        return {};
+    }
+    const accent = annotationAccentColor();
+    const animation = motionDuration(1) > 0;
+    const hoverLabel = {
+        show: true,
+        color: theme.tooltipTextColor,
+        backgroundColor: theme.tooltipBackgroundColor,
+        borderColor: theme.tooltipBorderColor,
+        borderWidth: 1,
+        borderRadius: 6,
+        padding: [5, 8],
+        fontSize: 12,
+        width: 220,
+        overflow: 'truncate',
+        formatter: '{b}'
+    };
+    return {
+        markLine: {
+            silent: false,
+            animation,
+            symbol: ['none', 'circle'],
+            symbolSize: [0, 9],
+            lineStyle: { color: accent, type: 'dashed', width: 1.25 },
+            label: { ...hoverLabel, show: false, position: 'end' },
+            emphasis: { lineStyle: { width: 2, type: 'solid' }, label: hoverLabel },
+            data: annotations.lines.map((line) => ({ xAxis: line.index, name: line.label }))
+        },
+        markArea: {
+            silent: false,
+            animation,
+            itemStyle: { color: withChartAlpha(accent, 0.1), borderColor: withChartAlpha(accent, 0.45), borderWidth: 1, borderType: 'dashed' },
+            label: { show: true, position: 'insideTop', distance: 6, color: theme.textColor, fontSize: 11, width: 140, overflow: 'truncate', formatter: '{b}' },
+            emphasis: { itemStyle: { color: withChartAlpha(accent, 0.2) }, label: hoverLabel },
+            data: annotations.areas.map((area) => [{ xAxis: area.start, name: area.label }, { xAxis: area.end }])
         }
     };
 }

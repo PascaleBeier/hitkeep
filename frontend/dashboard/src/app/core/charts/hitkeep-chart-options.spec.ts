@@ -110,6 +110,33 @@ describe('hitkeep chart options', () => {
         expect(merge.series[0]?.type).toBe('line');
     });
 
+    it('draws annotations as markers on the series that carries them only', () => {
+        const annotations = { lines: [{ index: 1, label: 'Launch' }], areas: [{ start: 0, end: 1, label: 'Campaign' }] };
+        for (const design of ['area', 'bar'] as const) {
+            const option = buildHitkeepChartOptions({
+                ariaLabel: 'Chart',
+                labels: ['Jul 1', 'Jul 2'],
+                locale: 'en-US',
+                design,
+                theme,
+                series: [{ ...baseSeries[0], annotations }, { id: 'views-comparison', label: 'Prev', color: '#6366f1', data: [1, 2], muted: true, dashed: true }]
+            }) as unknown as { series: { markLine?: { data: unknown[] }; markArea?: { data: unknown[] } }[] };
+
+            expect(option.series[0].markLine?.data).toEqual([{ xAxis: 1, name: 'Launch' }]);
+            expect(option.series[0].markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign' }, { xAxis: 1 }]]);
+            expect(option.series[1].markLine).toBeUndefined();
+            expect(option.series[1].markArea).toBeUndefined();
+        }
+    });
+
+    it('omits marker options when a series has no annotations', () => {
+        const option = buildHitkeepChartMergeOptions({ ariaLabel: 'Chart', labels: ['Jul 1'], locale: 'en-US', theme, series: [{ ...baseSeries[0], annotations: { lines: [], areas: [] } }] }) as unknown as {
+            series: object[];
+        };
+        expect(option.series[0]).not.toHaveProperty('markLine');
+        expect(option.series[0]).not.toHaveProperty('markArea');
+    });
+
     it('formats tooltip values with the active locale', () => {
         expect(formatChartValue(1234.56, 'de-DE')).toBe('1.234,56');
         expect(formatChartValue(42, 'en-US')).toBe('42');

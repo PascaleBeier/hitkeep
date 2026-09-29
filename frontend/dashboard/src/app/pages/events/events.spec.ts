@@ -13,6 +13,7 @@ import { Events } from '@pages/events/events';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { SiteService } from '@features/sites/services/site.service';
 import type { SiteSetupState } from '@services/setup-state.service';
+import { flushAnnotations } from '@testing/annotations';
 import { flushSetupState } from '@testing/setup-state';
 
 describe('Events', () => {
@@ -147,11 +148,14 @@ describe('Events', () => {
         fixture = TestBed.createComponent(Events);
         component = fixture.componentInstance;
         fixture.detectChanges();
+        // An open notes request keeps the app unstable, which would stall whenStable().
+        flushAnnotations(httpMock);
     });
 
     afterEach(() => {
-        // Drain the shared setup-state lookup for the tests that do not assert on it.
+        // Drain the shared setup-state and chart-notes lookups for the tests that do not assert on them.
         flushSetupState(httpMock, 'site-1');
+        flushAnnotations(httpMock);
         httpMock.verify();
     });
 
