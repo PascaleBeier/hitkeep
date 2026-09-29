@@ -21,8 +21,6 @@ export interface AppTableColumn<T = unknown> {
     options?: readonly AppTableOption[];
     /** Translates enum values without listed options as `labelKeyPrefix + value`. */
     labelKeyPrefix?: string;
-    /** Enum filters pick one value instead of many (for APIs that accept a single value). */
-    singleSelect?: boolean;
     sortable?: boolean;
     filterable?: boolean;
     /** Included in the global search. Defaults to true for text columns. */
@@ -31,18 +29,9 @@ export interface AppTableColumn<T = unknown> {
     groupable?: boolean;
     /** Identity column, frozen left. */
     frozen?: boolean;
-    /** Offered in the column toggle. Defaults to true, never for frozen columns. */
-    hideable?: boolean;
     /** Hidden until the viewer shows it. */
     hidden?: boolean;
-    /** Initial width; user resizing persists with the table state. */
-    width?: string;
     align?: 'start' | 'end';
     /** Formatted CSV value. */
     exportValue?: (row: T) => string;
-}
-
-export interface AppTableSort {
-    field: string;
-    order: 1 | -1;
 }

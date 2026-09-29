@@ -80,14 +80,13 @@
             stateKey="goals"
             [loading]="goalsLoading()"
             [defaultSort]="{ field: 'name', order: 1 }"
-            [rowActions]="canManage() ? goalRowActions : undefined"
+            [rowActions]="canManage() ? goalActions : undefined"
             [rowActionsLoading]="goalActionLoading"
             [selectable]="true"
-            [selectedKey]="selectedGoalId()"
-            (rowSelect)="selectGoal($any($event).id)"
+            [rowSelected]="isSelectedGoal"
+            (rowSelect)="selectGoal($event.id)"
             ariaLabelKey="goals.definitions.title"
             emptyTextKey="goals.manager.empty"
-            exportFilename="goals"
             data-testid="goals-table"
         >
             <ng-template appTableCell="name" let-goal><span class="font-medium">{{ goal.name }}</span></ng-template>

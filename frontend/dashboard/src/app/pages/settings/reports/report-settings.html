@@ -42,10 +42,9 @@
             [defaultSort]="{ field: 'name', order: 1 }"
             [rowActions]="reportRowActions"
             [rowActionsLoading]="reportActionLoading"
-            [selectedKey]="focusedReportID()"
+            [rowSelected]="isFocusedReport"
             mobile="cards"
             emptyTextKey="settings.reports.emptyFiltered"
-            exportFilename="reports"
             data-testid="report-table"
         >
             <ng-template appTableSlot="toolbar">

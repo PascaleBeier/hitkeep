@@ -41,7 +41,6 @@ export class TeamTrackingDomains {
         { field: 'tls_status', headerKey: 'admin.team.settings.trackingDomains.checks.tls', type: 'enum', groupable: true, options: this.statusOptions },
         { field: 'last_checked_at', headerKey: 'admin.team.settings.trackingDomains.lastChecked', type: 'date' }
     ];
-    protected readonly domainRowActions = (domain: CustomTrackingDomain) => this.domainActions(domain);
     protected readonly domainActionLoading = (domain: CustomTrackingDomain) => this.isBusy(domain.id);
 
     readonly teamId = input.required<string>();
@@ -196,7 +195,7 @@ export class TeamTrackingDomains {
         });
     }
 
-    protected domainActions(domain: CustomTrackingDomain): TableRowActionItem[] {
+    protected readonly domainActions = (domain: CustomTrackingDomain): TableRowActionItem[] => {
         const busy = this.isBusy(domain.id);
         return [
             {
@@ -225,7 +224,7 @@ export class TeamTrackingDomains {
                 command: () => this.confirmDelete(domain)
             }
         ];
-    }
+    };
 
     protected isBusy(domainID: string): boolean {
         return this.verifyingDomainID() === domainID || this.updatingDomainID() === domainID || this.deletingDomainID() === domainID;

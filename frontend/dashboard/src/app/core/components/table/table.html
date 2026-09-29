@@ -91,7 +91,7 @@
         [totalRecords]="totalRecords()"
         [first]="first()"
         (onLazyLoad)="lazyLoad.emit($event)"
-        [stateKey]="storageKey"
+        [stateKey]="storageKey()"
         stateStorage="local"
         (onFilter)="onFilter()"
         (onStateRestore)="onFilter()"
@@ -112,7 +112,7 @@
         [resizableColumns]="true"
         columnResizeMode="fit"
         [rowHover]="true"
-        [size]="density() === 'compact' ? 'small' : undefined"
+        size="small"
         styleClass="app-table__table"
     >
         <ng-template #header>
@@ -120,36 +120,14 @@
                 @if (expandedTemplate()) {
                 <th class="app-table__expander" pFrozenColumn [frozen]="true"><span class="sr-only">{{ "table.expand" | transloco }}</span></th>
                 } @for (column of visibleColumns(); track column.field) {
-                <th
-                    pResizableColumn
-                    [pSortableColumn]="column.field"
-                    [pSortableColumnDisabled]="column.sortable === false"
-                    pFrozenColumn
-                    [frozen]="!!column.frozen"
-                    [style.min-width]="column.width ?? null"
-                    [class.app-table__end]="column.align === 'end'"
-                    [attr.data-field]="column.field"
-                >
+                <th pResizableColumn [pSortableColumn]="column.field" [pSortableColumnDisabled]="column.sortable === false" pFrozenColumn [frozen]="!!column.frozen" [class.app-table__end]="column.align === 'end'" [attr.data-field]="column.field">
                     <span class="app-table__heading">
                         <span>{{ headerLabel(column) }}</span>
                         @if (column.sortable !== false) {
                         <p-sortIcon [field]="column.field" />
                         } @if (column.filterable !== false && !lazy()) { @switch (column.type ?? 'text') { @case ('enum') {
-                        <p-columnFilter [field]="column.field" display="menu" [matchMode]="column.singleSelect ? 'equals' : 'hkIn'" [showMatchModes]="false" [showOperator]="false" [showAddButton]="false" [ariaLabel]="headerLabel(column)">
+                        <p-columnFilter [field]="column.field" display="menu" matchMode="hkIn" [showMatchModes]="false" [showOperator]="false" [showAddButton]="false" [ariaLabel]="headerLabel(column)">
                             <ng-template #filter let-value let-filter="filterCallback">
-                                @if (column.singleSelect) {
-                                <p-select
-                                    [ngModel]="value"
-                                    [options]="enumOptions(column)"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    [showClear]="true"
-                                    [placeholder]="'table.any' | transloco"
-                                    (ngModelChange)="filter($event)"
-                                    appendTo="body"
-                                    styleClass="app-table__filter-input"
-                                />
-                                } @else {
                                 <p-multiselect
                                     [ngModel]="value"
                                     [options]="enumOptions(column)"
@@ -160,7 +138,6 @@
                                     appendTo="body"
                                     styleClass="app-table__filter-input"
                                 />
-                                }
                             </ng-template>
                         </p-columnFilter>
                         } @case ('date') {
@@ -206,7 +183,7 @@
                     <button type="button" class="app-table__group-toggle" [attr.aria-expanded]="!isKeyCollapsed(key)" (click)="toggleGroup(key)">
                         <i class="pi" [class.pi-chevron-down]="!isKeyCollapsed(key)" [class.pi-chevron-right]="isKeyCollapsed(key)" aria-hidden="true"></i>
                         <span class="app-table__group-label">{{ groupLabel(key) }}</span>
-                        <span class="app-table__group-count">{{ "table.groupCount" | transloco: { count: groupCount(key) } }}</span>
+                        <span class="app-table__group-count">{{ "table.groupCount" | transloco: { count: groupCounts().get(key) ?? 0 } }}</span>
                     </button>
                 </td>
             </tr>
@@ -280,11 +257,7 @@
             } @else {
             <tr>
                 <td [attr.colspan]="colspan()" class="app-table__empty">
-                    @if (emptyTitleKey(); as titleKey) {
-                    <app-page-state [titleKey]="titleKey" [messageKey]="emptyTextKey()" [icon]="emptyIcon()" />
-                    } @else {
                     <p>{{ emptyTextKey() | transloco }}</p>
-                    }
                 </td>
             </tr>
             }

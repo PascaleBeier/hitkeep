@@ -217,9 +217,8 @@
                         [defaultSort]="{ field: pageTableSortField(), order: -1 }"
                         [selectable]="true"
                         [rowSelected]="pageRowActive"
-                        (rowSelect)="setPathFromRow($any($event).path)"
+                        (rowSelect)="setPathFromRow($event.path)"
                         emptyTextKey="webVitals.pages.empty"
-                        exportFilename="web-vitals-pages"
                         data-testid="web-vitals-pages-table"
                     >
                         <ng-template appTableCell="path" let-row>
@@ -290,7 +289,6 @@
                         [loading]="isLoading()"
                         [defaultSort]="{ field: 'samples', order: -1 }"
                         emptyTextKey="webVitals.breakdown.empty"
-                        [exportFilename]="'web-vitals-' + tab.value"
                         data-testid="web-vitals-breakdown-table"
                     >
                         <ng-template appTableCell="name" let-row><span class="font-semibold">{{ dimensionLabel(row) }}</span></ng-template>

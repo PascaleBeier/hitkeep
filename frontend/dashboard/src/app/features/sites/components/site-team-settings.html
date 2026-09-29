@@ -103,8 +103,7 @@
                 dataKey="user_id"
                 [loading]="isLoading()"
                 [defaultSort]="{ field: 'added_at', order: -1 }"
-                [rowActions]="canManageTeam() ? memberRowActions : undefined"
-                exportFilename="site-team"
+                [rowActions]="canManageTeam() ? memberActions : undefined"
                 data-testid="site-team-table"
             >
                 <ng-template appTableSlot="toolbar">

@@ -50,7 +50,6 @@ export class ShareDashboardLink {
         { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
         { field: 'url', headerKey: 'share.dialog.shareUrlLabel' }
     ];
-    protected readonly shareLinkRowActions = (link: ShareLink) => this.shareLinkActions(link);
     protected readonly shareLinkActionLoading = (link: ShareLink) => this.deletingShareId() === link.id;
     protected notice = signal<ShareNotice | null>(null);
     private shareSiteId = signal<string | null>(null);
@@ -132,7 +131,7 @@ export class ShareDashboardLink {
         });
     }
 
-    protected shareLinkActions(link: ShareLink): TableRowActionItem[] {
+    protected readonly shareLinkActions = (link: ShareLink): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -150,7 +149,7 @@ export class ShareDashboardLink {
                 command: () => this.confirmDeleteShareLink(link)
             }
         ];
-    }
+    };
 
     protected resetShareDialog() {
         this.showShareDialog.set(false);

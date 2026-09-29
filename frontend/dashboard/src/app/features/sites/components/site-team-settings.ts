@@ -84,7 +84,6 @@ export class SiteTeamSettings {
         { field: 'role', headerKey: 'common.columns.role', type: 'enum', groupable: true, options: this.roleOptions() },
         { field: 'added_at', headerKey: 'common.columns.added', type: 'date' }
     ]);
-    protected readonly memberRowActions = (member: SiteMember) => this.memberActions(member);
     protected readonly availableTransferTeams = computed(() => {
         if (!this.canManageTeam()) return [];
         this.activeLanguage();
@@ -213,7 +212,7 @@ export class SiteTeamSettings {
             });
     }
 
-    memberActions(member: SiteMember): TableRowActionItem[] {
+    readonly memberActions = (member: SiteMember): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -223,7 +222,7 @@ export class SiteTeamSettings {
                 command: () => this.confirmRemoveMember(member)
             }
         ];
-    }
+    };
 
     confirmRemoveMember(member: SiteMember) {
         const siteId = this.site()?.id;

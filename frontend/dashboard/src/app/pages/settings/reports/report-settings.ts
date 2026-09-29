@@ -149,6 +149,7 @@ export class ReportSettings {
         { field: 'lastOutcome', headerKey: 'settings.reports.lastOutcome', type: 'enum' }
     ];
     protected readonly reportRowActions = (row: ReportTableRow) => this.reportActions(row.report);
+    protected readonly isFocusedReport = (row: ReportTableRow) => row.report.id === this.focusedReportID();
     protected readonly reportActionLoading = (row: ReportTableRow) => this.reportActionID() === row.report.id;
 
     protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {

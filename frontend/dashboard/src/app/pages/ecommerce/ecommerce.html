@@ -97,9 +97,8 @@
                             [defaultSort]="{ field: 'revenue', order: -1 }"
                             [selectable]="true"
                             [rowSelected]="productRowActive"
-                            (rowSelect)="toggleProductFilter($any($event))"
+                            (rowSelect)="toggleProductFilter($event)"
                             emptyTextKey="ecommerce.products.empty"
-                            exportFilename="ecommerce-products"
                             data-testid="ecommerce-products-table"
                         >
                             <ng-template appTableCell="item_name" let-product>
@@ -129,9 +128,8 @@
                             [searchFields]="['utm_medium']"
                             [selectable]="true"
                             [rowSelected]="sourceRowActive"
-                            (rowSelect)="toggleSourceFilter($any($event))"
+                            (rowSelect)="toggleSourceFilter($event)"
                             emptyTextKey="ecommerce.sources.empty"
-                            exportFilename="ecommerce-sources"
                             data-testid="ecommerce-sources-table"
                         >
                             <ng-template appTableCell="utm_source" let-source>

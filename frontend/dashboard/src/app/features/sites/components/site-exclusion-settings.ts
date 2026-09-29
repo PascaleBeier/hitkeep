@@ -70,7 +70,6 @@ export class SiteExclusionSettings {
         { field: 'description', headerKey: 'sites.exclusions.columns.description' },
         { field: 'created_at', headerKey: 'sites.exclusions.columns.created', type: 'date' }
     ];
-    protected readonly ruleRowActions = (rule: IPExclusion) => this.ruleActions(rule);
     protected readonly ruleActionLoading = (rule: IPExclusion) => this.deletingRuleID() === rule.id;
     protected readonly isAddDialogVisible = signal(false);
     protected readonly isCurrentIPLoading = signal(false);
@@ -206,7 +205,7 @@ export class SiteExclusionSettings {
         }
     }
 
-    protected ruleActions(rule: IPExclusion): TableRowActionItem[] {
+    protected readonly ruleActions = (rule: IPExclusion): TableRowActionItem[] => {
         if (rule.inherited) {
             return [];
         }
@@ -218,7 +217,7 @@ export class SiteExclusionSettings {
                 command: () => this.confirmDeleteRule(rule)
             }
         ];
-    }
+    };
 
     protected confirmDeleteRule(rule: IPExclusion): void {
         if (rule.inherited) {

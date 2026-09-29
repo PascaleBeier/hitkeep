@@ -34,7 +34,7 @@ const COLUMNS: AppTableColumn<Hook>[] = [
         ]
     },
     { field: 'attempts', headerKey: 'cols.attempts', type: 'number', align: 'end' },
-    { field: 'events', headerKey: 'cols.events', type: 'enum', sortable: false, options: [{ value: 'hit.created', labelKey: 'status.hit' }], hideable: true }
+    { field: 'events', headerKey: 'cols.events', type: 'enum', sortable: false, options: [{ value: 'hit.created', labelKey: 'status.hit' }] }
 ];
 
 @Component({

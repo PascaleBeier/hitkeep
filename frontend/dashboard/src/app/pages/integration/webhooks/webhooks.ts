@@ -116,7 +116,6 @@ export class WebhooksPage implements OnInit {
         { field: 'response_status', headerKey: 'integration.webhooks.deliveries.response', type: 'number', exportValue: (delivery) => String(delivery.response_status || delivery.last_error_code || '') },
         { field: 'created_at', headerKey: 'integration.webhooks.deliveries.created', type: 'date' }
     ];
-    protected readonly webhookRowActions = (webhook: Webhook) => this.webhookActions(webhook);
     private readonly reloadSequence = signal(0);
     private readonly loadedContext = signal<{ scope: WebhookScope; siteID?: string } | null>(null);
     private readonly requestContext = computed(() => {
@@ -235,7 +234,7 @@ export class WebhooksPage implements OnInit {
         }
     }
 
-    protected webhookActions(webhook: Webhook): TableRowActionItem[] {
+    protected readonly webhookActions = (webhook: Webhook): TableRowActionItem[] => {
         this.language();
         return [
             {
@@ -267,7 +266,7 @@ export class WebhooksPage implements OnInit {
                 command: () => this.confirmDelete(webhook)
             }
         ];
-    }
+    };
 
     protected save(): void {
         this.form.markAllAsTouched();

@@ -124,7 +124,6 @@ export class SettingsAPIClients {
         { field: 'expires_at', headerKey: 'settings.apiClients.meta.expires', type: 'date' },
         { field: 'site_roles', headerKey: 'settings.apiClients.form.siteScopesLabel', sortable: false, filterable: false, searchable: false }
     ];
-    protected readonly clientRowActions = (client: APIClient) => this.apiClientActions(client);
     protected readonly selectedSiteRoles = signal<APIClientSiteRole[]>([]);
 
     protected readonly form = new FormGroup({
@@ -330,7 +329,7 @@ export class SettingsAPIClients {
         }
     }
 
-    protected apiClientActions(client: APIClient): TableRowActionItem[] {
+    protected readonly apiClientActions = (client: APIClient): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -359,7 +358,7 @@ export class SettingsAPIClients {
                 command: () => this.confirmDeleteClient(client)
             }
         ];
-    }
+    };
 
     protected confirmDeleteClient(client: APIClient): void {
         this.confirmationService.confirm({

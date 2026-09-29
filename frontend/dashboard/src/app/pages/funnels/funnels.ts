@@ -103,7 +103,7 @@ export class Funnels {
         { field: 'step_path', headerKey: 'funnels.definitions.steps', sortable: false },
         { field: 'created_at', headerKey: 'common.columns.created', type: 'date', hidden: true }
     ];
-    protected readonly funnelRowActions = (funnel: Funnel) => this.funnelActions(funnel);
+    protected readonly isSelectedFunnel = (funnel: Funnel) => funnel.id === this.selectedFunnelId();
     protected readonly funnelActionLoading = (funnel: Funnel) => this.deletingFunnelId() === funnel.id;
     protected funnelSeries = signal<FunnelSeriesPoint[]>([]);
     protected comparisonFunnelSeries = signal<FunnelSeriesPoint[]>([]);
@@ -305,7 +305,7 @@ export class Funnels {
         this.editingFunnel.set(funnel);
         this.editorVisible.set(true);
     }
-    protected funnelActions(funnel: Funnel): TableRowActionItem[] {
+    protected readonly funnelActions = (funnel: Funnel): TableRowActionItem[] => {
         return [
             {
                 label: this.transloco.translate('common.actions.edit'),
@@ -319,7 +319,7 @@ export class Funnels {
                 command: () => this.confirmDelete(funnel)
             }
         ];
-    }
+    };
     private confirmDelete(funnel: Funnel) {
         this.confirmation.confirm({
             message: this.transloco.translate('funnels.manager.confirmDelete', {

@@ -141,9 +141,7 @@ export class QRCodesPage {
         { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
         { field: 'url', headerKey: 'qrCodes.share.url' }
     ];
-    protected readonly qrRowActions = (qr: QRCode) => this.qrActions(qr);
     protected readonly qrActionLoading = (qr: QRCode) => this.archivingQRID() === qr.id;
-    protected readonly shareRowActions = (link: QRCodeShareLink) => this.shareLinkActions(link);
     protected readonly shareActionLoading = (link: QRCodeShareLink) => this.deletingShareID() === link.id;
     protected readonly pageNotice = signal<ShareNotice | null>(null);
 
@@ -581,7 +579,7 @@ export class QRCodesPage {
         return token ? `/share/${token}${path}` : path;
     }
 
-    protected qrActions(qr: QRCode): TableRowActionItem[] {
+    protected readonly qrActions = (qr: QRCode): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [
             {
@@ -613,9 +611,9 @@ export class QRCodesPage {
             );
         }
         return actions;
-    }
+    };
 
-    protected shareLinkActions(link: QRCodeShareLink): TableRowActionItem[] {
+    protected readonly shareLinkActions = (link: QRCodeShareLink): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -633,7 +631,7 @@ export class QRCodesPage {
                 command: () => this.confirmDeleteShare(link)
             }
         ];
-    }
+    };
 
     protected copyShareLink(link: QRCodeShareLink): void {
         if (!link.url) return;

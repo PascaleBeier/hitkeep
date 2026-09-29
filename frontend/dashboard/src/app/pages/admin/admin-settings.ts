@@ -351,7 +351,6 @@ export class AdminSettings implements OnInit {
         { field: 'hits_last_7d', headerKey: 'admin.system.activation.columns.hits7d', type: 'number', align: 'end' },
         { field: 'events_last_7d', headerKey: 'admin.system.activation.columns.events7d', type: 'number', align: 'end' }
     ];
-    protected readonly activationActions = (row: SystemActivationRow) => this.activationRowActions(row);
     protected readonly activationActionLoading = (row: SystemActivationRow) => this.openingActivationTeamId() === row.team_id;
     protected readonly activationLiveSites = computed(() => this.activationRows().filter((row) => row.status === 'live').length);
     protected readonly activationStatusOptions = computed(() => {
@@ -455,11 +454,8 @@ export class AdminSettings implements OnInit {
         },
         { field: 'created_at', headerKey: 'common.columns.created', type: 'date', hidden: true }
     ];
-    protected readonly userRowActions = (user: User) => this.userActions(user);
     protected readonly userActionLoading = (user: User) => this.isDisablingUser(user) || this.isDeletingUser(user);
-    protected readonly siteRowActions = (site: Site) => this.siteActions(site);
     protected readonly siteActionLoading = (site: Site) => this.isDeletingSite(site);
-    protected readonly teamRowActions = (team: AdminTeam) => this.teamActions(team);
     protected readonly teamActionLoading = (team: AdminTeam) => this.isDeletingTeam(team);
     protected isLoading = signal(false);
     protected isLoadingSites = signal(false);
@@ -1004,7 +1000,7 @@ export class AdminSettings implements OnInit {
             });
     }
 
-    protected userActions(user: User): TableRowActionItem[] {
+    protected readonly userActions = (user: User): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [];
         if (this.canDisableUserMfa()) {
@@ -1026,9 +1022,9 @@ export class AdminSettings implements OnInit {
             command: () => this.confirmDeleteUser(user)
         });
         return actions;
-    }
+    };
 
-    protected siteActions(site: Site): TableRowActionItem[] {
+    protected readonly siteActions = (site: Site): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -1039,9 +1035,9 @@ export class AdminSettings implements OnInit {
                 command: () => this.confirmDeleteSite(site)
             }
         ];
-    }
+    };
 
-    protected teamActions(team: AdminTeam): TableRowActionItem[] {
+    protected readonly teamActions = (team: AdminTeam): TableRowActionItem[] => {
         if (team.is_default) {
             return [];
         }
@@ -1055,9 +1051,9 @@ export class AdminSettings implements OnInit {
                 command: () => this.confirmDeleteTeam(team)
             }
         ];
-    }
+    };
 
-    protected activationRowActions(row: SystemActivationRow): TableRowActionItem[] {
+    protected readonly activationRowActions = (row: SystemActivationRow): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -1077,7 +1073,7 @@ export class AdminSettings implements OnInit {
                 command: () => this.openActivationTeam(row)
             }
         ];
-    }
+    };
 
     private setActivationCopyStatus(status: 'success' | 'error') {
         this.activationCopyStatus.set(status);

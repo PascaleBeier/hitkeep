@@ -115,7 +115,7 @@ export class Goals {
         { field: 'conversions', headerKey: 'goals.kpis.conversions', type: 'number', align: 'end' },
         { field: 'conversion_rate', headerKey: 'common.kpis.conversionRate', type: 'number', align: 'end' }
     ];
-    protected readonly goalRowActions = (goal: Goal) => this.goalActions(goal);
+    protected readonly isSelectedGoal = (goal: Goal) => goal.id === this.selectedGoalId();
     protected readonly goalActionLoading = (goal: Goal) => this.deletingGoalId() === goal.id;
     protected subjectControl = new FormControl<string | null>(null);
     protected editorVisible = signal(false);
@@ -312,7 +312,7 @@ export class Goals {
         this.editingGoal.set(goal);
         this.editorVisible.set(true);
     }
-    protected goalActions(goal: Goal): TableRowActionItem[] {
+    protected readonly goalActions = (goal: Goal): TableRowActionItem[] => {
         return [
             {
                 label: this.transloco.translate('common.actions.edit'),
@@ -326,7 +326,7 @@ export class Goals {
                 command: () => this.confirmDelete(goal)
             }
         ];
-    }
+    };
     private confirmDelete(goal: Goal) {
         this.confirmation.confirm({
             message: this.transloco.translate('goals.manager.confirmDelete', {

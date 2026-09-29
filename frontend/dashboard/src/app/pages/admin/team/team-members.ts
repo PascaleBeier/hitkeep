@@ -62,8 +62,6 @@ export class TeamMembersPage {
         { field: 'created_at', headerKey: 'common.columns.created', type: 'date' },
         { field: 'expires_at', headerKey: 'teams.management.expiresLabel', type: 'date' }
     ];
-    protected readonly memberRowActions = (member: TeamMember) => this.memberActions(member);
-    protected readonly inviteRowActions = (invite: TeamInvite) => this.inviteActions(invite);
     protected readonly inviteActionLoading = (invite: TeamInvite) => this.isInviteActionLoading(invite);
     protected readonly isLoading = signal(false);
     protected readonly isInviting = signal(false);
@@ -187,7 +185,7 @@ export class TeamMembersPage {
         this.inviteForm.role().control().reset('member');
     }
 
-    protected memberActions(member: TeamMember): TableRowActionItem[] {
+    protected readonly memberActions = (member: TeamMember): TableRowActionItem[] => {
         this.activeLanguage();
         const actions: TableRowActionItem[] = [];
         if (this.canTransferMember(member)) {
@@ -211,7 +209,7 @@ export class TeamMembersPage {
             });
         }
         return actions;
-    }
+    };
 
     protected memberActionLoading(member: TeamMember): boolean {
         return this.removingUserID() === member.user_id || this.transferringUserID() === member.user_id;
@@ -314,7 +312,7 @@ export class TeamMembersPage {
         }
     }
 
-    protected inviteActions(invite: TeamInvite): TableRowActionItem[] {
+    protected readonly inviteActions = (invite: TeamInvite): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -332,7 +330,7 @@ export class TeamMembersPage {
                 command: () => this.confirmRevokeInvite(invite)
             }
         ];
-    }
+    };
 
     protected confirmResendInvite(invite: TeamInvite) {
         this.confirmationService.confirm({

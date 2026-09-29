@@ -68,7 +68,6 @@ export class AdminGlobalExclusionSettings {
         { field: 'description', headerKey: 'admin.exclusions.columns.description' },
         { field: 'created_at', headerKey: 'admin.exclusions.columns.created', type: 'date' }
     ];
-    protected readonly ruleRowActions = (rule: IPExclusion) => this.ruleActions(rule);
     protected readonly ruleActionLoading = (rule: IPExclusion) => this.deletingRuleID() === rule.id;
     protected readonly isCurrentIPLoading = signal(false);
     protected readonly currentIPCIDR = signal('');
@@ -184,7 +183,7 @@ export class AdminGlobalExclusionSettings {
         }
     }
 
-    protected ruleActions(rule: IPExclusion): TableRowActionItem[] {
+    protected readonly ruleActions = (rule: IPExclusion): TableRowActionItem[] => {
         this.activeLanguage();
         return [
             {
@@ -194,7 +193,7 @@ export class AdminGlobalExclusionSettings {
                 command: () => this.confirmDeleteRule(rule)
             }
         ];
-    }
+    };
 
     protected confirmDeleteRule(rule: IPExclusion): void {
         this.confirmationService.confirm({

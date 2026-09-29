@@ -67,9 +67,8 @@
                 dataKey="user_id"
                 [loading]="isLoading()"
                 [defaultSort]="{ field: 'added_at', order: -1 }"
-                [rowActions]="memberRowActions"
+                [rowActions]="memberActions"
                 emptyTextKey="teams.management.empty"
-                exportFilename="team-members"
                 data-testid="team-members-table"
             >
                 <ng-template appTableCell="role" let-member>
@@ -108,10 +107,9 @@
                 stateKey="team-invites"
                 [loading]="isLoading()"
                 [defaultSort]="{ field: 'created_at', order: -1 }"
-                [rowActions]="inviteRowActions"
+                [rowActions]="inviteActions"
                 [rowActionsLoading]="inviteActionLoading"
                 emptyTextKey="teams.management.pendingEmpty"
-                exportFilename="team-invites"
                 data-testid="team-invites-table"
             >
                 <ng-template appTableCell="role" let-invite>

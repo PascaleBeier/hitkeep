@@ -46,10 +46,9 @@
             [loading]="loading()"
             [searchFields]="['description']"
             [defaultSort]="{ field: 'updated_at', order: -1 }"
-            [rowActions]="webhookRowActions"
+            [rowActions]="webhookActions"
             [actionsDisabled]="saving()"
             ariaLabelKey="integration.webhooks.listLabel"
-            exportFilename="webhooks"
             data-testid="webhooks-table"
         >
             <ng-template appTableSlot="toolbar">
@@ -138,7 +137,6 @@
         [loading]="deliveryLoading()"
         [defaultSort]="{ field: 'created_at', order: -1 }"
         emptyTextKey="integration.webhooks.deliveries.empty"
-        exportFilename="webhook-deliveries"
         data-testid="webhook-deliveries-table"
     >
         <ng-template appTableCell="event_type" let-delivery><code>{{ delivery.event_type }}</code></ng-template>

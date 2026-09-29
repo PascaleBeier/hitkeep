@@ -153,15 +153,7 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h4 class="m-0 text-sm font-semibold">{{ "imports.datasets.title" | transloco }}</h4>
                         </div>
-                        <app-table
-                            [value]="manifestDatasets()"
-                            [columns]="datasetColumns()"
-                            stateKey="import-datasets"
-                            dataKey="name"
-                            [defaultSort]="{ field: 'rows_accepted', order: -1 }"
-                            exportFilename="import-datasets"
-                            data-testid="import-datasets-table"
-                        />
+                        <app-table [value]="manifestDatasets()" [columns]="datasetColumns()" stateKey="import-datasets" dataKey="name" [defaultSort]="{ field: 'rows_accepted', order: -1 }" data-testid="import-datasets-table" />
                     </div>
 
                     @if (showEventValidationDetails()) { @if (showEventCoverage()) {
@@ -262,7 +254,7 @@
                 @if (history().length === 0) {
                 <p-message severity="secondary" styleClass="w-full">{{ "imports.history.empty" | transloco }}</p-message>
                 } @else {
-                <app-table [value]="history()" [columns]="historyColumns" stateKey="import-jobs" [defaultSort]="{ field: 'created_at', order: -1 }" exportFilename="import-jobs" data-testid="import-jobs-table">
+                <app-table [value]="history()" [columns]="historyColumns" stateKey="import-jobs" [defaultSort]="{ field: 'created_at', order: -1 }" data-testid="import-jobs-table">
                     <ng-template appTableCell="status" let-job><p-tag [value]="('imports.status.' + job.status) | transloco" [severity]="statusSeverity(job.status)" /></ng-template>
                     <ng-template appTableCell="rows_imported" let-job>{{ job.rows_imported || job.rows_scanned | number }}</ng-template>
                     <ng-template appTableSlot="actions" let-job>

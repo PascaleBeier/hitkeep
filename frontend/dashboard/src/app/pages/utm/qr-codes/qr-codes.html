@@ -64,10 +64,9 @@
             stateKey="qr-codes"
             [searchFields]="['redirect_url', 'utm_source', 'utm_medium']"
             [defaultSort]="{ field: 'updated_at', order: -1 }"
-            [rowActions]="qrRowActions"
+            [rowActions]="qrActions"
             [rowActionsLoading]="qrActionLoading"
             emptyTextKey="qrCodes.empty.title"
-            exportFilename="qr-codes"
             data-testid="qr-codes-table"
         >
             <ng-template appTableCell="name" let-qr>
@@ -389,7 +388,7 @@
                 stateKey="qr-share-links"
                 [loading]="sharesLoading()"
                 [defaultSort]="{ field: 'created_at', order: -1 }"
-                [rowActions]="shareRowActions"
+                [rowActions]="shareLinkActions"
                 [rowActionsLoading]="shareActionLoading"
                 [exportable]="false"
                 emptyTextKey="qrCodes.share.empty"

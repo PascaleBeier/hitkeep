@@ -97,14 +97,13 @@
             stateKey="funnels"
             [loading]="loading()"
             [defaultSort]="{ field: 'name', order: 1 }"
-            [rowActions]="canManage() ? funnelRowActions : undefined"
+            [rowActions]="canManage() ? funnelActions : undefined"
             [rowActionsLoading]="funnelActionLoading"
             [selectable]="true"
-            [selectedKey]="selectedFunnelId()"
-            (rowSelect)="selectFunnel($any($event).id)"
+            [rowSelected]="isSelectedFunnel"
+            (rowSelect)="selectFunnel($event.id)"
             ariaLabelKey="funnels.definitions.title"
             emptyTextKey="funnels.manager.empty"
-            exportFilename="funnels"
             data-testid="funnels-table"
         >
             <ng-template appTableCell="name" let-funnel><span class="font-medium">{{ funnel.name }}</span></ng-template>

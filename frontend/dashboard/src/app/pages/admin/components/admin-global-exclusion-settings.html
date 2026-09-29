@@ -132,10 +132,9 @@
             [searchFields]="['scope_label', 'country_name', 'search_value']"
             [defaultSort]="{ field: 'created_at', order: -1 }"
             defaultGroupBy="type_label"
-            [rowActions]="ruleRowActions"
+            [rowActions]="ruleActions"
             [rowActionsLoading]="ruleActionLoading"
             emptyTextKey="admin.exclusions.empty"
-            exportFilename="global-exclusions"
             data-testid="global-exclusions-table"
         >
             <ng-template appTableCell="value_label" let-rule>

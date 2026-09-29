@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, Directive, OnInit, TemplateRef, com
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FilterMetadata, FilterService, SortEvent } from '@openng/optimus-ui/api';
+import { FilterMetadata, FilterService, SortEvent, SortMeta } from '@openng/optimus-ui/api';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { DatePickerModule } from '@openng/optimus-ui/datepicker';
 import { IconFieldModule } from '@openng/optimus-ui/iconfield';
@@ -16,14 +16,13 @@ import { Table, TableLazyLoadEvent, TableModule } from '@openng/optimus-ui/table
 import { TooltipModule } from '@openng/optimus-ui/tooltip';
 
 import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
-import { PageState } from '@components/page-state/page-state';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { TableRowActionItem, TableRowActions } from '@components/table-row-actions/table-row-actions';
 import { localeForLanguage } from '@core/i18n/duration-format';
 
-import { AppTableColumn, AppTableOption, AppTableSort } from './table.types';
+import { AppTableColumn, AppTableOption } from './table.types';
 
-export type { AppTableColumn, AppTableColumnType, AppTableOption, AppTableSort } from './table.types';
+export type { AppTableColumn, AppTableColumnType, AppTableOption } from './table.types';
 
 /** Custom cell rendering for one column: `<ng-template appTableCell="name" let-row>`. */
 @Directive({ selector: 'ng-template[appTableCell]' })
@@ -71,7 +70,6 @@ type Row = Record<string, unknown>;
         SkeletonModule,
         TooltipModule,
         FilterChipRow,
-        PageState,
         RelativeDateTime,
         TableRowActions
     ],
@@ -88,25 +86,21 @@ export class AppTable<T = Row> implements OnInit {
     readonly dataKey = input('id');
     readonly loading = input(false);
     readonly ariaLabelKey = input<string>();
-    readonly defaultSort = input<AppTableSort>();
+    readonly defaultSort = input<SortMeta>();
     readonly defaultGroupBy = input<string | null>(null);
     readonly rowActions = input<(row: T) => readonly TableRowActionItem[]>();
     readonly actionsDisabled = input(false);
     readonly rowActionsLoading = input<(row: T) => boolean>(() => false);
-    /** Rows are clickable and keyboard-selectable; the row matching `selectedKey` is highlighted. */
+    /** Rows are clickable and keyboard-selectable. */
     readonly selectable = input(false);
-    readonly selectedKey = input<unknown>(null);
-    /** Highlights every matching row, for pages where several rows can be active at once. */
-    readonly rowSelected = input<(row: T) => boolean>();
+    /** Highlights every row it matches. */
+    readonly rowSelected = input<(row: T) => boolean>(() => false);
     readonly searchable = input(true);
     /** Row fields searched in addition to searchable columns. */
     readonly searchFields = input<readonly string[]>([]);
     readonly exportable = input(true);
     readonly exportFilename = input<string>();
-    readonly emptyTitleKey = input<string>();
     readonly emptyTextKey = input('table.empty');
-    readonly emptyIcon = input('pi pi-inbox');
-    readonly density = input<'compact' | 'comfortable'>('compact');
     readonly mobile = input<'scroll' | 'cards'>('scroll');
     readonly rows = input(10);
     readonly rowsPerPageOptions = input<number[]>([10, 25, 50]);
@@ -150,6 +144,19 @@ export class AppTable<T = Row> implements OnInit {
             groups.set(key, [...(groups.get(key) ?? []), row]);
         }
         return [...groups.values()].flat();
+    });
+    protected readonly storageKey = computed(() => STORAGE_PREFIX + this.stateKey());
+    protected readonly groupCounts = computed(() => {
+        this.filterTick();
+        const column = this.groupColumn();
+        const counts = new Map<string, number>();
+        if (!column) return counts;
+        const table = this.tableRef();
+        for (const row of (table?.filteredValue ?? this.tableValue()) as T[]) {
+            const key = this.groupKey(row, column);
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        return counts;
     });
     protected readonly visibleColumns = computed(() => this.columns().filter((column) => !this.hidden().has(column.field)));
     protected readonly hasActions = computed(() => Boolean(this.rowActions() || this.actionsTemplate()));
@@ -240,10 +247,6 @@ export class AppTable<T = Row> implements OnInit {
 
     protected table(): Table {
         return this.tableRef()!;
-    }
-
-    protected get storageKey(): string {
-        return STORAGE_PREFIX + this.stateKey();
     }
 
     protected onFilter(): void {
@@ -368,13 +371,6 @@ export class AppTable<T = Row> implements OnInit {
         this.collapsedGroups.set(next);
     }
 
-    protected groupCount(key: string): number {
-        const column = this.groupColumn();
-        const table = this.table();
-        const rows = (table.filteredValue ?? table.value ?? []) as T[];
-        return column ? rows.filter((row) => this.groupKey(row, column) === key).length : 0;
-    }
-
     protected groupLabel(key: string): string {
         const column = this.groupColumn();
         if (!column || key === '') return this.transloco.translate('table.noValue');
@@ -383,9 +379,7 @@ export class AppTable<T = Row> implements OnInit {
     }
 
     protected isSelected(row: T): boolean {
-        const predicate = this.rowSelected();
-        if (predicate) return predicate(row);
-        return this.selectedKey() != null && this.resolve(row, this.dataKey()) === this.selectedKey();
+        return this.rowSelected()(row);
     }
 
     protected selectRow(row: T, event?: Event): void {
@@ -454,7 +448,7 @@ export class AppTable<T = Row> implements OnInit {
     }
 
     private isHideable(column: AppTableColumn<T>): boolean {
-        return !column.frozen && column.hideable !== false;
+        return !column.frozen;
     }
 
     private groupKey(row: T | undefined, column: AppTableColumn<T>): string {
@@ -520,7 +514,7 @@ export class AppTable<T = Row> implements OnInit {
 
     private readView(): ViewState | null {
         try {
-            const raw = localStorage.getItem(`${this.storageKey}.view`);
+            const raw = localStorage.getItem(`${this.storageKey()}.view`);
             return raw ? (JSON.parse(raw) as ViewState) : null;
         } catch {
             return null;
@@ -529,7 +523,7 @@ export class AppTable<T = Row> implements OnInit {
 
     private writeView(): void {
         try {
-            localStorage.setItem(`${this.storageKey}.view`, JSON.stringify({ hidden: [...this.hidden()], groupBy: this.groupBy() } satisfies ViewState));
+            localStorage.setItem(`${this.storageKey()}.view`, JSON.stringify({ hidden: [...this.hidden()], groupBy: this.groupBy() } satisfies ViewState));
         } catch {
             // View state is a convenience; the table works without storage.
         }
@@ -537,7 +531,7 @@ export class AppTable<T = Row> implements OnInit {
 
     private removeView(): void {
         try {
-            localStorage.removeItem(`${this.storageKey}.view`);
+            localStorage.removeItem(`${this.storageKey()}.view`);
         } catch {
             // See writeView.
         }
