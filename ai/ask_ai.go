@@ -8,7 +8,6 @@ import (
 	"maps"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +33,10 @@ type AskAIRequest struct {
 	History    []AskAIMessage
 	SkillText  string
 	Tools      []goaisdk.Tool
+	// Snapshot maps tool names to inputs run before the model answers.
+	Snapshot map[string]string
+	// ToolTitles labels the citations the dashboard shows.
+	ToolTitles map[string]string
 }
 
 type AskAIFilter struct {
@@ -47,10 +50,10 @@ type AskAIMessage struct {
 }
 
 type AskAIOutput struct {
-	AnswerMarkdown string          `json:"answer_markdown" jsonschema:"description=Concise markdown answer grounded in HitKeep aggregate tool output."`
-	Citations      []AskAICitation `json:"citations" jsonschema:"description=Tool evidence references used by the answer."`
-	Charts         []AskAIChart    `json:"charts" jsonschema:"description=Optional charts or tables built only from tool output."`
-	Actions        []AskAIAction   `json:"actions" jsonschema:"description=Optional dashboard navigation or export actions."`
+	AnswerMarkdown string          `json:"answer_markdown"`
+	Citations      []AskAICitation `json:"citations"`
+	Charts         []AskAIChart    `json:"charts"`
+	Actions        []AskAIAction   `json:"actions"`
 }
 
 type AskAICitation struct {
@@ -149,11 +152,20 @@ func (s *Service) StreamAskAI(ctx context.Context, req AskAIRequest, sink AskAIS
 	return AskAIResult{RunID: runID, Output: generation.Output, Usage: generation.Usage}, nil
 }
 
+const (
+	askAIMaxSteps = 5
+	// Reasoning models spend output tokens on thinking before they answer.
+	askAIMaxOutputTokens = 4000
+	askAIMaxAnswerChars  = 6000
+	askAIMaxCharts       = 3
+	askAIMaxActions      = 3
+)
+
 func (s *Service) runAskAIStreamingGeneration(ctx context.Context, req AskAIRequest, sink AskAIStreamSink) askAIGeneration {
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.conf.Timeout)
 	defer cancel()
-	run := &askAIRun{conf: s.conf, sink: sink, cancel: cancel, started: time.Now(), toolCalls: map[string]bool{}}
-	messages, err := askAIMessages(req)
+	run := newAskAIRun(s.conf, req, sink, cancel)
+	messages, err := askAIMessages(req, run.readSnapshot(timeoutCtx))
 	if err != nil {
 		return run.failed(err)
 	}
@@ -161,25 +173,21 @@ func (s *Service) runAskAIStreamingGeneration(ctx context.Context, req AskAIRequ
 	options := []goaisdk.Option{
 		goaisdk.WithSystem(askAISystemPrompt(req.SkillText)),
 		goaisdk.WithMessages(messages...),
-		goaisdk.WithTools(req.Tools...),
-		goaisdk.WithMaxSteps(5),
-		goaisdk.WithMaxOutputTokens(1800),
+		goaisdk.WithTools(append(slices.Clone(req.Tools), run.outputTools()...)...),
+		goaisdk.WithMaxSteps(askAIMaxSteps),
+		goaisdk.WithMaxOutputTokens(askAIMaxOutputTokens),
 		goaisdk.WithOnRequest(run.onRequest),
 		goaisdk.WithOnResponse(run.onResponse),
 		goaisdk.WithOnToolCallStart(run.onToolCallStart),
 		goaisdk.WithOnToolCall(run.onToolCall),
 	}
 	options = append(options, temperatureOptions(s.model, 0.2)...)
-	options = append(options, mantleAskAIToolOptions(s.conf, req.Tools)...)
 	options = append(options, promptCachingOptions(s.conf)...)
 
 	stream, err := goaisdk.StreamText(timeoutCtx, s.model, options...)
 	if err != nil {
 		return run.failed(err)
 	}
-
-	var raw strings.Builder
-	extractor := askAIAnswerDeltaExtractor{}
 	textStream := stream.TextStream()
 read:
 	for {
@@ -188,11 +196,8 @@ read:
 			if !ok {
 				break read
 			}
-			raw.WriteString(chunk)
-			if delta := extractor.append(chunk); delta != "" {
-				if err := run.emit(AskAIStreamDelta{Type: AskAIStreamDeltaAnswer, Status: "streaming", TextDelta: delta}); err != nil {
-					return run.failed(err)
-				}
+			if err := run.emit(AskAIStreamDelta{Type: AskAIStreamDeltaAnswer, Status: "streaming", TextDelta: chunk}); err != nil {
+				return run.failed(err)
 			}
 		case <-timeoutCtx.Done():
 			return run.failed(cmp.Or(run.sinkError(), timeoutCtx.Err()))
@@ -206,44 +211,113 @@ read:
 	if err := stream.Err(); err != nil {
 		return run.failed(err)
 	}
-	rawText := raw.String()
-	if result != nil && strings.TrimSpace(result.Text) != "" {
-		rawText = result.Text
-	}
-	usage, lifecycle, evidenceIDs := run.snapshot()
-	if usage.TotalTokens == 0 && result != nil {
-		usage = Usage{
-			InputTokens:   result.TotalUsage.InputTokens,
-			OutputTokens:  result.TotalUsage.OutputTokens,
-			TotalTokens:   totalTokens(result.TotalUsage),
-			ToolCallCount: usage.ToolCallCount,
+	// The draft also streamed text written before tool calls; the answer is
+	// the text of the final step, which replaces the draft in the dashboard.
+	var answer string
+	var usage provider.Usage
+	if result != nil {
+		usage = result.TotalUsage
+		if len(result.Steps) > 0 {
+			answer = result.Steps[len(result.Steps)-1].Text
 		}
 	}
-	output, err := decodeAskAIOutputText(rawText)
-	if err != nil && extractor.complete {
-		// The answer streamed intact but the rest of the object did not:
-		// keep the answer the user already read instead of failing the run.
-		output, err = AskAIOutput{AnswerMarkdown: extractor.emitted}, nil
-	}
-	if err == nil {
-		output, err = ValidateAskAIOutput(output, req, evidenceIDs)
-	}
-	return askAIGeneration{Output: output, Usage: usage, EvidenceIDs: evidenceIDs, LifecycleEvents: lifecycle, Latency: time.Since(run.started), Err: err}
+	return run.finish(answer, usage)
 }
 
 // askAIRun records one generation. GoAI runs tool calls concurrently, so
 // every hook takes the lock.
 type askAIRun struct {
 	conf    Config
+	req     AskAIRequest
 	sink    AskAIStreamSink
 	cancel  context.CancelFunc
 	started time.Time
+	// analytics names the tools whose results count as evidence.
+	analytics map[string]bool
 
 	mu        sync.Mutex
 	usage     Usage
 	lifecycle []LifecycleEvent
-	toolCalls map[string]bool
+	evidence  map[string]bool
+	charts    []AskAIChart
+	actions   []AskAIAction
 	sinkErr   error
+}
+
+func newAskAIRun(conf Config, req AskAIRequest, sink AskAIStreamSink, cancel context.CancelFunc) *askAIRun {
+	analytics := make(map[string]bool, len(req.Tools))
+	for _, tool := range req.Tools {
+		analytics[tool.Name] = true
+	}
+	return &askAIRun{conf: conf, req: req, sink: sink, cancel: cancel, started: time.Now(), analytics: analytics, evidence: map[string]bool{}}
+}
+
+// readSnapshot runs the request's snapshot calls before the model answers,
+// so every model starts from real numbers instead of guessing.
+func (r *askAIRun) readSnapshot(ctx context.Context) string {
+	var snapshot strings.Builder
+	for _, name := range slices.Sorted(maps.Keys(r.req.Snapshot)) {
+		i := slices.IndexFunc(r.req.Tools, func(tool goaisdk.Tool) bool { return tool.Name == name })
+		if i < 0 {
+			continue
+		}
+		callID := "snapshot-" + name
+		r.onToolCallStart(goaisdk.ToolCallStartInfo{ToolCallID: callID, ToolName: name})
+		started := time.Now()
+		out, err := r.req.Tools[i].Execute(ctx, json.RawMessage(r.req.Snapshot[name]))
+		r.onToolCall(goaisdk.ToolCallInfo{ToolCallID: callID, ToolName: name, Duration: time.Since(started), Error: err})
+		if err == nil {
+			snapshot.WriteString(out)
+			snapshot.WriteString("\n")
+		}
+	}
+	return snapshot.String()
+}
+
+// outputTools let the model attach charts and dashboard actions to its
+// answer. They exist only for the dashboard, never for MCP.
+func (r *askAIRun) outputTools() []goaisdk.Tool {
+	return []goaisdk.Tool{
+		goaisdk.NewTool("show_chart",
+			"Show a line, bar, or table chart below the answer, with rows copied from tool results. Line and bar charts need x_key and series; tables need only rows. At most 3 charts, 120 rows, and 12 fields per row.",
+			func(_ context.Context, chart AskAIChart) (string, error) {
+				chart, err := validateAskAIChart(chart)
+				if err != nil {
+					return "", err
+				}
+				return "The chart is shown below the answer.", r.collect(func() bool {
+					return appendCapped(&r.charts, chart, askAIMaxCharts)
+				})
+			}),
+		goaisdk.NewTool("suggest_action",
+			"Offer a button below the answer: type navigate with a dashboard path target such as /dashboard, /events, /goals, or /ai-agents, or type download_export with format xlsx, json, csv, or ndjson for the site export. At most 3 actions.",
+			func(_ context.Context, action AskAIAction) (string, error) {
+				action, err := validateAskAIAction(action, r.req.SiteID)
+				if err != nil {
+					return "", err
+				}
+				return "The action is shown below the answer.", r.collect(func() bool {
+					return appendCapped(&r.actions, action, askAIMaxActions)
+				})
+			}),
+	}
+}
+
+func (r *askAIRun) collect(add func() bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !add() {
+		return errors.New("limit reached; answer without it")
+	}
+	return nil
+}
+
+func appendCapped[T any](items *[]T, item T, limit int) bool {
+	if len(*items) >= limit {
+		return false
+	}
+	*items = append(*items, item)
+	return true
 }
 
 func (r *askAIRun) record(event LifecycleEvent) {
@@ -303,7 +377,9 @@ func (r *askAIRun) onResponse(info goaisdk.ResponseInfo) {
 
 func (r *askAIRun) onToolCallStart(info goaisdk.ToolCallStartInfo) {
 	r.record(LifecycleEvent{Type: "tool_call_start", ToolName: info.ToolName, Step: info.Step, Status: "started"})
-	r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_start", MessageKey: "askAi.progress.readingAnalytics", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+	if r.analytics[info.ToolName] {
+		r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_start", MessageKey: "askAi.progress.readingAnalytics", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+	}
 }
 
 func (r *askAIRun) onToolCall(info goaisdk.ToolCallInfo) {
@@ -312,18 +388,20 @@ func (r *askAIRun) onToolCall(info goaisdk.ToolCallInfo) {
 	r.usage.ToolCallCount++
 	if info.Error != nil {
 		status, category = "failure", ClassifyError(info.Error)
-	} else if name := strings.TrimSpace(info.ToolName); name != "" {
-		r.toolCalls[name] = true
+	} else if r.analytics[info.ToolName] {
+		r.evidence[info.ToolName] = true
 	}
 	r.mu.Unlock()
 	r.record(LifecycleEvent{Type: "tool_call_finish", ToolName: info.ToolName, Step: info.Step, Status: status, ErrorCategory: category, LatencyMS: info.Duration.Milliseconds()})
-	r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_finish", MessageKey: "askAi.progress.composing", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+	if r.analytics[info.ToolName] {
+		r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_finish", MessageKey: "askAi.progress.composing", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+	}
 }
 
 func (r *askAIRun) snapshot() (Usage, []LifecycleEvent, []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.usage, slices.Clone(r.lifecycle), slices.Sorted(maps.Keys(r.toolCalls))
+	return r.usage, slices.Clone(r.lifecycle), slices.Sorted(maps.Keys(r.evidence))
 }
 
 func (r *askAIRun) failed(err error) askAIGeneration {
@@ -331,9 +409,37 @@ func (r *askAIRun) failed(err error) askAIGeneration {
 	return askAIGeneration{Usage: usage, LifecycleEvents: lifecycle, Latency: time.Since(r.started), Err: err}
 }
 
+// finish assembles the dashboard answer. Citations come from the analytics
+// tools that actually ran, so the model can never cite invented evidence.
+func (r *askAIRun) finish(answer string, fallback provider.Usage) askAIGeneration {
+	usage, lifecycle, evidence := r.snapshot()
+	if usage.TotalTokens == 0 {
+		usage = Usage{InputTokens: fallback.InputTokens, OutputTokens: fallback.OutputTokens, TotalTokens: totalTokens(fallback), ToolCallCount: usage.ToolCallCount}
+	}
+	generation := askAIGeneration{Usage: usage, EvidenceIDs: evidence, LifecycleEvents: lifecycle, Latency: time.Since(r.started)}
+	answer = truncateUTF8(strings.TrimSpace(answer), askAIMaxAnswerChars)
+	if answer == "" {
+		generation.Err = fmt.Errorf("%w: the model returned no answer", ErrInvalidOutput)
+		return generation
+	}
+	citations := make([]AskAICitation, 0, len(evidence))
+	for _, id := range evidence {
+		citations = append(citations, AskAICitation{Label: cmp.Or(r.req.ToolTitles[id], id), ToolCallID: id})
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	generation.Output = AskAIOutput{
+		AnswerMarkdown: answer,
+		Citations:      citations,
+		Charts:         append([]AskAIChart{}, r.charts...),
+		Actions:        append([]AskAIAction{}, r.actions...),
+	}
+	return generation
+}
+
 // askAIMessages replays the drawer conversation as real turns, then asks the
-// current question with the scoped context.
-func askAIMessages(req AskAIRequest) ([]provider.Message, error) {
+// current question with its scope and the analytics already read.
+func askAIMessages(req AskAIRequest, snapshot string) ([]provider.Message, error) {
 	input := askAIGenerationInput(req)
 	input.History = nil
 	inputJSON, err := json.Marshal(input)
@@ -350,28 +456,11 @@ func askAIMessages(req AskAIRequest) ([]provider.Message, error) {
 			messages = append(messages, goaisdk.AssistantMessage(message.Content))
 		}
 	}
-	return append(messages, goaisdk.UserMessage(askAIStreamingPrompt(string(inputJSON)))), nil
-}
-
-func decodeAskAIOutputText(text string) (AskAIOutput, error) {
-	text = strings.TrimSpace(text)
-	text = strings.TrimPrefix(text, "\ufeff")
-	if strings.HasPrefix(text, "```") {
-		text = strings.TrimSpace(strings.TrimPrefix(text, "```json"))
-		text = strings.TrimSpace(strings.TrimPrefix(text, "```"))
-		text = strings.TrimSpace(strings.TrimSuffix(text, "```"))
+	prompt := "Answer this dashboard question for the scoped HitKeep site and date range.\n\nInput:\n\n" + string(inputJSON)
+	if snapshot != "" {
+		prompt += "\n\nAnalytics already read for this question. Start from it and call tools only for what it lacks:\n\n" + snapshot
 	}
-	if start := strings.Index(text, "{"); start > 0 {
-		text = text[start:]
-	}
-	if before, after, ok := strings.CutLast(text, "}"); ok && after != "" {
-		text = before + "}"
-	}
-	var output AskAIOutput
-	if err := json.Unmarshal([]byte(text), &output); err != nil {
-		return AskAIOutput{}, fmt.Errorf("%w: decode ask ai output: %v", ErrInvalidOutput, err)
-	}
-	return output, nil
+	return append(messages, goaisdk.UserMessage(prompt)), nil
 }
 
 func normalizeAskAIRequest(req AskAIRequest) AskAIRequest {
@@ -416,7 +505,7 @@ func askAIToolNames(tools []goaisdk.Tool) []string {
 }
 
 func askAISystemPrompt(skillText string) string {
-	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Use the available read-only aggregate tools before making analytics claims. Tools default to the dashboard date range and filters in the input; pass from and to, or compare_from and compare_to on the site overview, to read other periods such as the previous one. Request only the site overview sections the question needs. Check annotations before explaining a spike or drop, and use the docs tools, when offered, for product questions instead of guessing. Keep answers concise and evidence-backed. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. Charts and tables must be derived only from tool output. Export actions must only suggest the existing site takeout download. Navigation actions must only point to known dashboard routes. Return the requested JSON object only.`
+	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Start from the analytics already read for the question and call the read-only aggregate tools for anything it lacks. Tools default to the dashboard date range and filters in the input; pass from and to, or compare_from and compare_to on the site overview, to read other periods such as the previous one. Request only the site overview sections the question needs. Check annotations before explaining a spike or drop, and use the docs tools, when offered, for product questions instead of guessing. Write the answer as concise markdown that leads with the verdict. Never invent numbers: state only values from analytics you were given or read, and say so when the data cannot answer the question. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. To show a chart or table, call show_chart with rows copied from tool results. To point to a dashboard page or the site export, call suggest_action. The dashboard lists the analytics you read as sources, so do not add a sources section.`
 	skillText = strings.TrimSpace(skillText)
 	if skillText == "" {
 		return base
@@ -425,163 +514,12 @@ func askAISystemPrompt(skillText string) string {
 	return base + "\n\nPublic HitKeep skill guidance:\n\n" + skillText
 }
 
-func askAIStreamingPrompt(input string) string {
-	return "Answer this dashboard question for the scoped HitKeep site and date range. Use aggregate tools as needed, cite tool evidence by tool name, and return only one JSON object. Put the answer_markdown field first so the dashboard can stream a safe draft answer, then citations, charts, and actions. Do not wrap the JSON in markdown fences. The object must match this JSON schema:\n\n" + string(askAIOutputSchema()) + "\n\nInput:\n\n" + input
-}
-
-type askAIAnswerDeltaExtractor struct {
-	raw      strings.Builder
-	emitted  string
-	complete bool
-}
-
-func (e *askAIAnswerDeltaExtractor) append(chunk string) string {
-	if e.complete || chunk == "" {
-		return ""
-	}
-	e.raw.WriteString(chunk)
-	value, complete, ok := extractJSONStringFieldPrefix(e.raw.String(), "answer_markdown")
-	if !ok {
-		return ""
-	}
-	e.complete = complete
-	if len(value) <= len(e.emitted) || !strings.HasPrefix(value, e.emitted) {
-		return ""
-	}
-	delta := value[len(e.emitted):]
-	e.emitted = value
-	return delta
-}
-
-func extractJSONStringFieldPrefix(input, field string) (string, bool, bool) {
-	key := `"` + field + `"`
-	idx := strings.Index(input, key)
-	if idx < 0 {
-		return "", false, false
-	}
-	pos := idx + len(key)
-	for pos < len(input) && isJSONSpace(input[pos]) {
-		pos++
-	}
-	if pos >= len(input) || input[pos] != ':' {
-		return "", false, false
-	}
-	pos++
-	for pos < len(input) && isJSONSpace(input[pos]) {
-		pos++
-	}
-	if pos >= len(input) || input[pos] != '"' {
-		return "", false, false
-	}
-	pos++
-
-	var out strings.Builder
-	for pos < len(input) {
-		ch := input[pos]
-		if ch == '"' {
-			return out.String(), true, true
-		}
-		if ch != '\\' {
-			out.WriteByte(ch)
-			pos++
-			continue
-		}
-		if pos+1 >= len(input) {
-			return out.String(), false, true
-		}
-		escaped := input[pos+1]
-		switch escaped {
-		case '"', '\\', '/':
-			out.WriteByte(escaped)
-			pos += 2
-		case 'b':
-			out.WriteByte('\b')
-			pos += 2
-		case 'f':
-			out.WriteByte('\f')
-			pos += 2
-		case 'n':
-			out.WriteByte('\n')
-			pos += 2
-		case 'r':
-			out.WriteByte('\r')
-			pos += 2
-		case 't':
-			out.WriteByte('\t')
-			pos += 2
-		case 'u':
-			if pos+6 > len(input) {
-				return out.String(), false, true
-			}
-			codepoint, err := strconv.ParseInt(input[pos+2:pos+6], 16, 32)
-			if err != nil {
-				return out.String(), false, true
-			}
-			out.WriteRune(rune(codepoint))
-			pos += 6
-		default:
-			return out.String(), false, true
-		}
-	}
-	return out.String(), false, true
-}
-
-func isJSONSpace(ch byte) bool {
-	return ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'
-}
-
-func ValidateAskAIOutput(output AskAIOutput, req AskAIRequest, evidenceIDs []string) (AskAIOutput, error) {
-	output.AnswerMarkdown = strings.TrimSpace(output.AnswerMarkdown)
-	if output.AnswerMarkdown == "" {
-		return AskAIOutput{}, fmt.Errorf("%w: answer_markdown is required", ErrInvalidOutput)
-	}
-	if len(output.AnswerMarkdown) > 6000 {
-		return AskAIOutput{}, fmt.Errorf("%w: answer_markdown too long", ErrInvalidOutput)
-	}
-	// Optional parts that fail validation are dropped, not fatal: the answer
-	// stays useful while unsafe or invented citations, charts, and actions
-	// never reach the dashboard.
-	allowedCitations := askAIAllowedCitationIDs(evidenceIDs)
-	output.Citations = keepValid(output.Citations, func(citation AskAICitation) (AskAICitation, error) {
-		citation.Label, citation.ToolCallID = strings.TrimSpace(citation.Label), strings.TrimSpace(citation.ToolCallID)
-		if citation.Label == "" || !allowedCitations[citation.ToolCallID] {
-			return citation, fmt.Errorf("%w: unsupported citation %q", ErrInvalidOutput, citation.ToolCallID)
-		}
-		return citation, nil
-	})
-	output.Charts = keepValid(output.Charts, validateAskAIChart)
-	output.Actions = keepValid(output.Actions, func(action AskAIAction) (AskAIAction, error) {
-		return validateAskAIAction(action, req.SiteID)
-	})
-	return output, nil
-}
-
 // truncateUTF8 cuts s to at most n bytes without splitting a character.
 func truncateUTF8(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
 	return strings.ToValidUTF8(s[:n], "")
-}
-
-func keepValid[T any](items []T, validate func(T) (T, error)) []T {
-	out := make([]T, 0, len(items))
-	for _, item := range items {
-		if normalized, err := validate(item); err == nil {
-			out = append(out, normalized)
-		}
-	}
-	return out
-}
-
-func askAIAllowedCitationIDs(evidenceIDs []string) map[string]bool {
-	allowed := map[string]bool{"input_context": true}
-	for _, id := range evidenceIDs {
-		if id = strings.TrimSpace(id); id != "" {
-			allowed[id] = true
-		}
-	}
-	return allowed
 }
 
 func validateAskAIChart(chart AskAIChart) (AskAIChart, error) {
@@ -725,20 +663,6 @@ func trimAskAIHistory(history []AskAIMessage, limit int) []AskAIMessage {
 		out = append(out, AskAIMessage{Role: role, Content: content})
 	}
 	return out
-}
-
-func askAIOutputSchema() json.RawMessage {
-	return json.RawMessage(`{
-		"type":"object",
-		"additionalProperties":false,
-		"required":["answer_markdown","citations","charts","actions"],
-		"properties":{
-			"answer_markdown":{"type":"string"},
-			"citations":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["label","tool_call_id"],"properties":{"label":{"type":"string"},"tool_call_id":{"type":"string"}}}},
-			"charts":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","title","rows"],"properties":{"type":{"type":"string","enum":["line","bar","table"]},"title":{"type":"string"},"x_key":{"type":"string"},"series":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["key","label"],"properties":{"key":{"type":"string"},"label":{"type":"string"}}}},"rows":{"type":"array","items":{"type":"object","additionalProperties":{"type":["string","number","boolean","null"]}}}}}},
-			"actions":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["type","label","target"],"properties":{"type":{"type":"string","enum":["navigate","download_export"]},"label":{"type":"string"},"target":{"type":"string"},"format":{"type":"string","enum":["xlsx","json","csv","ndjson"]}}}}
-		}
-	}`)
 }
 
 func askAIAuditInput(req AskAIRequest) askAIPromptInput {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -31,6 +32,26 @@ const (
 // are left out: notes explain data but must never become cited evidence.
 func Evidence() []Tool {
 	return []Tool{SiteOverview, EventNames, EventBreakdown, Ecommerce, WebVitals, AIVisibility}
+}
+
+// Snapshot is what an assistant reads before it answers, keyed by tool name:
+// the overview for the range against the previous period of the same length,
+// with the top five pages, sources, and audience rows, plus the team's notes.
+func Snapshot(from, to time.Time) map[string]string {
+	previous := from.Add(-to.Sub(from))
+	return map[string]string{
+		ToolSiteOverview: fmt.Sprintf(`{"compare_from":%q,"compare_to":%q,"sections":["pages","sources","audience"],"limit":5}`, formatTime(previous), formatTime(from)),
+		ToolAnnotations:  `{}`,
+	}
+}
+
+// Titles labels tools by name.
+func Titles(tools ...Tool) map[string]string {
+	titles := make(map[string]string, len(tools))
+	for _, tool := range tools {
+		titles[tool.Name] = tool.Title
+	}
+	return titles
 }
 
 // Analytics returns every site analytics tool.

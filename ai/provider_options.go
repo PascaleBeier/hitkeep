@@ -11,13 +11,6 @@ func mantleStructuredOutputOptions(conf Config) []goaisdk.Option {
 	})}
 }
 
-func mantleAskAIToolOptions(conf Config, tools []goaisdk.Tool) []goaisdk.Option {
-	if len(tools) == 0 || !isOpenAICompatibleProvider(conf.Provider) || !isBedrockMantleBaseURL(conf.BaseURL) {
-		return nil
-	}
-	return []goaisdk.Option{goaisdk.WithToolChoice(goaisdk.ToolChoiceRequired)}
-}
-
 // promptCachingOptions caches the system prompt and tool definitions across
 // tool-loop steps. Only providers with explicit cache markers get the option;
 // OpenAI-style providers cache stable prefixes on their own, and others warn.

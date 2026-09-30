@@ -231,52 +231,6 @@ func TestRunLedgerFinalizeAskAIRecordsSafeOutputOnly(t *testing.T) {
 	}
 }
 
-func TestValidateAskAIOutputNormalizesSafeExportAction(t *testing.T) {
-	siteID := uuid.New()
-	tool := goaisdk.NewTool("hitkeep_get_site_overview", "overview", func(context.Context, struct{}) (string, error) {
-		return "{}", nil
-	})
-
-	output, err := ValidateAskAIOutput(AskAIOutput{
-		AnswerMarkdown: "Traffic increased over the selected range.",
-		Citations:      []AskAICitation{{Label: "Overview", ToolCallID: "hitkeep_get_site_overview"}},
-		Charts: []AskAIChart{{
-			Type:   "line",
-			Title:  "Visits",
-			XKey:   "date",
-			Series: []AskAIChartSeries{{Key: "visits", Label: "Visits"}},
-			Rows:   []map[string]any{{"date": "2026-06-01", "visits": float64(10)}},
-		}},
-		Actions: []AskAIAction{{Type: "download_export", Label: "Download export", Target: "ignored", Format: "csv"}},
-	}, AskAIRequest{SiteID: siteID, Tools: []goaisdk.Tool{tool}}, []string{"hitkeep_get_site_overview"})
-
-	if err != nil {
-		t.Fatalf("ValidateAskAIOutput: %v", err)
-	}
-	if got, want := output.Actions[0].Target, "/api/sites/"+siteID.String()+"/takeout?format=csv"; got != want {
-		t.Fatalf("expected normalized export target %q, got %q", want, got)
-	}
-}
-
-func TestAskAIAnswerDeltaExtractorStreamsOnlyAnswerMarkdown(t *testing.T) {
-	extractor := askAIAnswerDeltaExtractor{}
-	chunks := []string{
-		`{"answer_markdown":"Traffic `,
-		`increased.\nVisits`,
-		` are up","citations":[],"charts":[],"actions":[]}`,
-		` ignored`,
-	}
-	var deltas []string
-	for _, chunk := range chunks {
-		if delta := extractor.append(chunk); delta != "" {
-			deltas = append(deltas, delta)
-		}
-	}
-	if got := strings.Join(deltas, ""); got != "Traffic increased.\nVisits are up" {
-		t.Fatalf("expected streamed answer markdown only, got %q from deltas %#v", got, deltas)
-	}
-}
-
 func TestRunAskAIStreamingGenerationStopsWhenTextStreamStallsPastTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		streamCh := make(chan provider.StreamChunk)
@@ -375,90 +329,6 @@ func TestRunAskAIStreamingGenerationReturnsProgressSinkError(t *testing.T) {
 	}
 }
 
-func TestDecodeAskAIOutputTextStripsFencesAndExtraText(t *testing.T) {
-	output, err := decodeAskAIOutputText("```json\n{\"answer_markdown\":\"Traffic increased.\",\"citations\":[],\"charts\":[],\"actions\":[]}\n```\n")
-	if err != nil {
-		t.Fatalf("decodeAskAIOutputText: %v", err)
-	}
-	if output.AnswerMarkdown != "Traffic increased." {
-		t.Fatalf("expected decoded answer markdown, got %+v", output)
-	}
-}
-
-func TestValidateAskAIOutputDropsUnsafeNavigationAndCitation(t *testing.T) {
-	siteID := uuid.New()
-	valid := AskAIOutput{
-		AnswerMarkdown: "Traffic increased.",
-		Citations:      []AskAICitation{{Label: "Overview", ToolCallID: "input_context"}},
-		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "visits", "value": float64(10)}}}},
-		Actions:        []AskAIAction{{Type: "navigate", Label: "Open", Target: "https://example.com/phish"}},
-	}
-	if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 || output.AnswerMarkdown == "" {
-		t.Fatalf("expected unsafe navigation to be dropped from a kept answer, got %+v, %v", output, err)
-	}
-
-	valid.Actions = nil
-	valid.Citations = []AskAICitation{{Label: "Invented", ToolCallID: "invented_tool"}}
-	if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Citations) != 0 {
-		t.Fatalf("expected invented citation to be dropped, got %+v, %v", output.Citations, err)
-	}
-}
-
-func TestValidateAskAIOutputRequiresPathOnlyNavigationActions(t *testing.T) {
-	siteID := uuid.New()
-	valid := AskAIOutput{
-		AnswerMarkdown: "Traffic increased.",
-		Citations:      []AskAICitation{{Label: "Input context", ToolCallID: "input_context"}},
-		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "visits", "value": float64(10)}}}},
-		Actions:        []AskAIAction{{Type: "navigate", Label: "Open dashboard", Target: "/dashboard"}},
-	}
-	output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil)
-	if err != nil {
-		t.Fatalf("expected path-only navigation action to pass: %v", err)
-	}
-	if got := output.Actions[0].Target; got != "/dashboard" {
-		t.Fatalf("expected normalized dashboard path, got %q", got)
-	}
-
-	for _, target := range []string{"/dashboard?raw=Traffic%20increased", "/events#latest"} {
-		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open dashboard", Target: target}}
-		if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 {
-			t.Fatalf("expected navigation target %q to be dropped, got %+v, %v", target, output.Actions, err)
-		}
-	}
-}
-
-func TestValidateAskAIOutputAllowsAIAgentsNavigationTargets(t *testing.T) {
-	siteID := uuid.New()
-	valid := AskAIOutput{
-		AnswerMarkdown: "AI agents fetched more pages.",
-		Citations:      []AskAICitation{{Label: "Input context", ToolCallID: "input_context"}},
-		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "fetches", "value": float64(10)}}}},
-	}
-
-	// The legacy /ai-visibility target stays allowed because the dashboard
-	// redirects it to the single /ai-agents page.
-	for _, target := range []string{"/ai-agents", "/ai-visibility"} {
-		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open AI agents", Target: target}}
-		output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil)
-		if err != nil {
-			t.Fatalf("expected navigation target %q to pass: %v", target, err)
-		}
-		if got := output.Actions[0].Target; got != target {
-			t.Fatalf("expected navigation target %q to be preserved, got %q", target, got)
-		}
-	}
-
-	// The allowlist matches whole paths, so unlisted look-alikes and child
-	// routes stay rejected.
-	for _, target := range []string{"/ai-agents/unknown-tab", "/ai-agents-secret"} {
-		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open AI agents", Target: target}}
-		if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 {
-			t.Fatalf("expected navigation target %q to be dropped, got %+v, %v", target, output.Actions, err)
-		}
-	}
-}
-
 func TestNormalizeAskAIRequestPreservesAIAgentsRouteContext(t *testing.T) {
 	req := normalizeAskAIRequest(AskAIRequest{Query: "Which agents crawl most?", Route: "/ai-agents?range=30d#top"})
 	if req.Route != "/ai-agents" {
@@ -478,24 +348,7 @@ func TestNormalizeAskAIRequestPreservesSafeRoutePathFromRouterURL(t *testing.T) 
 	}
 }
 
-func TestValidateAskAIOutputDropsConfiguredButUnusedCitation(t *testing.T) {
-	siteID := uuid.New()
-	tool := goaisdk.NewTool("hitkeep_get_site_overview", "overview", func(context.Context, struct{}) (string, error) {
-		return "{}", nil
-	})
-
-	output, err := ValidateAskAIOutput(AskAIOutput{
-		AnswerMarkdown: "Traffic increased.",
-		Citations:      []AskAICitation{{Label: "Overview", ToolCallID: "hitkeep_get_site_overview"}},
-		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "visits", "value": float64(10)}}}},
-		Actions:        nil,
-	}, AskAIRequest{SiteID: siteID, Tools: []goaisdk.Tool{tool}}, nil)
-	if err != nil || len(output.Citations) != 0 {
-		t.Fatalf("expected configured-but-unused citation to be dropped, got %+v, %v", output.Citations, err)
-	}
-}
-
-func TestGenerateAskAIUsesRequiredToolsOnMantle(t *testing.T) {
+func TestGenerateAskAILeavesToolChoiceOpenOnMantle(t *testing.T) {
 	recorder := &recordingRecorder{}
 	var capturedParams provider.GenerateParams
 	service := &Service{
@@ -538,8 +391,10 @@ func TestGenerateAskAIUsesRequiredToolsOnMantle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateAskAI: %v", err)
 	}
-	if capturedParams.ToolChoice != goaisdk.ToolChoiceRequired {
-		t.Fatalf("expected required tool choice for Mantle Ask AI, got %q", capturedParams.ToolChoice)
+	// A required tool choice would forbid the plain-text answer; the snapshot
+	// grounds the model instead.
+	if capturedParams.ToolChoice == goaisdk.ToolChoiceRequired {
+		t.Fatal("Mantle Ask AI must be able to answer without another tool call")
 	}
 	if !strings.Contains(capturedParams.System, "Answer only questions about the scoped HitKeep site's analytics") ||
 		!strings.Contains(capturedParams.System, "Code is in scope when it helps implement or diagnose HitKeep tracking") ||
@@ -565,7 +420,7 @@ func TestGenerateAskAIReturnsRunIDOnInvalidOutput(t *testing.T) {
 			id: "amazon.nova-lite-v1:0",
 			generateFn: func(context.Context, provider.GenerateParams) (*provider.GenerateResult, error) {
 				return &provider.GenerateResult{
-					Text:         `{"answer_markdown":"","citations":[],"charts":[],"actions":[]}`,
+					Text:         "   ",
 					FinishReason: provider.FinishStop,
 					Usage:        provider.Usage{InputTokens: 9, OutputTokens: 4},
 				}, nil

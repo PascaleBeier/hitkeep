@@ -92,7 +92,7 @@ func seedEvalStore(t *testing.T) (*database.Store, *api.Site) {
 }
 
 func evalRequest(store *database.Store, site *api.Site, query string, history []AskAIMessage) AskAIRequest {
-	tools := analyticstools.GoAI(analyticstools.Scope{
+	aiTools := analyticstools.GoAI(analyticstools.Scope{
 		SiteID: site.ID,
 		Resolve: func(context.Context, uuid.UUID) (analyticstools.Site, error) {
 			return analyticstools.Site{ID: site.ID, Control: store, Analytics: store}, nil
@@ -101,8 +101,10 @@ func evalRequest(store *database.Store, site *api.Site, query string, history []
 	}, analyticstools.Analytics()...)
 	return normalizeAskAIRequest(AskAIRequest{
 		SiteID: site.ID, SiteDomain: site.Domain, Query: query, History: history,
-		From: evalFrom, To: evalTo, Route: "/dashboard", Tools: tools,
-		SkillText: skills.EmbeddedAnalyticsProcedurePack(),
+		From: evalFrom, To: evalTo, Route: "/dashboard", Tools: aiTools,
+		SkillText:  skills.EmbeddedAnalyticsProcedurePack(),
+		Snapshot:   analyticstools.Snapshot(evalFrom, evalTo),
+		ToolTitles: analyticstools.Titles(analyticstools.Analytics()...),
 	})
 }
 
@@ -122,9 +124,9 @@ func toolCallStep(name, input string) []provider.StreamChunk {
 	}
 }
 
-func answerStep(output string) []provider.StreamChunk {
+func answerStep(answer string) []provider.StreamChunk {
 	return []provider.StreamChunk{
-		{Type: provider.ChunkText, Text: output},
+		{Type: provider.ChunkText, Text: answer},
 		{Type: provider.ChunkFinish, FinishReason: provider.FinishStop, Usage: provider.Usage{InputTokens: 20, OutputTokens: 15}},
 	}
 }
@@ -138,7 +140,7 @@ var goldenCases = []goldenCase{
 			case 0:
 				return toolCallStep(analyticstools.ToolSiteOverview, `{"compare_from":"2026-08-01T00:00:00Z","compare_to":"2026-08-31T00:00:00Z","sections":["chart"]}`)
 			case 1:
-				return answerStep(`{"answer_markdown":"Pageviews rose from 37 to 58.","citations":[{"label":"Overview","tool_call_id":"hitkeep_get_site_overview"}],"charts":[],"actions":[]}`)
+				return answerStep("Pageviews rose from 37 to 58.")
 			}
 			return nil
 		},
@@ -149,8 +151,8 @@ var goldenCases = []goldenCase{
 			if !strings.Contains(seen, `\"top_pages\":null`) {
 				t.Errorf("unrequested sections reached the model: %s", seen)
 			}
-			if len(generation.Output.Citations) != 1 {
-				t.Errorf("citations = %+v, want the overview", generation.Output.Citations)
+			if got := generation.Output.Citations; len(got) != 2 || got[1].ToolCallID != analyticstools.ToolSiteOverview || got[1].Label != "Get HitKeep Site Overview" {
+				t.Errorf("citations = %+v, want the snapshot tools with titles", got)
 			}
 		},
 	},
@@ -162,7 +164,7 @@ var goldenCases = []goldenCase{
 			case 0:
 				return toolCallStep(analyticstools.ToolSiteOverview, `{"site_id":"`+uuid.NewString()+`","sections":[]}`)
 			case 1:
-				return answerStep(`{"answer_markdown":"I can only read this site.","citations":[],"charts":[],"actions":[]}`)
+				return answerStep("I can only read this site.")
 			}
 			return nil
 		},
@@ -178,7 +180,7 @@ var goldenCases = []goldenCase{
 		history: []AskAIMessage{{Role: "user", Content: "How many pageviews in September?"}, {Role: "assistant", Content: "58 pageviews."}},
 		script: func(step int) []provider.StreamChunk {
 			if step == 0 {
-				return answerStep(`{"answer_markdown":"August had 37 pageviews.","citations":[],"charts":[],"actions":[]}`)
+				return answerStep("August had 37 pageviews.")
 			}
 			return nil
 		},
@@ -186,21 +188,33 @@ var goldenCases = []goldenCase{
 			if !strings.Contains(seen, "How many pageviews in September?") || !strings.Contains(seen, "58 pageviews.") {
 				t.Errorf("history did not reach the model: %s", seen)
 			}
+			// The snapshot reached the model before it called any tool.
+			if !strings.Contains(seen, `\"total_pageviews\":58`) || !strings.Contains(seen, "pricing page redesign") {
+				t.Errorf("snapshot did not reach the model: %s", seen)
+			}
 		},
 	},
 	{
-		name:  "invalid extras never cost the answer",
-		query: "Chart it and link me to the page.",
+		name:  "invalid charts are corrected, never fatal",
+		query: "Chart the top pages.",
 		script: func(step int) []provider.StreamChunk {
-			if step == 0 {
-				return answerStep(`{"answer_markdown":"Traffic is up.","citations":[{"label":"Made up","tool_call_id":"hitkeep_get_raw_hits"}],"charts":[{"type":"pie","title":"Share","rows":[]}],"actions":[{"type":"navigate","label":"Open","target":"https://evil.example"}]}`)
+			switch step {
+			case 0:
+				return toolCallStep("show_chart", `{"type":"pie","title":"Share","rows":[]}`)
+			case 1:
+				return toolCallStep("show_chart", `{"type":"table","title":"Top pages","rows":[{"path":"/pricing","pageviews":30}]}`)
+			case 2:
+				return answerStep("/pricing led September.")
 			}
 			return nil
 		},
-		check: func(t *testing.T, generation askAIGeneration, _ string) {
+		check: func(t *testing.T, generation askAIGeneration, seen string) {
+			if !strings.Contains(seen, "unsupported chart type") {
+				t.Errorf("the chart error did not reach the model: %s", seen)
+			}
 			out := generation.Output
-			if out.AnswerMarkdown != "Traffic is up." || len(out.Citations)+len(out.Charts)+len(out.Actions) != 0 {
-				t.Errorf("output = %+v, want the answer without invalid extras", out)
+			if out.AnswerMarkdown != "/pricing led September." || len(out.Charts) != 1 || out.Charts[0].Title != "Top pages" {
+				t.Errorf("output = %+v, want the answer and the corrected chart", out)
 			}
 		},
 	},
@@ -244,11 +258,6 @@ var liveCases = []liveCase{
 
 func (c liveCase) passes(generation askAIGeneration) bool {
 	if generation.Err != nil {
-		return false
-	}
-	// An analytics answer without a successful tool call is invented, even
-	// when it happens to name the right term.
-	if len(c.want) > 0 && len(generation.EvidenceIDs) == 0 {
 		return false
 	}
 	answer := generation.Output.AnswerMarkdown
@@ -387,7 +396,7 @@ func (m *scriptedStreamModel) DoStream(_ context.Context, params provider.Genera
 	chunks := m.script(m.step)
 	m.step++
 	if chunks == nil {
-		chunks = answerStep(`{"answer_markdown":"Script ended.","citations":[],"charts":[],"actions":[]}`)
+		chunks = answerStep("Script ended.")
 	}
 	return providerStreamFromChunks(chunks...), nil
 }

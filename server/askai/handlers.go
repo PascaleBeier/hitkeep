@@ -623,6 +623,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 			TeamID: teamID, SiteID: siteID, ActorID: userID, ActorType: "user", SiteDomain: site.Domain,
 			Query: request.Query, From: from, To: to, Route: request.Route, Filters: toAIAskFilters(filters), History: toAIAskHistory(request.History),
 			SkillText: publicskills.EmbeddedAnalyticsProcedurePack(), Tools: aiTools,
+			Snapshot: analyticstools.Snapshot(from, to), ToolTitles: analyticstools.Titles(tools...),
 		},
 	}, true
 }
