@@ -374,7 +374,7 @@ func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptIn
 	started := time.Now()
 	var output OpportunityCandidateProposal
 	temperatureOpts := temperatureOptions(s.model, 0.2)
-	structuredOutputOpts := mantleStructuredOutputOptions(s.conf)
+	structuredOutputOpts := append(mantleStructuredOutputOptions(s.conf), promptCachingOptions(s.conf)...)
 	options := make([]goaisdk.Option, 0, 10+len(temperatureOpts)+len(structuredOutputOpts))
 	options = append(options,
 		goaisdk.WithSystem(opportunitySystemPrompt()),

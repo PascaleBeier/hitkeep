@@ -637,6 +637,9 @@ func TestAskAIAuditsInvalidRequests(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected invalid request status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
 	}
+	if rec.Header().Get("Deprecation") == "" || !strings.Contains(rec.Header().Get("Link"), `/ask-ai/events>; rel="successor-version"`) {
+		t.Fatalf("expected the non-streaming route to announce its deprecation, got %v", rec.Header())
+	}
 	if ai.calls != 0 {
 		t.Fatalf("expected AI not to be called, got %d calls", ai.calls)
 	}

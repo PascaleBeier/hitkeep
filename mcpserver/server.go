@@ -10,11 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"hitkeep/analyticstools"
-	authcore "hitkeep/auth"
 	"hitkeep/config"
 	"hitkeep/database"
 	json "hitkeep/jsonapi"
@@ -357,26 +355,6 @@ func apiAuth(ctx context.Context) (*database.APIClientAuth, error) {
 		return nil, errors.New("unauthorized")
 	}
 	return authz, nil
-}
-
-func (s *service) requireSiteView(ctx context.Context, siteID uuid.UUID) (*database.APIClientAuth, error) {
-	authz, err := apiAuth(ctx)
-	if err != nil {
-		return nil, err
-	}
-	role, ok := authz.SiteRoles[siteID]
-	if !ok || !role.HasPermission(authcore.PermSiteView) {
-		return nil, errors.New("forbidden")
-	}
-	return authz, nil
-}
-
-func (s *service) analyticsStore(ctx context.Context, siteID uuid.UUID) (*database.Store, error) {
-	if s.tenantStores == nil {
-		return s.store, nil
-	}
-	store, _, err := s.tenantStores.ResolveSiteStore(ctx, siteID)
-	return store, err
 }
 
 func (s *service) logMiddleware() mcp.Middleware {

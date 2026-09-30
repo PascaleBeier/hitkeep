@@ -385,7 +385,7 @@ func TestDecodeAskAIOutputTextStripsFencesAndExtraText(t *testing.T) {
 	}
 }
 
-func TestValidateAskAIOutputRejectsUnsafeNavigationAndCitation(t *testing.T) {
+func TestValidateAskAIOutputDropsUnsafeNavigationAndCitation(t *testing.T) {
 	siteID := uuid.New()
 	valid := AskAIOutput{
 		AnswerMarkdown: "Traffic increased.",
@@ -393,14 +393,14 @@ func TestValidateAskAIOutputRejectsUnsafeNavigationAndCitation(t *testing.T) {
 		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "visits", "value": float64(10)}}}},
 		Actions:        []AskAIAction{{Type: "navigate", Label: "Open", Target: "https://example.com/phish"}},
 	}
-	if _, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); !errors.Is(err, ErrInvalidOutput) {
-		t.Fatalf("expected unsafe navigation to be rejected, got %v", err)
+	if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 || output.AnswerMarkdown == "" {
+		t.Fatalf("expected unsafe navigation to be dropped from a kept answer, got %+v, %v", output, err)
 	}
 
 	valid.Actions = nil
 	valid.Citations = []AskAICitation{{Label: "Invented", ToolCallID: "invented_tool"}}
-	if _, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); !errors.Is(err, ErrInvalidOutput) {
-		t.Fatalf("expected invented citation to be rejected, got %v", err)
+	if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Citations) != 0 {
+		t.Fatalf("expected invented citation to be dropped, got %+v, %v", output.Citations, err)
 	}
 }
 
@@ -422,8 +422,8 @@ func TestValidateAskAIOutputRequiresPathOnlyNavigationActions(t *testing.T) {
 
 	for _, target := range []string{"/dashboard?raw=Traffic%20increased", "/events#latest"} {
 		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open dashboard", Target: target}}
-		if _, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); !errors.Is(err, ErrInvalidOutput) {
-			t.Fatalf("expected navigation target %q to be rejected, got %v", target, err)
+		if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 {
+			t.Fatalf("expected navigation target %q to be dropped, got %+v, %v", target, output.Actions, err)
 		}
 	}
 }
@@ -453,8 +453,8 @@ func TestValidateAskAIOutputAllowsAIAgentsNavigationTargets(t *testing.T) {
 	// routes stay rejected.
 	for _, target := range []string{"/ai-agents/unknown-tab", "/ai-agents-secret"} {
 		valid.Actions = []AskAIAction{{Type: "navigate", Label: "Open AI agents", Target: target}}
-		if _, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); !errors.Is(err, ErrInvalidOutput) {
-			t.Fatalf("expected navigation target %q to be rejected, got %v", target, err)
+		if output, err := ValidateAskAIOutput(valid, AskAIRequest{SiteID: siteID}, nil); err != nil || len(output.Actions) != 0 {
+			t.Fatalf("expected navigation target %q to be dropped, got %+v, %v", target, output.Actions, err)
 		}
 	}
 }
@@ -478,24 +478,24 @@ func TestNormalizeAskAIRequestPreservesSafeRoutePathFromRouterURL(t *testing.T) 
 	}
 }
 
-func TestValidateAskAIOutputRejectsConfiguredButUnusedCitation(t *testing.T) {
+func TestValidateAskAIOutputDropsConfiguredButUnusedCitation(t *testing.T) {
 	siteID := uuid.New()
 	tool := goaisdk.NewTool("hitkeep_get_site_overview", "overview", func(context.Context, struct{}) (string, error) {
 		return "{}", nil
 	})
 
-	_, err := ValidateAskAIOutput(AskAIOutput{
+	output, err := ValidateAskAIOutput(AskAIOutput{
 		AnswerMarkdown: "Traffic increased.",
 		Citations:      []AskAICitation{{Label: "Overview", ToolCallID: "hitkeep_get_site_overview"}},
 		Charts:         []AskAIChart{{Type: "table", Title: "Summary", Rows: []map[string]any{{"metric": "visits", "value": float64(10)}}}},
 		Actions:        nil,
 	}, AskAIRequest{SiteID: siteID, Tools: []goaisdk.Tool{tool}}, nil)
-	if !errors.Is(err, ErrInvalidOutput) {
-		t.Fatalf("expected configured-but-unused citation to be rejected, got %v", err)
+	if err != nil || len(output.Citations) != 0 {
+		t.Fatalf("expected configured-but-unused citation to be dropped, got %+v, %v", output.Citations, err)
 	}
 }
 
-func TestGenerateAskAIUsesStrictMantleStructuredOutputAndRequiredTools(t *testing.T) {
+func TestGenerateAskAIUsesRequiredToolsOnMantle(t *testing.T) {
 	recorder := &recordingRecorder{}
 	var capturedParams provider.GenerateParams
 	service := &Service{
@@ -537,9 +537,6 @@ func TestGenerateAskAIUsesStrictMantleStructuredOutputAndRequiredTools(t *testin
 	})
 	if err != nil {
 		t.Fatalf("GenerateAskAI: %v", err)
-	}
-	if capturedParams.ProviderOptions["strictJsonSchema"] != true {
-		t.Fatalf("expected strict Mantle JSON schema provider option, got %#v", capturedParams.ProviderOptions)
 	}
 	if capturedParams.ToolChoice != goaisdk.ToolChoiceRequired {
 		t.Fatalf("expected required tool choice for Mantle Ask AI, got %q", capturedParams.ToolChoice)
@@ -1617,6 +1614,16 @@ func (m *fakeLanguageModel) DoGenerate(ctx context.Context, params provider.Gene
 func (m *fakeLanguageModel) DoStream(ctx context.Context, params provider.GenerateParams) (*provider.StreamResult, error) {
 	if m.streamFn != nil {
 		return m.streamFn(ctx, params)
+	}
+	if m.generateFn != nil {
+		result, err := m.generateFn(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		return providerStreamFromChunks(
+			provider.StreamChunk{Type: provider.ChunkText, Text: result.Text},
+			provider.StreamChunk{Type: provider.ChunkFinish, FinishReason: result.FinishReason, Usage: result.Usage},
+		), nil
 	}
 	return nil, errors.New("stream not implemented")
 }

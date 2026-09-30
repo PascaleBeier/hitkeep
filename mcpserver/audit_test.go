@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,33 @@ func TestMCPPublishedSurfaceAudit(t *testing.T) {
 	}
 	if init.Capabilities.Tools.ListChanged || init.Capabilities.Resources.ListChanged || init.Capabilities.Resources.Subscribe {
 		t.Fatalf("stateful capabilities advertised: %+v", init.Capabilities)
+	}
+	if init.Capabilities.Prompts == nil || init.Capabilities.Prompts.ListChanged {
+		t.Fatalf("expected stateless prompts capability: %+v", init.Capabilities.Prompts)
+	}
+	if !strings.Contains(init.Instructions, "hitkeep_list_sites") || !strings.Contains(init.Instructions, "read-only") {
+		t.Fatalf("instructions must route to site discovery and state the read-only boundary: %q", init.Instructions)
+	}
+
+	prompts, err := session.ListPrompts(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("ListPrompts: %v", err)
+	}
+	wantPrompts := []string{"hitkeep-ai-visibility-analyst", "hitkeep-analytics", "hitkeep-ecommerce-analyst", "hitkeep-tracking-verifier", "hitkeep-traffic-diagnosis"}
+	gotPrompts := make([]string, 0, len(prompts.Prompts))
+	for _, prompt := range prompts.Prompts {
+		gotPrompts = append(gotPrompts, prompt.Name)
+	}
+	slices.Sort(gotPrompts)
+	if !slices.Equal(gotPrompts, wantPrompts) {
+		t.Fatalf("prompts = %v, want the public procedures %v", gotPrompts, wantPrompts)
+	}
+	prompt, err := session.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "hitkeep-traffic-diagnosis", Arguments: map[string]string{"question": "Why did traffic drop?"}})
+	if err != nil || len(prompt.Messages) != 1 {
+		t.Fatalf("GetPrompt: %v %+v", err, prompt)
+	}
+	if text, ok := prompt.Messages[0].Content.(*mcp.TextContent); !ok || !strings.Contains(text.Text, "Why did traffic drop?") {
+		t.Fatalf("prompt did not carry the question: %+v", prompt.Messages[0].Content)
 	}
 
 	tools, err := session.ListTools(context.Background(), nil)

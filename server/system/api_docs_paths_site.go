@@ -247,7 +247,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 				}),
 		},
 		"/api/sites/{id}/ask-ai": map[string]any{
-			"post": op([]string{"Sites"}, "Ask AI", "Runs the session-only, site-scoped dashboard assistant over read-only aggregate analytics tools. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+			"post": deprecated(op([]string{"Sites"}, "Ask AI", "Deprecated: use /api/sites/{id}/ask-ai/events, which runs the same audited workflow and streams the answer. This endpoint returns the finished answer of that workflow and will be removed in the next major version. Runs the session-only, site-scoped dashboard assistant over read-only aggregate analytics tools. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/AskAIRequest"}),
 				map[string]any{
 					"200": jsonRefResp("Ask AI response", "#/components/schemas/AskAIResponse"),
@@ -256,7 +256,7 @@ func openAPIV1AdminSitePaths() map[string]any {
 					"409": jsonRefResp("Ask AI unavailable", "#/components/schemas/AskAIStatus"),
 					"429": jsonRefResp("Ask AI budget or daily allowance exhausted", "#/components/schemas/AskAIStatus"),
 					"502": errResp("Ask AI provider or validation failure"),
-				}),
+				})),
 		},
 		"/api/sites/{id}/ask-ai/events": map[string]any{
 			"post": op([]string{"Sites"}, "Stream Ask AI", "Runs the same audited, session-only Ask AI workflow and streams safe Server-Sent Events for progress, answer deltas, and the final validated response. Requires a human dashboard session with site.view; API client bearer tokens and shared dashboard routes are rejected.", secCookie(), []any{paramRef("#/components/parameters/siteID")},

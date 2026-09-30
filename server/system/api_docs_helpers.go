@@ -2,6 +2,11 @@ package system
 
 import "maps"
 
+func deprecated(operation map[string]any) map[string]any {
+	operation["deprecated"] = true
+	return operation
+}
+
 func op(tags []string, summary string, description string, security []any, parameters []any, requestBody any, responses map[string]any) map[string]any {
 	out := map[string]any{
 		"tags":        tags,

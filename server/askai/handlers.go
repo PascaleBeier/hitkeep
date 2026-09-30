@@ -74,8 +74,12 @@ func Register(mux *http.ServeMux, ctx *shared.Context) {
 	}, h.handleHistory()))
 }
 
+// handleAsk serves the deprecated non-streaming route; remove it in v3.
 func (h *handler) handleAsk() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// RFC 9745: deprecated since 2026-09-30, succeeded by the event stream.
+		w.Header().Set("Deprecation", "@1790726400")
+		w.Header().Set("Link", `<`+r.URL.Path+`/events>; rel="successor-version"`)
 		prepared, ok := h.prepareAskAI(w, r)
 		if !ok {
 			return

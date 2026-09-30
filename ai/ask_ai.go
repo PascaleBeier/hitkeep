@@ -1,12 +1,13 @@
 package ai
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -119,28 +120,9 @@ type askAIPromptInput struct {
 	ToolNames  []string       `json:"tool_names"`
 }
 
+// GenerateAskAI returns the finished answer of a generation nobody streams.
 func (s *Service) GenerateAskAI(ctx context.Context, req AskAIRequest) (AskAIResult, error) {
-	if s == nil || !s.conf.Enabled {
-		return AskAIResult{}, ErrDisabled
-	}
-	req = normalizeAskAIRequest(req)
-	ledger := newRunLedger(s.conf, s.recorder)
-	if !s.Configured() {
-		if err := ledger.recordAskAINotConfigured(ctx, req); err != nil {
-			return AskAIResult{}, err
-		}
-		return AskAIResult{}, ErrNotConfigured
-	}
-	reservedRunID, err := ledger.reserveAskAI(ctx, req)
-	if err != nil {
-		return AskAIResult{}, err
-	}
-	generation := s.runAskAIGeneration(ctx, req)
-	runID, err := ledger.finalizeAskAI(ctx, reservedRunID, req, generation)
-	if err != nil {
-		return AskAIResult{RunID: runID, Usage: generation.Usage}, err
-	}
-	return AskAIResult{RunID: runID, Output: generation.Output, Usage: generation.Usage}, nil
+	return s.StreamAskAI(ctx, req, nil)
 }
 
 func (s *Service) StreamAskAI(ctx context.Context, req AskAIRequest, sink AskAIStreamSink) (AskAIResult, error) {
@@ -167,349 +149,68 @@ func (s *Service) StreamAskAI(ctx context.Context, req AskAIRequest, sink AskAIS
 	return AskAIResult{RunID: runID, Output: generation.Output, Usage: generation.Usage}, nil
 }
 
-func (s *Service) runAskAIGeneration(ctx context.Context, req AskAIRequest) askAIGeneration {
-	inputJSON, err := json.Marshal(askAIGenerationInput(req))
-	if err != nil {
-		return askAIGeneration{Err: fmt.Errorf("encode ask ai prompt input: %w", err)}
-	}
-	timeoutCtx, cancel := context.WithTimeout(ctx, s.conf.Timeout)
-	defer cancel()
-
-	usage := Usage{}
-	lifecycleEvents := []LifecycleEvent{}
-	successfulToolCalls := map[string]bool{}
-	appendLifecycle := func(event LifecycleEvent) {
-		if event.Provider == "" {
-			event.Provider = s.conf.Provider
-		}
-		if event.Model == "" {
-			event.Model = s.conf.Model
-		}
-		if event.Timestamp.IsZero() {
-			event.Timestamp = time.Now().UTC()
-		}
-		lifecycleEvents = append(lifecycleEvents, event)
-	}
-
-	started := time.Now()
-	temperatureOpts := temperatureOptions(s.model, 0.2)
-	structuredOutputOpts := mantleStructuredOutputOptions(s.conf)
-	toolChoiceOpts := mantleAskAIToolOptions(s.conf, req.Tools)
-	options := make([]goaisdk.Option, 0, 10+len(temperatureOpts)+len(structuredOutputOpts)+len(toolChoiceOpts))
-	options = append(options,
-		goaisdk.WithSystem(askAISystemPrompt(req.SkillText)),
-		goaisdk.WithPrompt(askAIPrompt(string(inputJSON))),
-		goaisdk.WithExplicitSchema(askAIOutputSchema()),
-		goaisdk.WithTools(req.Tools...),
-		goaisdk.WithMaxSteps(5),
-		goaisdk.WithMaxOutputTokens(1800),
-		goaisdk.WithOnRequest(func(info goaisdk.RequestInfo) {
-			appendLifecycle(LifecycleEvent{
-				Type:         "request_start",
-				Model:        info.Model,
-				MessageCount: info.MessageCount,
-				ToolCount:    info.ToolCount,
-				Status:       "started",
-				Timestamp:    info.Timestamp,
-			})
-		}),
-		goaisdk.WithOnResponse(func(info goaisdk.ResponseInfo) {
-			usage.InputTokens += info.Usage.InputTokens
-			usage.OutputTokens += info.Usage.OutputTokens
-			usage.TotalTokens += totalTokens(info.Usage)
-			status := "success"
-			category := ""
-			if info.Error != nil {
-				status = "failure"
-				category = ClassifyError(info.Error)
-			}
-			appendLifecycle(LifecycleEvent{
-				Type:          "request_finish",
-				Status:        status,
-				StatusCode:    info.StatusCode,
-				ErrorCategory: category,
-				LatencyMS:     info.Latency.Milliseconds(),
-			})
-		}),
-		goaisdk.WithOnToolCallStart(func(info goaisdk.ToolCallStartInfo) {
-			appendLifecycle(LifecycleEvent{
-				Type:     "tool_call_start",
-				ToolName: info.ToolName,
-				Step:     info.Step,
-				Status:   "started",
-			})
-		}),
-		goaisdk.WithOnToolCall(func(info goaisdk.ToolCallInfo) {
-			usage.ToolCallCount++
-			status := "success"
-			category := ""
-			if info.Error != nil {
-				status = "failure"
-				category = ClassifyError(info.Error)
-			} else if name := strings.TrimSpace(info.ToolName); name != "" {
-				successfulToolCalls[name] = true
-			}
-			appendLifecycle(LifecycleEvent{
-				Type:          "tool_call_finish",
-				ToolName:      info.ToolName,
-				Step:          info.Step,
-				Status:        status,
-				ErrorCategory: category,
-				LatencyMS:     info.Duration.Milliseconds(),
-			})
-		}),
-	)
-	options = append(options, temperatureOpts...)
-	options = append(options, structuredOutputOpts...)
-	options = append(options, toolChoiceOpts...)
-	result, err := goaisdk.GenerateObject[AskAIOutput](timeoutCtx, s.model, options...)
-	latency := time.Since(started)
-	evidenceIDs := askAIToolEvidenceIDs(successfulToolCalls)
-	output, usage, err := finalizeAskAIGeneration(result, usage, err, req, evidenceIDs)
-	return askAIGeneration{Output: output, Usage: usage, EvidenceIDs: evidenceIDs, LifecycleEvents: lifecycleEvents, Latency: latency, Err: err}
-}
-
 func (s *Service) runAskAIStreamingGeneration(ctx context.Context, req AskAIRequest, sink AskAIStreamSink) askAIGeneration {
-	inputJSON, err := json.Marshal(askAIGenerationInput(req))
-	if err != nil {
-		return askAIGeneration{Err: fmt.Errorf("encode ask ai prompt input: %w", err)}
-	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.conf.Timeout)
 	defer cancel()
-
-	var mu sync.Mutex
-	usage := Usage{}
-	lifecycleEvents := []LifecycleEvent{}
-	successfulToolCalls := map[string]bool{}
-	var sinkErr error
-	appendLifecycle := func(event LifecycleEvent) {
-		if event.Provider == "" {
-			event.Provider = s.conf.Provider
-		}
-		if event.Model == "" {
-			event.Model = s.conf.Model
-		}
-		if event.Timestamp.IsZero() {
-			event.Timestamp = time.Now().UTC()
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		lifecycleEvents = append(lifecycleEvents, event)
-	}
-	addUsage := func(providerUsage provider.Usage) {
-		mu.Lock()
-		defer mu.Unlock()
-		usage.InputTokens += providerUsage.InputTokens
-		usage.OutputTokens += providerUsage.OutputTokens
-		usage.TotalTokens += totalTokens(providerUsage)
-	}
-	incrementToolCallUsage := func() {
-		mu.Lock()
-		defer mu.Unlock()
-		usage.ToolCallCount++
-	}
-	recordSuccessfulToolCall := func(name string) {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			return
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		successfulToolCalls[name] = true
-	}
-	currentSinkErr := func() error {
-		mu.Lock()
-		defer mu.Unlock()
-		return sinkErr
-	}
-	recordSinkErr := func(err error) {
-		if err == nil {
-			return
-		}
-		mu.Lock()
-		if sinkErr == nil {
-			sinkErr = err
-			cancel()
-		}
-		mu.Unlock()
-	}
-	emit := func(delta AskAIStreamDelta) error {
-		if sink == nil {
-			return nil
-		}
-		return sink(delta)
+	run := &askAIRun{conf: s.conf, sink: sink, cancel: cancel, started: time.Now(), toolCalls: map[string]bool{}}
+	messages, err := askAIMessages(req)
+	if err != nil {
+		return run.failed(err)
 	}
 
-	started := time.Now()
-	failedGeneration := func(err error) askAIGeneration {
-		mu.Lock()
-		usageSnapshot := usage
-		lifecycleSnapshot := slices.Clone(lifecycleEvents)
-		mu.Unlock()
-		return askAIGeneration{Usage: usageSnapshot, LifecycleEvents: lifecycleSnapshot, Latency: time.Since(started), Err: err}
-	}
-	generationSnapshot := func() (Usage, []LifecycleEvent, []string) {
-		mu.Lock()
-		defer mu.Unlock()
-		return usage, slices.Clone(lifecycleEvents), askAIToolEvidenceIDs(successfulToolCalls)
-	}
-	temperatureOpts := temperatureOptions(s.model, 0.2)
-	toolChoiceOpts := mantleAskAIToolOptions(s.conf, req.Tools)
-	options := make([]goaisdk.Option, 0, 9+len(temperatureOpts)+len(toolChoiceOpts))
-	options = append(options,
+	options := []goaisdk.Option{
 		goaisdk.WithSystem(askAISystemPrompt(req.SkillText)),
-		goaisdk.WithPrompt(askAIStreamingPrompt(string(inputJSON))),
+		goaisdk.WithMessages(messages...),
 		goaisdk.WithTools(req.Tools...),
 		goaisdk.WithMaxSteps(5),
 		goaisdk.WithMaxOutputTokens(1800),
-		goaisdk.WithOnRequest(func(info goaisdk.RequestInfo) {
-			appendLifecycle(LifecycleEvent{
-				Type:         "request_start",
-				Model:        info.Model,
-				MessageCount: info.MessageCount,
-				ToolCount:    info.ToolCount,
-				Status:       "started",
-				Timestamp:    info.Timestamp,
-			})
-		}),
-		goaisdk.WithOnResponse(func(info goaisdk.ResponseInfo) {
-			addUsage(info.Usage)
-			status := "success"
-			category := ""
-			if info.Error != nil {
-				status = "failure"
-				category = ClassifyError(info.Error)
-			}
-			appendLifecycle(LifecycleEvent{
-				Type:          "request_finish",
-				Status:        status,
-				StatusCode:    info.StatusCode,
-				ErrorCategory: category,
-				LatencyMS:     info.Latency.Milliseconds(),
-			})
-		}),
-		goaisdk.WithOnToolCallStart(func(info goaisdk.ToolCallStartInfo) {
-			appendLifecycle(LifecycleEvent{
-				Type:     "tool_call_start",
-				ToolName: info.ToolName,
-				Step:     info.Step,
-				Status:   "started",
-			})
-			if err := emit(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_start", MessageKey: "askAi.progress.readingAnalytics", ToolCallID: info.ToolCallID, ToolName: info.ToolName}); err != nil {
-				recordSinkErr(err)
-			}
-		}),
-		goaisdk.WithOnToolCall(func(info goaisdk.ToolCallInfo) {
-			incrementToolCallUsage()
-			status := "success"
-			category := ""
-			if info.Error != nil {
-				status = "failure"
-				category = ClassifyError(info.Error)
-			} else {
-				recordSuccessfulToolCall(info.ToolName)
-			}
-			appendLifecycle(LifecycleEvent{
-				Type:          "tool_call_finish",
-				ToolName:      info.ToolName,
-				Step:          info.Step,
-				Status:        status,
-				ErrorCategory: category,
-				LatencyMS:     info.Duration.Milliseconds(),
-			})
-			if err := emit(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_finish", MessageKey: "askAi.progress.composing", ToolCallID: info.ToolCallID, ToolName: info.ToolName}); err != nil {
-				recordSinkErr(err)
-			}
-		}),
-	)
-	options = append(options, temperatureOpts...)
-	options = append(options, toolChoiceOpts...)
+		goaisdk.WithOnRequest(run.onRequest),
+		goaisdk.WithOnResponse(run.onResponse),
+		goaisdk.WithOnToolCallStart(run.onToolCallStart),
+		goaisdk.WithOnToolCall(run.onToolCall),
+	}
+	options = append(options, temperatureOptions(s.model, 0.2)...)
+	options = append(options, mantleAskAIToolOptions(s.conf, req.Tools)...)
+	options = append(options, promptCachingOptions(s.conf)...)
 
 	stream, err := goaisdk.StreamText(timeoutCtx, s.model, options...)
 	if err != nil {
-		return failedGeneration(err)
+		return run.failed(err)
 	}
 
 	var raw strings.Builder
 	extractor := askAIAnswerDeltaExtractor{}
 	textStream := stream.TextStream()
+read:
 	for {
 		select {
 		case chunk, ok := <-textStream:
 			if !ok {
-				goto streamDone
+				break read
 			}
 			raw.WriteString(chunk)
 			if delta := extractor.append(chunk); delta != "" {
-				if err := emit(AskAIStreamDelta{Type: AskAIStreamDeltaAnswer, Status: "streaming", TextDelta: delta}); err != nil {
-					return failedGeneration(err)
+				if err := run.emit(AskAIStreamDelta{Type: AskAIStreamDeltaAnswer, Status: "streaming", TextDelta: delta}); err != nil {
+					return run.failed(err)
 				}
 			}
 		case <-timeoutCtx.Done():
-			if err := currentSinkErr(); err != nil {
-				return failedGeneration(err)
-			}
-			return failedGeneration(timeoutCtx.Err())
+			return run.failed(cmp.Or(run.sinkError(), timeoutCtx.Err()))
 		}
 	}
 
-streamDone:
-	if err := currentSinkErr(); err != nil {
-		return failedGeneration(err)
+	if err := run.sinkError(); err != nil {
+		return run.failed(err)
 	}
 	result := stream.Result()
-	if err := currentSinkErr(); err != nil {
-		return failedGeneration(err)
-	}
-	if err := stream.Err(); err != nil {
-		return failedGeneration(err)
+	if err := cmp.Or(run.sinkError(), stream.Err()); err != nil {
+		return run.failed(err)
 	}
 	rawText := raw.String()
 	if result != nil && strings.TrimSpace(result.Text) != "" {
 		rawText = result.Text
 	}
-	usageSnapshot, lifecycleSnapshot, evidenceIDs := generationSnapshot()
-	output, usage, err := finalizeAskAIStreamingGeneration(rawText, result, usageSnapshot, req, evidenceIDs)
-	return askAIGeneration{Output: output, Usage: usage, EvidenceIDs: evidenceIDs, LifecycleEvents: lifecycleSnapshot, Latency: time.Since(started), Err: err}
-}
-
-func finalizeAskAIGeneration(result *goaisdk.ObjectResult[AskAIOutput], usage Usage, err error, req AskAIRequest, evidenceIDs []string) (AskAIOutput, Usage, error) {
-	var output AskAIOutput
-	if err != nil {
-		return output, usage, err
-	}
-	if result == nil {
-		return output, usage, fmt.Errorf("%w: missing provider result", ErrInvalidOutput)
-	}
-	output, err = strictAskAIResult(result)
-	if err == nil {
-		output, err = ValidateAskAIOutput(output, req, evidenceIDs)
-	}
-	if usage.TotalTokens == 0 {
-		usage = Usage{
-			InputTokens:   result.Usage.InputTokens,
-			OutputTokens:  result.Usage.OutputTokens,
-			TotalTokens:   totalTokens(result.Usage),
-			ToolCallCount: usage.ToolCallCount,
-		}
-	}
-	return output, usage, err
-}
-
-func strictAskAIResult(result *goaisdk.ObjectResult[AskAIOutput]) (AskAIOutput, error) {
-	for _, v := range slices.Backward(result.Steps) {
-		if text := strings.TrimSpace(v.Text); text != "" {
-			return decodeAskAIOutputText(text)
-		}
-	}
-	return result.Object, nil
-}
-
-func finalizeAskAIStreamingGeneration(rawText string, result *goaisdk.TextResult, usage Usage, req AskAIRequest, evidenceIDs []string) (AskAIOutput, Usage, error) {
-	output, err := decodeAskAIOutputText(rawText)
-	if err == nil {
-		output, err = ValidateAskAIOutput(output, req, evidenceIDs)
-	}
+	usage, lifecycle, evidenceIDs := run.snapshot()
 	if usage.TotalTokens == 0 && result != nil {
 		usage = Usage{
 			InputTokens:   result.TotalUsage.InputTokens,
@@ -518,7 +219,138 @@ func finalizeAskAIStreamingGeneration(rawText string, result *goaisdk.TextResult
 			ToolCallCount: usage.ToolCallCount,
 		}
 	}
-	return output, usage, err
+	output, err := decodeAskAIOutputText(rawText)
+	if err != nil && extractor.complete {
+		// The answer streamed intact but the rest of the object did not:
+		// keep the answer the user already read instead of failing the run.
+		output, err = AskAIOutput{AnswerMarkdown: extractor.emitted}, nil
+	}
+	if err == nil {
+		output, err = ValidateAskAIOutput(output, req, evidenceIDs)
+	}
+	return askAIGeneration{Output: output, Usage: usage, EvidenceIDs: evidenceIDs, LifecycleEvents: lifecycle, Latency: time.Since(run.started), Err: err}
+}
+
+// askAIRun records one generation. GoAI runs tool calls concurrently, so
+// every hook takes the lock.
+type askAIRun struct {
+	conf    Config
+	sink    AskAIStreamSink
+	cancel  context.CancelFunc
+	started time.Time
+
+	mu        sync.Mutex
+	usage     Usage
+	lifecycle []LifecycleEvent
+	toolCalls map[string]bool
+	sinkErr   error
+}
+
+func (r *askAIRun) record(event LifecycleEvent) {
+	event.Provider = cmp.Or(event.Provider, r.conf.Provider)
+	event.Model = cmp.Or(event.Model, r.conf.Model)
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now().UTC()
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lifecycle = append(r.lifecycle, event)
+}
+
+func (r *askAIRun) emit(delta AskAIStreamDelta) error {
+	if r.sink == nil {
+		return nil
+	}
+	return r.sink(delta)
+}
+
+// emitProgress reports tool progress; a failed write stops the generation.
+func (r *askAIRun) emitProgress(delta AskAIStreamDelta) {
+	err := r.emit(delta)
+	if err == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.sinkErr == nil {
+		r.sinkErr = err
+		r.cancel()
+	}
+}
+
+func (r *askAIRun) sinkError() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sinkErr
+}
+
+func (r *askAIRun) onRequest(info goaisdk.RequestInfo) {
+	r.record(LifecycleEvent{Type: "request_start", Model: info.Model, MessageCount: info.MessageCount, ToolCount: info.ToolCount, Status: "started", Timestamp: info.Timestamp})
+}
+
+func (r *askAIRun) onResponse(info goaisdk.ResponseInfo) {
+	r.mu.Lock()
+	r.usage.InputTokens += info.Usage.InputTokens
+	r.usage.OutputTokens += info.Usage.OutputTokens
+	r.usage.TotalTokens += totalTokens(info.Usage)
+	r.mu.Unlock()
+	status, category := "success", ""
+	if info.Error != nil {
+		status, category = "failure", ClassifyError(info.Error)
+	}
+	r.record(LifecycleEvent{Type: "request_finish", Status: status, StatusCode: info.StatusCode, ErrorCategory: category, LatencyMS: info.Latency.Milliseconds()})
+}
+
+func (r *askAIRun) onToolCallStart(info goaisdk.ToolCallStartInfo) {
+	r.record(LifecycleEvent{Type: "tool_call_start", ToolName: info.ToolName, Step: info.Step, Status: "started"})
+	r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_start", MessageKey: "askAi.progress.readingAnalytics", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+}
+
+func (r *askAIRun) onToolCall(info goaisdk.ToolCallInfo) {
+	status, category := "success", ""
+	r.mu.Lock()
+	r.usage.ToolCallCount++
+	if info.Error != nil {
+		status, category = "failure", ClassifyError(info.Error)
+	} else if name := strings.TrimSpace(info.ToolName); name != "" {
+		r.toolCalls[name] = true
+	}
+	r.mu.Unlock()
+	r.record(LifecycleEvent{Type: "tool_call_finish", ToolName: info.ToolName, Step: info.Step, Status: status, ErrorCategory: category, LatencyMS: info.Duration.Milliseconds()})
+	r.emitProgress(AskAIStreamDelta{Type: AskAIStreamDeltaProgress, Status: "tool_call_finish", MessageKey: "askAi.progress.composing", ToolCallID: info.ToolCallID, ToolName: info.ToolName})
+}
+
+func (r *askAIRun) snapshot() (Usage, []LifecycleEvent, []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.usage, slices.Clone(r.lifecycle), slices.Sorted(maps.Keys(r.toolCalls))
+}
+
+func (r *askAIRun) failed(err error) askAIGeneration {
+	usage, lifecycle, _ := r.snapshot()
+	return askAIGeneration{Usage: usage, LifecycleEvents: lifecycle, Latency: time.Since(r.started), Err: err}
+}
+
+// askAIMessages replays the drawer conversation as real turns, then asks the
+// current question with the scoped context.
+func askAIMessages(req AskAIRequest) ([]provider.Message, error) {
+	input := askAIGenerationInput(req)
+	input.History = nil
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, fmt.Errorf("encode ask ai prompt input: %w", err)
+	}
+	messages := make([]provider.Message, 0, len(req.History)+1)
+	for _, message := range req.History {
+		switch {
+		case message.Role == "user":
+			messages = append(messages, goaisdk.UserMessage(message.Content))
+		case len(messages) > 0:
+			// Providers expect the conversation to open with a user turn.
+			messages = append(messages, goaisdk.AssistantMessage(message.Content))
+		}
+	}
+	return append(messages, goaisdk.UserMessage(askAIStreamingPrompt(string(inputJSON)))), nil
 }
 
 func decodeAskAIOutputText(text string) (AskAIOutput, error) {
@@ -584,19 +416,13 @@ func askAIToolNames(tools []goaisdk.Tool) []string {
 }
 
 func askAISystemPrompt(skillText string) string {
-	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Use the available read-only aggregate tools before making analytics claims. Keep answers concise and evidence-backed. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. Charts and tables must be derived only from tool output. Export actions must only suggest the existing site takeout download. Navigation actions must only point to known dashboard routes. Return the requested JSON object only.`
+	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Use the available read-only aggregate tools before making analytics claims. Tools default to the dashboard date range and filters in the input; pass from and to, or compare_from and compare_to on the site overview, to read other periods such as the previous one. Request only the site overview sections the question needs. Check annotations before explaining a spike or drop, and use the docs tools, when offered, for product questions instead of guessing. Keep answers concise and evidence-backed. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. Charts and tables must be derived only from tool output. Export actions must only suggest the existing site takeout download. Navigation actions must only point to known dashboard routes. Return the requested JSON object only.`
 	skillText = strings.TrimSpace(skillText)
 	if skillText == "" {
 		return base
 	}
-	if len(skillText) > 18000 {
-		skillText = skillText[:18000]
-	}
+	skillText = truncateUTF8(skillText, 18000)
 	return base + "\n\nPublic HitKeep skill guidance:\n\n" + skillText
-}
-
-func askAIPrompt(input string) string {
-	return "Answer this dashboard question for the scoped HitKeep site and date range. Use aggregate tools as needed, cite tool evidence by tool name, and return only the structured JSON response:\n\n" + input
 }
 
 func askAIStreamingPrompt(input string) string {
@@ -712,41 +538,40 @@ func ValidateAskAIOutput(output AskAIOutput, req AskAIRequest, evidenceIDs []str
 	if len(output.AnswerMarkdown) > 6000 {
 		return AskAIOutput{}, fmt.Errorf("%w: answer_markdown too long", ErrInvalidOutput)
 	}
+	// Optional parts that fail validation are dropped, not fatal: the answer
+	// stays useful while unsafe or invented citations, charts, and actions
+	// never reach the dashboard.
 	allowedCitations := askAIAllowedCitationIDs(evidenceIDs)
-	citations := make([]AskAICitation, 0, len(output.Citations))
-	for _, citation := range output.Citations {
-		citation.Label = strings.TrimSpace(citation.Label)
-		citation.ToolCallID = strings.TrimSpace(citation.ToolCallID)
-		if citation.Label == "" || citation.ToolCallID == "" {
-			return AskAIOutput{}, fmt.Errorf("%w: citation label and tool_call_id are required", ErrInvalidOutput)
+	output.Citations = keepValid(output.Citations, func(citation AskAICitation) (AskAICitation, error) {
+		citation.Label, citation.ToolCallID = strings.TrimSpace(citation.Label), strings.TrimSpace(citation.ToolCallID)
+		if citation.Label == "" || !allowedCitations[citation.ToolCallID] {
+			return citation, fmt.Errorf("%w: unsupported citation %q", ErrInvalidOutput, citation.ToolCallID)
 		}
-		if !allowedCitations[citation.ToolCallID] {
-			return AskAIOutput{}, fmt.Errorf("%w: unsupported citation %q", ErrInvalidOutput, citation.ToolCallID)
-		}
-		citations = append(citations, citation)
-	}
-	output.Citations = citations
-
-	charts := make([]AskAIChart, 0, len(output.Charts))
-	for _, chart := range output.Charts {
-		normalized, err := validateAskAIChart(chart)
-		if err != nil {
-			return AskAIOutput{}, err
-		}
-		charts = append(charts, normalized)
-	}
-	output.Charts = charts
-
-	actions := make([]AskAIAction, 0, len(output.Actions))
-	for _, action := range output.Actions {
-		normalized, err := validateAskAIAction(action, req.SiteID)
-		if err != nil {
-			return AskAIOutput{}, err
-		}
-		actions = append(actions, normalized)
-	}
-	output.Actions = actions
+		return citation, nil
+	})
+	output.Charts = keepValid(output.Charts, validateAskAIChart)
+	output.Actions = keepValid(output.Actions, func(action AskAIAction) (AskAIAction, error) {
+		return validateAskAIAction(action, req.SiteID)
+	})
 	return output, nil
+}
+
+// truncateUTF8 cuts s to at most n bytes without splitting a character.
+func truncateUTF8(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return strings.ToValidUTF8(s[:n], "")
+}
+
+func keepValid[T any](items []T, validate func(T) (T, error)) []T {
+	out := make([]T, 0, len(items))
+	for _, item := range items {
+		if normalized, err := validate(item); err == nil {
+			out = append(out, normalized)
+		}
+	}
+	return out
 }
 
 func askAIAllowedCitationIDs(evidenceIDs []string) map[string]bool {
@@ -757,20 +582,6 @@ func askAIAllowedCitationIDs(evidenceIDs []string) map[string]bool {
 		}
 	}
 	return allowed
-}
-
-func askAIToolEvidenceIDs(toolCalls map[string]bool) []string {
-	if len(toolCalls) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(toolCalls))
-	for name := range toolCalls {
-		if name = strings.TrimSpace(name); name != "" {
-			ids = append(ids, name)
-		}
-	}
-	sort.Strings(ids)
-	return ids
 }
 
 func validateAskAIChart(chart AskAIChart) (AskAIChart, error) {
@@ -910,9 +721,7 @@ func trimAskAIHistory(history []AskAIMessage, limit int) []AskAIMessage {
 		if content == "" {
 			continue
 		}
-		if len(content) > 1200 {
-			content = content[:1200]
-		}
+		content = truncateUTF8(content, 1200)
 		out = append(out, AskAIMessage{Role: role, Content: content})
 	}
 	return out
