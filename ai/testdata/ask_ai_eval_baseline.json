@@ -15,6 +15,10 @@
     "passed": 7,
     "total": 10
   },
+  "gpt-6-luna": {
+    "passed": 10,
+    "total": 10
+  },
   "gpt-oss-120b": {
     "passed": 10,
     "total": 10
