@@ -240,6 +240,10 @@ type askAIRun struct {
 	// analytics names the tools whose results count as evidence.
 	analytics map[string]bool
 
+	// sinkMu serializes sink writes: progress arrives from tool goroutines
+	// while answer text arrives from the stream loop.
+	sinkMu sync.Mutex
+
 	mu        sync.Mutex
 	usage     Usage
 	lifecycle []LifecycleEvent
@@ -388,6 +392,8 @@ func (r *askAIRun) emit(delta AskAIStreamDelta) error {
 	if r.sink == nil {
 		return nil
 	}
+	r.sinkMu.Lock()
+	defer r.sinkMu.Unlock()
 	return r.sink(delta)
 }
 
