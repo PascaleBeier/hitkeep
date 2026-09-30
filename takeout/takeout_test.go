@@ -1742,3 +1742,44 @@ func takeoutString(value any) string {
 		return fmt.Sprint(typed)
 	}
 }
+
+func TestExportSiteDataIncludesAnnotationsWithoutAuthor(t *testing.T) {
+	ctx := context.Background()
+	store := database.NewStore(filepath.Join(t.TempDir(), "takeout.db"))
+	if err := store.Connect(); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	userID, err := store.CreateUser(ctx, "notes-takeout@example.com", "hash")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	site, err := store.CreateSite(ctx, userID, "notes-takeout.test")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	start := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	end := start.AddDate(0, 0, 5)
+	if _, err := store.CreateAnnotation(ctx, site.ID, api.AnnotationInput{StartsAt: start, EndsAt: &end, Body: "Autumn campaign"}, userID); err != nil {
+		t.Fatalf("create annotation: %v", err)
+	}
+
+	filename, err := NewTakeoutService(store, filepath.Join(t.TempDir(), "exports")).ExportSiteData(ctx, site.ID, "csv")
+	if err != nil {
+		t.Fatalf("export site data: %v", err)
+	}
+	raw, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatalf("read export: %v", err)
+	}
+	export := string(raw)
+	if !strings.Contains(export, "annotation") || !strings.Contains(export, "Autumn campaign") {
+		t.Fatalf("site takeout is missing the annotation:\n%s", export)
+	}
+	if strings.Contains(export, userID.String()) {
+		t.Fatal("site takeout must not expose the annotation author")
+	}
+}
