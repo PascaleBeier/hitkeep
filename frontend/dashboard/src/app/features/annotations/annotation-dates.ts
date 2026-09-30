@@ -28,10 +28,7 @@ export function fromDateTimeInputs(inputs: DateTimeInputs, granularity: Annotati
 }
 
 export function formatAnnotationWhen(annotation: Pick<Annotation, 'starts_at' | 'ends_at'>, granularity: AnnotationGranularity, locale: string): string {
-    const format = new Intl.DateTimeFormat(
-        locale,
-        granularity === 'day' ? { month: 'short', day: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }
-    );
+    const format = new Intl.DateTimeFormat(locale, granularity === 'day' ? { month: 'short', day: 'numeric', timeZone: 'UTC' } : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const start = new Date(annotation.starts_at);
     if (!annotation.ends_at) {
         return format.format(start);

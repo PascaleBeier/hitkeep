@@ -26,11 +26,7 @@ describe('annotationMarkers', () => {
     });
 
     it('drops notes entirely outside the window', () => {
-        const markers = annotationMarkers(days, [
-            note('before', '2026-08-30T00:00:00Z'),
-            note('after', '2026-09-06T00:00:00Z'),
-            note('range-before', '2026-08-20T00:00:00Z', '2026-08-31T12:00:00Z')
-        ]);
+        const markers = annotationMarkers(days, [note('before', '2026-08-30T00:00:00Z'), note('after', '2026-09-06T00:00:00Z'), note('range-before', '2026-08-20T00:00:00Z', '2026-08-31T12:00:00Z')]);
         expect(markers).toEqual({ lines: [], areas: [], visible: [] });
     });
 

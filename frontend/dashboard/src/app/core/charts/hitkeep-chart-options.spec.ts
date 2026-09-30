@@ -119,7 +119,10 @@ describe('hitkeep chart options', () => {
                 locale: 'en-US',
                 design,
                 theme,
-                series: [{ ...baseSeries[0], annotations }, { id: 'views-comparison', label: 'Prev', color: '#6366f1', data: [1, 2], muted: true, dashed: true }]
+                series: [
+                    { ...baseSeries[0], annotations },
+                    { id: 'views-comparison', label: 'Prev', color: '#6366f1', data: [1, 2], muted: true, dashed: true }
+                ]
             }) as unknown as { series: { markLine?: { data: unknown[] }; markArea?: { data: unknown[] } }[] };
 
             expect(option.series[0].markLine?.data).toEqual([{ xAxis: 1, name: 'Launch' }]);

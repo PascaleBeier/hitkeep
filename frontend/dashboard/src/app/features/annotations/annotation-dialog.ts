@@ -88,7 +88,15 @@ function toFormModel(draft: AnnotationDraft | null): AnnotationFormModel {
                                 {{ 'annotations.dialog.endLabel' | transloco }}
                                 <span class="font-normal text-[var(--p-text-muted-color)]">{{ 'annotations.dialog.optional' | transloco }}</span>
                             </label>
-                            <input pInputText id="annotation-end-date" type="date" class="w-full" [formField]="noteForm.endDate" [attr.aria-invalid]="endBeforeStart() || null" [attr.aria-describedby]="endBeforeStart() ? 'annotation-end-error' : null" />
+                            <input
+                                pInputText
+                                id="annotation-end-date"
+                                type="date"
+                                class="w-full"
+                                [formField]="noteForm.endDate"
+                                [attr.aria-invalid]="endBeforeStart() || null"
+                                [attr.aria-describedby]="endBeforeStart() ? 'annotation-end-error' : null"
+                            />
                             @if (hourly()) {
                                 <input pInputText type="time" class="w-full" [formField]="noteForm.endTime" [attr.aria-label]="'annotations.dialog.endTimeLabel' | transloco" />
                             }
@@ -166,7 +174,12 @@ export class AnnotationDialog {
     });
     protected readonly remaining = computed(() => ANNOTATION_BODY_LIMIT - this.model().body.length);
     protected readonly showBodyError = computed(() => this.noteForm.body().touched() && this.noteForm.body().invalid());
-    protected readonly endBeforeStart = computed(() => this.noteForm.endDate().errors().some((e) => e.kind === 'endBeforeStart'));
+    protected readonly endBeforeStart = computed(() =>
+        this.noteForm
+            .endDate()
+            .errors()
+            .some((e) => e.kind === 'endBeforeStart')
+    );
     protected readonly readOnlyWhen = computed(() => {
         const draft = this.draft();
         if (!draft) {

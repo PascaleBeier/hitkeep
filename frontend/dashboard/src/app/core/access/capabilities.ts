@@ -79,15 +79,7 @@ export const INSTANCE_ROLE_CAPABILITIES = {
 } as const satisfies Record<string, readonly AccessCapability[]>;
 
 export const SITE_ROLE_CAPABILITIES = {
-    owner: [
-        SITE_CAPABILITIES.view,
-        SITE_CAPABILITIES.manageData,
-        SITE_CAPABILITIES.manageGoals,
-        SITE_CAPABILITIES.manageAnnotations,
-        SITE_CAPABILITIES.manageTeam,
-        SITE_CAPABILITIES.manageWebhooks,
-        SITE_CAPABILITIES.delete
-    ],
+    owner: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks, SITE_CAPABILITIES.delete],
     admin: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks],
     editor: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations],
     viewer: [SITE_CAPABILITIES.view]
