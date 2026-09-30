@@ -2,6 +2,8 @@ package analyticstools
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -107,6 +109,26 @@ func TestScopeRanges(t *testing.T) {
 	for _, input := range rangeInputs {
 		if strings.Contains(schema, `"`+input+`"`) {
 			t.Fatalf("locked scope exposes %s: %s", input, schema)
+		}
+	}
+}
+
+func TestGoAIKeepsInternalErrorsFromTheModel(t *testing.T) {
+	scope := Scope{SiteID: uuid.New(), Resolve: func(_ context.Context, id uuid.UUID) (Site, error) { return Site{ID: id}, nil }}
+	for _, tc := range []struct {
+		err       error
+		wantShown bool
+	}{
+		{InvalidInput("event_name is required"), true},
+		{fmt.Errorf("query events: %w", errors.New(`duckdb: table "hits" is locked`)), false},
+	} {
+		tool := Define("probe", "Probe", "Probe.", func(context.Context, Call, Target) (struct{}, error) { return struct{}{}, tc.err })
+		_, err := goaiTool(t, scope, tool).Execute(context.Background(), []byte(`{}`))
+		if shown := err != nil && err.Error() == tc.err.Error(); shown != tc.wantShown {
+			t.Errorf("%v reached the model as %v", tc.err, err)
+		}
+		if err == nil || strings.Contains(err.Error(), "duckdb") {
+			t.Errorf("tool error = %v", err)
 		}
 	}
 }

@@ -1,8 +1,6 @@
 package analyticstools
 
 import (
-	"errors"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -73,10 +71,10 @@ func parseFilters(inputs []FilterInput) ([]api.Filter, error) {
 		filterType := strings.ToLower(strings.TrimSpace(input.Type))
 		filterValue := strings.TrimSpace(input.Value)
 		if filterType == "" || filterValue == "" {
-			return nil, errors.New("filter type and value are required together")
+			return nil, InvalidInput("filter type and value are required together")
 		}
 		if !slices.Contains(FilterTypes, filterType) {
-			return nil, fmt.Errorf("invalid filter type %q", filterType)
+			return nil, InvalidInput("invalid filter type %q", filterType)
 		}
 		filters = append(filters, api.Filter{Type: filterType, Value: filterValue})
 	}
@@ -89,7 +87,7 @@ func parseRange(from, to string, maxDays int) (time.Time, time.Time, error) {
 	if to != "" {
 		parsed, err := time.Parse(time.RFC3339, to)
 		if err != nil {
-			return time.Time{}, time.Time{}, errors.New("invalid to timestamp, expected RFC3339")
+			return time.Time{}, time.Time{}, InvalidInput("invalid to timestamp, expected RFC3339")
 		}
 		end = parsed
 	}
@@ -97,42 +95,42 @@ func parseRange(from, to string, maxDays int) (time.Time, time.Time, error) {
 	if from != "" {
 		parsed, err := time.Parse(time.RFC3339, from)
 		if err != nil {
-			return time.Time{}, time.Time{}, errors.New("invalid from timestamp, expected RFC3339")
+			return time.Time{}, time.Time{}, InvalidInput("invalid from timestamp, expected RFC3339")
 		}
 		start = parsed
 	}
 	if !end.After(start) {
-		return time.Time{}, time.Time{}, errors.New("to must be after from")
+		return time.Time{}, time.Time{}, InvalidInput("to must be after from")
 	}
 	if maxDays <= 0 {
 		maxDays = defaultMaxDays
 	}
 	if end.Sub(start) > time.Duration(maxDays)*24*time.Hour {
-		return time.Time{}, time.Time{}, fmt.Errorf("date range exceeds %d days", maxDays)
+		return time.Time{}, time.Time{}, InvalidInput("date range exceeds %d days", maxDays)
 	}
 	return start.UTC(), end.UTC(), nil
 }
 
 func parseExplicitRange(from, to string, maxDays int) (time.Time, time.Time, error) {
 	if strings.TrimSpace(from) == "" || strings.TrimSpace(to) == "" {
-		return time.Time{}, time.Time{}, errors.New("compare_from and compare_to are required together")
+		return time.Time{}, time.Time{}, InvalidInput("compare_from and compare_to are required together")
 	}
 	start, err := time.Parse(time.RFC3339, strings.TrimSpace(from))
 	if err != nil {
-		return time.Time{}, time.Time{}, errors.New("invalid compare_from timestamp, expected RFC3339")
+		return time.Time{}, time.Time{}, InvalidInput("invalid compare_from timestamp, expected RFC3339")
 	}
 	end, err := time.Parse(time.RFC3339, strings.TrimSpace(to))
 	if err != nil {
-		return time.Time{}, time.Time{}, errors.New("invalid compare_to timestamp, expected RFC3339")
+		return time.Time{}, time.Time{}, InvalidInput("invalid compare_to timestamp, expected RFC3339")
 	}
 	if !end.After(start) {
-		return time.Time{}, time.Time{}, errors.New("compare_to must be after compare_from")
+		return time.Time{}, time.Time{}, InvalidInput("compare_to must be after compare_from")
 	}
 	if maxDays <= 0 {
 		maxDays = defaultMaxDays
 	}
 	if end.Sub(start) > time.Duration(maxDays)*24*time.Hour {
-		return time.Time{}, time.Time{}, fmt.Errorf("comparison date range exceeds %d days", maxDays)
+		return time.Time{}, time.Time{}, InvalidInput("comparison date range exceeds %d days", maxDays)
 	}
 	return start.UTC(), end.UTC(), nil
 }

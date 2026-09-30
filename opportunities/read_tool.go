@@ -2,7 +2,6 @@ package opportunities
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -57,7 +56,7 @@ var ReadTool = analyticstools.Define(ToolGetOpportunities, "Get HitKeep Opportun
 	func(ctx context.Context, call analyticstools.Call, in readInput) (ReadOutput, error) {
 		status, ok := statusFilters[strings.ToLower(strings.TrimSpace(in.Status))]
 		if !ok {
-			return ReadOutput{}, fmt.Errorf("invalid opportunity status %q", in.Status)
+			return ReadOutput{}, analyticstools.InvalidInput("invalid opportunity status %q", in.Status)
 		}
 		limit := in.Limit
 		if limit <= 0 {

@@ -2,8 +2,6 @@ package analyticstools
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -158,7 +156,7 @@ var EventBreakdown = Define(ToolEventBreakdown, "Get HitKeep Event Breakdown",
 	func(ctx context.Context, call Call, in eventBreakdownInput) (EventBreakdownOutput, error) {
 		eventName, propertyKey := strings.TrimSpace(in.EventName), strings.TrimSpace(in.PropertyKey)
 		if eventName == "" || propertyKey == "" {
-			return EventBreakdownOutput{}, errors.New("event_name and property_key are required")
+			return EventBreakdownOutput{}, InvalidInput("event_name and property_key are required")
 		}
 		breakdown, err := call.Analytics.GetEventPropertyBreakdown(ctx, api.EventBreakdownParams{
 			SiteID: call.ID, Start: call.From, End: call.To, EventName: eventName, PropertyKey: propertyKey,
@@ -222,12 +220,12 @@ var WebVitals = Define(ToolWebVitals, "Get HitKeep Web Vitals",
 		metric := api.WebVitalMetric(strings.ToUpper(strings.TrimSpace(in.Metric)))
 		if metric != "" {
 			if _, err := database.WebVitalRatingForValue(metric, 0); err != nil {
-				return WebVitalsOutput{}, err
+				return WebVitalsOutput{}, InvalidInput("invalid metric %q", in.Metric)
 			}
 		}
 		dimension := api.WebVitalDimension(strings.TrimSpace(in.BreakdownDimension))
 		if dimension != "" && !slices.Contains(webVitalDimensions, dimension) {
-			return WebVitalsOutput{}, fmt.Errorf("invalid web vital breakdown dimension %q", in.BreakdownDimension)
+			return WebVitalsOutput{}, InvalidInput("invalid web vital breakdown dimension %q", in.BreakdownDimension)
 		}
 		if metric == "" && (in.IncludePages || dimension != "") {
 			metric = api.WebVitalLCP
@@ -236,7 +234,7 @@ var WebVitals = Define(ToolWebVitals, "Get HitKeep Web Vitals",
 		switch rating {
 		case "", api.WebVitalRatingGood, api.WebVitalRatingNeedsImprovement, api.WebVitalRatingPoor:
 		default:
-			return WebVitalsOutput{}, fmt.Errorf("invalid web vital rating %q", in.Rating)
+			return WebVitalsOutput{}, InvalidInput("invalid web vital rating %q", in.Rating)
 		}
 		params := api.WebVitalsParams{
 			SiteID: call.ID, Start: call.From, End: call.To,
@@ -349,7 +347,7 @@ var FunnelStats = Define(ToolFunnelStats, "Get HitKeep Funnel Stats",
 	func(ctx context.Context, call Call, in funnelStatsInput) (FunnelStatsOutput, error) {
 		funnelID, err := uuid.Parse(strings.TrimSpace(in.FunnelID))
 		if err != nil {
-			return FunnelStatsOutput{}, errors.New("invalid funnel_id")
+			return FunnelStatsOutput{}, InvalidInput("invalid funnel_id")
 		}
 		stats, err := call.Analytics.GetFunnelStats(ctx, funnelID, api.AnalyticsParams{SiteID: call.ID, Start: call.From, End: call.To})
 		if err != nil {
@@ -434,7 +432,7 @@ var SearchConsole = Define(ToolSearchConsole, "Get HitKeep Search Console",
 			return SearchConsoleOutput{}, err
 		}
 		if !status.Mapped {
-			return SearchConsoleOutput{}, errors.New("Search Console property is not mapped")
+			return SearchConsoleOutput{}, InvalidInput("Search Console property is not mapped")
 		}
 		sections, err := parseSections(in.Sections, searchConsoleSections, []string{"overview", "series"})
 		if err != nil {
@@ -463,7 +461,7 @@ func parseSections(input, allowed, defaults []string) (map[string]bool, error) {
 	for _, section := range input {
 		normalized := strings.ToLower(strings.TrimSpace(section))
 		if !slices.Contains(allowed, normalized) {
-			return nil, fmt.Errorf("invalid section %q", section)
+			return nil, InvalidInput("invalid section %q", section)
 		}
 		sections[normalized] = true
 	}

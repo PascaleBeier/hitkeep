@@ -6,6 +6,8 @@ package analyticstools
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -35,7 +37,8 @@ type Scope struct {
 	// SiteID binds every call to one site and hides site_id from the model.
 	// Leave it zero to let each call name a site, which Resolve authorizes.
 	SiteID uuid.UUID
-	// Resolve authorizes the caller for a site and returns its stores.
+	// Resolve authorizes the caller for a site and returns its stores. Its
+	// errors are shown to the caller, so keep internal details out of them.
 	Resolve func(ctx context.Context, siteID uuid.UUID) (Site, error)
 	// From and To are the default range when a call names none.
 	From, To time.Time
@@ -103,16 +106,16 @@ func define[In, Out any](name, title, description string, openWorld bool, run fu
 					var in In
 					if len(raw) > 0 {
 						if err := json.Unmarshal(raw, &in); err != nil {
-							return "", errors.New("invalid tool input")
+							return "", InvalidInput("invalid tool input")
 						}
 					}
 					call, err := scope.call(ctx, in)
 					if err != nil {
-						return "", err
+						return "", modelSafe(name, err)
 					}
 					out, err := run(ctx, call, in)
 					if err != nil {
-						return "", err
+						return "", modelSafe(name, err)
 					}
 					// The evidence ID is the tool name, so Ask AI and Opportunities
 					// can check citations against the tools that actually ran.
@@ -143,6 +146,28 @@ func define[In, Out any](name, title, description string, openWorld bool, run fu
 	}
 }
 
+// shownError is an error whose message is safe for the model: an input it
+// can correct, or an authorization outcome.
+type shownError struct{ err error }
+
+func (e shownError) Error() string { return e.err.Error() }
+func (e shownError) Unwrap() error { return e.err }
+
+// InvalidInput reports a tool input the caller can correct.
+func InvalidInput(format string, args ...any) error {
+	return shownError{fmt.Errorf(format, args...)}
+}
+
+// modelSafe keeps store, network, and other internal errors on the server:
+// tool results reach the model provider, which is outside HitKeep.
+func modelSafe(tool string, err error) error {
+	if _, ok := errors.AsType[shownError](err); ok {
+		return err
+	}
+	slog.Warn("AI tool failed", "tool", tool, "error", err)
+	return errors.New("these analytics could not be read; answer without them or try other inputs")
+}
+
 // GoAI adapts tools for a GoAI tool loop under one scope.
 func GoAI(scope Scope, tools ...Tool) []goaisdk.Tool {
 	out := make([]goaisdk.Tool, 0, len(tools))
@@ -169,7 +194,7 @@ func (s Scope) call(ctx context.Context, in any) (Call, error) {
 	if siteID == uuid.Nil {
 		parsed, err := uuid.Parse(strings.TrimSpace(target.SiteID))
 		if err != nil {
-			return Call{}, errors.New("invalid site_id")
+			return Call{}, InvalidInput("invalid site_id")
 		}
 		siteID = parsed
 	}
@@ -190,7 +215,7 @@ func (s Scope) call(ctx context.Context, in any) (Call, error) {
 	}
 	site, err := s.Resolve(ctx, siteID)
 	if err != nil {
-		return Call{}, err
+		return Call{}, shownError{err}
 	}
 	return Call{
 		Site:         site,

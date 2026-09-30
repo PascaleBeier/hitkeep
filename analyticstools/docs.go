@@ -72,7 +72,7 @@ func NewDocs(baseURL string, ttl time.Duration) *Docs {
 func (c *Docs) Search(ctx context.Context, query string, limit int) ([]docSearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return nil, errors.New("query is required")
+		return nil, InvalidInput("query is required")
 	}
 	llms, err := c.GetMarkdown(ctx, "/llms.txt")
 	if err != nil {
@@ -155,7 +155,7 @@ func (c *Docs) GetMarkdown(ctx context.Context, rawPath string) (DocPage, error)
 func (c *Docs) normalizePath(rawPath string) (string, error) {
 	rawPath = strings.TrimSpace(rawPath)
 	if rawPath == "" {
-		return "", errors.New("path is required")
+		return "", InvalidInput("path is required")
 	}
 	if rawPath == "hitkeep://docs/llms" {
 		return "/llms.txt", nil
@@ -166,7 +166,7 @@ func (c *Docs) normalizePath(rawPath string) (string, error) {
 
 	if parsed, err := url.Parse(rawPath); err == nil && parsed.IsAbs() {
 		if parsed.Scheme != c.base.Scheme || parsed.Host != c.base.Host {
-			return "", errors.New("docs URL must use the configured HitKeep docs origin")
+			return "", InvalidInput("docs URL must use the configured HitKeep docs origin")
 		}
 		rawPath = parsed.EscapedPath()
 	}
@@ -175,10 +175,10 @@ func (c *Docs) normalizePath(rawPath string) (string, error) {
 	}
 	decodedPath, err := url.PathUnescape(rawPath)
 	if err != nil {
-		return "", errors.New("docs path must be valid URL path encoding")
+		return "", InvalidInput("docs path must be valid URL path encoding")
 	}
 	if strings.Contains(decodedPath, "..") {
-		return "", errors.New("docs path must not contain '..'")
+		return "", InvalidInput("docs path must not contain '..'")
 	}
 	if rawPath != "/llms.txt" && !strings.Contains(pathBase(rawPath), ".") && !strings.HasSuffix(rawPath, "/") {
 		rawPath += "/"

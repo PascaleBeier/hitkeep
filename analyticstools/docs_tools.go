@@ -2,7 +2,6 @@ package analyticstools
 
 import (
 	"context"
-	"errors"
 	"strings"
 )
 
@@ -62,7 +61,7 @@ func DocsTools(docs *Docs) []Tool {
 			true, func(ctx context.Context, _ Call, in apiReferenceInput) (DocOutput, error) {
 				path := strings.TrimSpace(in.PathOrOperation)
 				if path == "" {
-					return DocOutput{}, errors.New("path_or_operation is required")
+					return DocOutput{}, InvalidInput("path_or_operation is required")
 				}
 				if !strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "http://") && !strings.HasPrefix(path, "https://") {
 					path = "/api/operations/" + strings.Trim(path, "/") + "/"
