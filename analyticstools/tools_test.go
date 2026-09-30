@@ -165,6 +165,58 @@ func TestSiteStatsKeepsRequestedSections(t *testing.T) {
 	}
 }
 
+func TestMoversRankChangesWithShares(t *testing.T) {
+	rows, total := movers(
+		[]api.DimensionStat{{Name: "/blog", Pageviews: 20}, {Name: "/pricing", Pageviews: 30}, {Name: "/docs", Pageviews: 8}},
+		[]api.DimensionStat{{Name: "/pricing", Pageviews: 25}, {Name: "/blog", Pageviews: 12}, {Name: "/old", Pageviews: 3}},
+	)
+	if *total != 18 {
+		t.Fatalf("total change = %d, want 18", *total)
+	}
+	got := make([]string, 0, len(rows))
+	for _, row := range rows {
+		got = append(got, fmt.Sprintf("%s %+d %.3f", row.Name, *row.PageviewChange, *row.ShareOfChange))
+	}
+	want := []string{"/blog +8 0.444", "/docs +8 0.444", "/pricing +5 0.278", "/old -3 -0.167"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("movers = %v, want %v", got, want)
+	}
+}
+
+func TestBreakdownToolReadsTrackedHits(t *testing.T) {
+	store, siteID, _ := setupAnnotationsStore(t)
+	hn := "https://news.ycombinator.com/item?id=1"
+	for i := range 5 {
+		hit := &api.Hit{SiteID: siteID, SessionID: uuid.New(), PageID: uuid.New(), Timestamp: time.Date(2026, 9, 2+i, 12, 0, 0, 0, time.UTC), Path: "/blog"}
+		if i < 3 {
+			hit.Referrer = &hn
+		}
+		if err := store.CreateHit(context.Background(), hit); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scope := Scope{SiteID: siteID, Resolve: func(_ context.Context, id uuid.UUID) (Site, error) {
+		return Site{ID: id, Control: store, Analytics: store}, nil
+	}, From: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), To: time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC)}
+	raw, err := goaiTool(t, scope, Breakdown).Execute(context.Background(), []byte(`{"dimension":"referrer","compare_from":"2026-08-01T00:00:00Z","compare_to":"2026-08-31T00:00:00Z"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Data BreakdownOutput `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		t.Fatal(err)
+	}
+	top := body.Data.Rows[0]
+	if !strings.Contains(top.Name, "ycombinator") || top.Pageviews != 3 || *top.PageviewChange != 3 || *body.Data.PageviewChange != 5 {
+		t.Fatalf("breakdown = %+v, top = %+v", body.Data, top)
+	}
+	if _, err := goaiTool(t, scope, Breakdown).Execute(context.Background(), []byte(`{"dimension":"ip_address"}`)); err == nil || !strings.Contains(err.Error(), "invalid dimension") {
+		t.Fatalf("unknown dimension error = %v", err)
+	}
+}
+
 func goaiTool(t *testing.T, scope Scope, tool Tool) goaisdk.Tool {
 	t.Helper()
 	tools := GoAI(scope, tool)

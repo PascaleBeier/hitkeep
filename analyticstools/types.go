@@ -105,6 +105,28 @@ type funnel struct {
 	CreatedAt string       `json:"created_at"`
 }
 
+type BreakdownOutput struct {
+	SiteID      string `json:"site_id"`
+	From        string `json:"from"`
+	To          string `json:"to"`
+	CompareFrom string `json:"compare_from,omitempty"`
+	CompareTo   string `json:"compare_to,omitempty"`
+	Dimension   string `json:"dimension"`
+	// PageviewChange is the total change across all values, when comparing.
+	PageviewChange *int           `json:"pageview_change,omitempty"`
+	Rows           []breakdownRow `json:"rows"`
+}
+
+type breakdownRow struct {
+	Name              string `json:"name"`
+	Pageviews         int    `json:"pageviews"`
+	Visitors          int    `json:"visitors"`
+	PreviousPageviews *int   `json:"previous_pageviews,omitempty"`
+	PageviewChange    *int   `json:"pageview_change,omitempty"`
+	// ShareOfChange is this value's part of the total pageview change.
+	ShareOfChange *float64 `json:"share_of_change,omitempty"`
+}
+
 type EventNamesOutput struct {
 	SiteID string   `json:"site_id"`
 	From   string   `json:"from"`

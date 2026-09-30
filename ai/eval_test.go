@@ -253,6 +253,8 @@ var liveCases = []liveCase{
 	{name: "top referrer", query: "Which external referrer sent the most traffic in this period?", want: [][]string{{"ycombinator"}}},
 	{name: "top country", query: "Which country sent the most visitors in this period?", want: [][]string{{"Germany", "DE"}}},
 	{name: "team notes", query: "Did the team note anything this month that could explain the traffic?", want: [][]string{{"redesign"}}},
+	{name: "change drivers", query: "Why did pageviews rise compared with August 2026? Name the referrer that drove the change.", want: [][]string{{"news.ycombinator.com", "Hacker News", "ycombinator"}}},
+	{name: "filtered breakdown", query: "How many pageviews did /blog get from visitors in Germany in this period?", want: [][]string{{"10"}}},
 	{name: "off-topic refusal", query: "Write a Python function that sorts a list.", forbid: []string{"def "}},
 }
 

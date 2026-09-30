@@ -1,7 +1,9 @@
 package analyticstools
 
 import (
+	"cmp"
 	"context"
+	"math"
 	"slices"
 	"strings"
 
@@ -23,6 +25,7 @@ const (
 	ToolQRCampaigns         = "hitkeep_get_qr_campaigns"
 	ToolSearchConsoleStatus = "hitkeep_get_search_console_status"
 	ToolSearchConsole       = "hitkeep_get_search_console"
+	ToolBreakdown           = "hitkeep_get_breakdown"
 )
 
 // Evidence returns the tools whose output may back a saved claim. Annotations
@@ -53,7 +56,7 @@ func Titles(tools ...Tool) map[string]string {
 
 // Analytics returns every site analytics tool.
 func Analytics() []Tool {
-	return append(Evidence(), Annotations, FunnelStats, QRCampaigns, SearchConsoleStatus, SearchConsole)
+	return append(Evidence(), Breakdown, Annotations, FunnelStats, QRCampaigns, SearchConsoleStatus, SearchConsole)
 }
 
 type siteOverviewInput struct {
@@ -133,6 +136,93 @@ func (s *siteStats) keep(sections map[string]bool, limit int) {
 		}
 	}
 }
+
+type breakdownInput struct {
+	Target
+	FilterSet
+	Dimension   string `json:"dimension" jsonschema:"Dimension to break down: page, referrer, country, city, device, browser, language, provider, asn, ai_source, ai_bot, utm_source, utm_medium, utm_campaign, utm_content, or utm_term."`
+	CompareFrom string `json:"compare_from,omitempty" jsonschema:"Optional RFC3339 comparison start timestamp. With compare_to, rows show each value's change, largest movers first."`
+	CompareTo   string `json:"compare_to,omitempty" jsonschema:"Optional RFC3339 comparison end timestamp."`
+	Limit       int    `json:"limit,omitempty" jsonschema:"Maximum rows to return. Defaults to 10 and is capped at 50."`
+}
+
+// moverScan bounds how many values per period a comparison reads.
+// ponytail: movers outside each period's top 500 values are missed; raise it
+// if a dimension's long tail starts to matter.
+const moverScan = 500
+
+var Breakdown = Define(ToolBreakdown, "Get HitKeep Breakdown",
+	"Break pageviews and visitors down by one dimension, such as page, referrer, country, or UTM source, with optional filters and up to 50 rows. With compare_from and compare_to, each row also shows its change and share of the total change, largest movers first: use it to explain why traffic moved. Counts tracked hits; imported history is not broken down.",
+	func(ctx context.Context, call Call, in breakdownInput) (BreakdownOutput, error) {
+		dimension := strings.ToLower(strings.TrimSpace(in.Dimension))
+		if !slices.Contains(database.BreakdownDimensions(), dimension) {
+			return BreakdownOutput{}, InvalidInput("invalid dimension %q", in.Dimension)
+		}
+		params := api.AnalyticsParams{SiteID: call.ID, UserID: call.UserID, Start: call.From, End: call.To, Filters: call.Filters}
+		out := BreakdownOutput{SiteID: call.ID.String(), From: formatTime(call.From), To: formatTime(call.To), Dimension: dimension}
+		limit := normalizeLimit(in.Limit)
+		if call.RangeLocked || (in.CompareFrom == "" && in.CompareTo == "") {
+			stats, err := call.Analytics.GetDimensionBreakdown(ctx, params, dimension, limit)
+			for _, stat := range stats {
+				out.Rows = append(out.Rows, breakdownRow{Name: stat.Name, Pageviews: stat.Pageviews, Visitors: stat.Visitors})
+			}
+			return out, err
+		}
+		compareStart, compareEnd, err := parseExplicitRange(in.CompareFrom, in.CompareTo, call.MaxRangeDays)
+		if err != nil {
+			return BreakdownOutput{}, err
+		}
+		current, err := call.Analytics.GetDimensionBreakdown(ctx, params, dimension, moverScan)
+		if err != nil {
+			return BreakdownOutput{}, err
+		}
+		params.Start, params.End = compareStart, compareEnd
+		previous, err := call.Analytics.GetDimensionBreakdown(ctx, params, dimension, moverScan)
+		if err != nil {
+			return BreakdownOutput{}, err
+		}
+		out.CompareFrom, out.CompareTo = formatTime(compareStart), formatTime(compareEnd)
+		out.Rows, out.PageviewChange = movers(current, previous)
+		out.Rows = out.Rows[:min(len(out.Rows), limit)]
+		return out, nil
+	})
+
+// movers pairs both periods' values and ranks them by the size of their
+// pageview change, with each value's share of the total change.
+func movers(current, previous []api.DimensionStat) ([]breakdownRow, *int) {
+	rows := map[string]*breakdownRow{}
+	row := func(name string) *breakdownRow {
+		if rows[name] == nil {
+			rows[name] = &breakdownRow{Name: name, PreviousPageviews: new(0)}
+		}
+		return rows[name]
+	}
+	total := 0
+	for _, stat := range current {
+		r := row(stat.Name)
+		r.Pageviews, r.Visitors = stat.Pageviews, stat.Visitors
+		total += stat.Pageviews
+	}
+	for _, stat := range previous {
+		*row(stat.Name).PreviousPageviews = stat.Pageviews
+		total -= stat.Pageviews
+	}
+	out := make([]breakdownRow, 0, len(rows))
+	for _, r := range rows {
+		change := r.Pageviews - *r.PreviousPageviews
+		r.PageviewChange = &change
+		if total != 0 {
+			r.ShareOfChange = new(math.Round(float64(change)/float64(total)*1000) / 1000)
+		}
+		out = append(out, *r)
+	}
+	slices.SortFunc(out, func(a, b breakdownRow) int {
+		return cmp.Or(cmp.Compare(abs(*b.PageviewChange), abs(*a.PageviewChange)), cmp.Compare(a.Name, b.Name))
+	})
+	return out, &total
+}
+
+func abs(n int) int { return max(n, -n) }
 
 var EventNames = Define(ToolEventNames, "Get HitKeep Event Names",
 	"List the custom event names tracked for one site in a range. Call this before hitkeep_get_event_breakdown to find valid event names.",

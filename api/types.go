@@ -839,6 +839,13 @@ type MetricStat struct {
 	Value int    `json:"value"`
 }
 
+// DimensionStat is one value of a breakdown dimension.
+type DimensionStat struct {
+	Name      string `json:"name"`
+	Pageviews int    `json:"pageviews"`
+	Visitors  int    `json:"visitors"`
+}
+
 type ImportExclusionReason struct {
 	Reason string `json:"reason"`
 	Detail string `json:"detail,omitempty"`
