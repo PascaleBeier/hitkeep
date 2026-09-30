@@ -282,6 +282,16 @@ const agentsCTE = `agents AS (
 			) named
 		)`
 
+// referrersCTE classifies each distinct referrer of the scoped CTE once, for
+// the same reason and with the same pushdown caveat as agentsCTE.
+const referrersCTE = `referrers AS (
+			SELECT
+				referrer,
+				hk_referrer(referrer) AS referrer_name,
+				hk_ai_source(referrer) AS ai_source
+			FROM (SELECT DISTINCT referrer FROM scoped)
+		)`
+
 // queryAIKpis aggregates the AI traffic KPIs for one window. It mirrors the
 // summary row of the GetSiteStats top-list query so comparison windows carry
 // the same numbers without running a second full stats query.

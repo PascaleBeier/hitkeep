@@ -291,24 +291,21 @@ func (s *Store) buildAIActivityFilterSet(ctx context.Context, params api.Analyti
 // order: hit_rows, then fetch_rows, then pageview_rows — callers must bind
 // their arguments in exactly that order.
 //
-// hit_rows classifies each hit once: the ~200-branch user-agent pattern walk
-// runs for the agent name only, and the category is derived from that resolved
-// name instead of walking the patterns a second time.
+// hit_rows classifies each distinct user agent and referrer once (see
+// agentsCTE) instead of walking the pattern macros for every hit.
 func aiActivityCTEs(hitFilterSQL, fetchFilterSQL, pageviewFilterSQL string) string {
 	return fmt.Sprintf(`
+		%s,
 		hit_rows AS (
 			SELECT
-				classified.*,
-				hk_ai_bot_category_from_name(classified.agent) AS category
-			FROM (
-				SELECT
-					hk_ai_bot(h.user_agent) AS agent,
-					hk_ai_source(h.referrer) AS source,
-					h.path AS path,
-					h.session_id AS session_id
-				FROM hits h
-				WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
-			) classified
+				a.ai_bot AS agent,
+				a.ai_bot_category AS category,
+				r.ai_source AS source,
+				h.path,
+				h.session_id
+			FROM scoped h
+			LEFT JOIN agents a ON a.user_agent IS NOT DISTINCT FROM h.user_agent
+			LEFT JOIN referrers r ON r.referrer IS NOT DISTINCT FROM h.referrer
 		),
 		fetch_rows AS (
 			SELECT
@@ -416,12 +413,26 @@ func aiActivityCTEs(hitFilterSQL, fetchFilterSQL, pageviewFilterSQL string) stri
 				fetch_scalars.total_bytes
 			FROM hit_scalars, fetch_scalars, merged_scalars, pageview_scalars
 		)`,
-		hitFilterSQL,
+		aiHitCTEs(hitFilterSQL),
 		fetchFilterSQL,
 		pageviewFilterSQL,
 		aiActivityCategoryDimPrefix,
 		aiActivityCategoryDimPrefix,
 	)
+}
+
+// aiHitCTEs scopes the site's hits for one window (placeholders: site, start,
+// end, then the filter args) and classifies each distinct user agent and
+// referrer once, since the pattern macros dominate any per-hit scan.
+func aiHitCTEs(hitFilterSQL string) string {
+	//nolint:gosec // hitFilterSQL is derived from a fixed allowlist; values are parameterized.
+	return `scoped AS (
+			SELECT h.*
+			FROM hits h
+			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?` + hitFilterSQL + `
+		),
+		` + agentsCTE + `,
+		` + referrersCTE
 }
 
 // aiActivitySeries buckets both sides on the same grid and merges them, so the
@@ -440,14 +451,16 @@ func (s *Store) aiActivitySeries(
 
 	//nolint:gosec // bucket expressions come from a fixed allowlist and every filter clause is parameterized.
 	query := `
-		WITH hit_buckets AS (
+		WITH ` + aiHitCTEs(hitFilterSQL) + `,
+		hit_buckets AS (
 			SELECT
 				` + bucketSQL("h.timestamp", truncUnit) + ` AS bucket,
-				COUNT(*) FILTER (WHERE hk_ai_bot(h.user_agent) IS NOT NULL) AS tracked,
+				COUNT(*) FILTER (WHERE a.ai_bot IS NOT NULL) AS tracked,
 				CAST(0 AS BIGINT) AS fetched,
-				COUNT(DISTINCT h.session_id) FILTER (WHERE hk_ai_source(h.referrer) IS NOT NULL) AS referral_visits
-			FROM hits h
-			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?` + hitFilterSQL + `
+				COUNT(DISTINCT h.session_id) FILTER (WHERE r.ai_source IS NOT NULL) AS referral_visits
+			FROM scoped h
+			LEFT JOIN agents a ON a.user_agent IS NOT DISTINCT FROM h.user_agent
+			LEFT JOIN referrers r ON r.referrer IS NOT DISTINCT FROM h.referrer
 			GROUP BY bucket
 		),
 		fetch_buckets AS (

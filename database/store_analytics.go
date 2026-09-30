@@ -203,10 +203,11 @@ func (s *Store) querySiteDimensionLists(ctx context.Context, params api.Analytic
 			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
 		),
 		%s,
+		%s,
 		base AS (
 			SELECT
 				h.path AS path,
-				hk_referrer(h.referrer) AS referrer,
+				r.referrer_name AS referrer,
 				hk_device(h.viewport_width) AS device,
 				hk_country(h.country_code) AS country,
 				COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
@@ -215,7 +216,7 @@ func (s *Store) querySiteDimensionLists(ctx context.Context, params api.Analytic
 				a.browser AS browser,
 				a.ai_bot AS ai_bot,
 				a.ai_bot_category AS ai_bot_category,
-				hk_ai_source(h.referrer) AS ai_source,
+				r.ai_source AS ai_source,
 				h.session_id AS session_id,
 				CASE
 					WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
@@ -228,6 +229,7 @@ func (s *Store) querySiteDimensionLists(ctx context.Context, params api.Analytic
 				COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
 			FROM scoped h
 			LEFT JOIN agents a ON a.user_agent IS NOT DISTINCT FROM h.user_agent
+			LEFT JOIN referrers r ON r.referrer IS NOT DISTINCT FROM h.referrer
 		),
 		agg AS (
 			SELECT
@@ -320,7 +322,7 @@ func (s *Store) querySiteDimensionLists(ctx context.Context, params api.Analytic
 		FROM ranked
 		WHERE dim = '__summary__' OR rn <= 10
 		ORDER BY CASE WHEN dim = '__summary__' THEN 0 ELSE 1 END, dim, val DESC;
-	`, filterSQL, agentsCTE, aiBotCategoryDimPrefix)
+	`, filterSQL, agentsCTE, referrersCTE, aiBotCategoryDimPrefix)
 
 	topRows, err := s.db.QueryContext(ctx, topQuery, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...)
 	if err != nil {

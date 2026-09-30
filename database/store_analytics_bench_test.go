@@ -102,6 +102,15 @@ func BenchmarkComparisonAndBreakdown(b *testing.B) {
 			}
 		}
 	})
+	b.Run("ai_activity", func(b *testing.B) {
+		compare := params
+		compare.CompareStart, compare.CompareEnd = params.Start.AddDate(0, 0, -29), params.Start
+		for b.Loop() {
+			if _, err := store.GetAIActivity(ctx, compare); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 	for _, dimension := range []string{"page", "browser", "ai_bot"} {
 		b.Run("breakdown_"+dimension, func(b *testing.B) {
 			for b.Loop() {
