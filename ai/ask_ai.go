@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -180,6 +182,14 @@ func (s *Service) runAskAIStreamingGeneration(ctx context.Context, req AskAIRequ
 		goaisdk.WithOnResponse(run.onResponse),
 		goaisdk.WithOnToolCallStart(run.onToolCallStart),
 		goaisdk.WithOnToolCall(run.onToolCall),
+		goaisdk.WithOnBeforeStep(func(info goaisdk.BeforeStepInfo) goaisdk.BeforeStepResult {
+			if info.Step < askAIMaxSteps {
+				return goaisdk.BeforeStepResult{}
+			}
+			return goaisdk.BeforeStepResult{ExtraMessages: []provider.Message{
+				goaisdk.UserMessage("This is your last step: answer now from the analytics you have, without calling more tools."),
+			}}
+		}),
 	}
 	options = append(options, temperatureOptions(s.model, 0.2)...)
 	options = append(options, promptCachingOptions(s.conf)...)
@@ -211,17 +221,12 @@ read:
 	if err := stream.Err(); err != nil {
 		return run.failed(err)
 	}
-	// The draft also streamed text written before tool calls; the answer is
-	// the text of the final step, which replaces the draft in the dashboard.
-	var answer string
-	var usage provider.Usage
-	if result != nil {
-		usage = result.TotalUsage
-		if len(result.Steps) > 0 {
-			answer = result.Steps[len(result.Steps)-1].Text
-		}
+	// The draft also streamed text written before tool calls; the final
+	// answer replaces it in the dashboard.
+	if result == nil {
+		return run.finish("", provider.Usage{})
 	}
-	return run.finish(answer, usage)
+	return run.finish(run.answer(result.Steps), result.TotalUsage)
 }
 
 // askAIRun records one generation. GoAI runs tool calls concurrently, so
@@ -274,14 +279,33 @@ func (r *askAIRun) readSnapshot(ctx context.Context) string {
 	return snapshot.String()
 }
 
+// answer is the text written after the last analytics tool call: text before
+// it is preamble, and chart or action calls must not cut the answer off.
+func (r *askAIRun) answer(steps []goaisdk.StepResult) string {
+	var parts []string
+	for _, step := range steps {
+		if slices.ContainsFunc(step.ToolCalls, func(call provider.ToolCall) bool { return r.analytics[call.Name] }) {
+			parts = parts[:0]
+			continue
+		}
+		if text := strings.TrimSpace(step.Text); text != "" {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
 // outputTools let the model attach charts and dashboard actions to its
 // answer. They exist only for the dashboard, never for MCP.
 func (r *askAIRun) outputTools() []goaisdk.Tool {
 	return []goaisdk.Tool{
 		goaisdk.NewTool("show_chart",
-			"Show a line, bar, or table chart below the answer, with rows copied from tool results. Line and bar charts need x_key and series; tables need only rows. At most 3 charts, 120 rows, and 12 fields per row.",
-			func(_ context.Context, chart AskAIChart) (string, error) {
-				chart, err := validateAskAIChart(chart)
+			"Show a chart below the answer, with values copied from tool results. type is line, bar, or table. columns names each value in a row; line and bar charts also need x_key (one of the columns) and series (the columns to plot). At most 3 charts, 120 rows, and 12 columns.",
+			func(_ context.Context, in askAIChartInput) (string, error) {
+				chart, err := in.chart()
+				if err == nil {
+					chart, err = validateAskAIChart(chart)
+				}
 				if err != nil {
 					return "", err
 				}
@@ -301,6 +325,35 @@ func (r *askAIRun) outputTools() []goaisdk.Tool {
 				})
 			}),
 	}
+}
+
+// askAIChartInput keeps rows as plain string cells: nested free-form objects
+// are rejected by some providers' tool schemas, such as Gemini's.
+type askAIChartInput struct {
+	Type    string             `json:"type"`
+	Title   string             `json:"title"`
+	XKey    string             `json:"x_key,omitempty"`
+	Series  []AskAIChartSeries `json:"series,omitempty"`
+	Columns []string           `json:"columns"`
+	Rows    [][]string         `json:"rows"`
+}
+
+func (in askAIChartInput) chart() (AskAIChart, error) {
+	rows := make([]map[string]any, 0, len(in.Rows))
+	for _, cells := range in.Rows {
+		if len(cells) != len(in.Columns) {
+			return AskAIChart{}, errors.New("each row needs one value per column")
+		}
+		row := make(map[string]any, len(cells))
+		for i, cell := range cells {
+			row[in.Columns[i]] = cell
+			if n, err := strconv.ParseFloat(cell, 64); err == nil && !math.IsNaN(n) && !math.IsInf(n, 0) {
+				row[in.Columns[i]] = n
+			}
+		}
+		rows = append(rows, row)
+	}
+	return AskAIChart{Type: in.Type, Title: in.Title, XKey: in.XKey, Series: in.Series, Rows: rows}, nil
 }
 
 func (r *askAIRun) collect(add func() bool) error {
@@ -505,7 +558,7 @@ func askAIToolNames(tools []goaisdk.Tool) []string {
 }
 
 func askAISystemPrompt(skillText string) string {
-	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Start from the analytics already read for the question and call the read-only aggregate tools for anything it lacks. Tools default to the dashboard date range and filters in the input; pass from and to, or compare_from and compare_to on the site overview, to read other periods such as the previous one. Request only the site overview sections the question needs. Check annotations before explaining a spike or drop, and use the docs tools, when offered, for product questions instead of guessing. Write the answer as concise markdown that leads with the verdict. Never invent numbers: state only values from analytics you were given or read, and say so when the data cannot answer the question. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. To show a chart or table, call show_chart with rows copied from tool results. To point to a dashboard page or the site export, call suggest_action. The dashboard lists the analytics you read as sources, so do not add a sources section.`
+	base := `You are HitKeep Ask AI, a privacy-first dashboard assistant. Answer only questions about the scoped HitKeep site's analytics, tracking setup, or use of HitKeep features. Code is in scope when it helps implement or diagnose HitKeep tracking or an analytics integration. Interpret short follow-ups in the context of earlier HitKeep analytics questions. If a user asks for something unrelated, including a general programming tutorial, do not answer that task; briefly say you can help with HitKeep analytics or tracking and invite a relevant question. Start from the analytics already read for the question and call the read-only aggregate tools for anything it lacks. Tools default to the dashboard date range and filters in the input; pass from and to, or compare_from and compare_to on the site overview, to read other periods such as the previous one. Request only the site overview sections the question needs. The snapshot compares with the previous period of the same length, shown as compare_from and compare_to; for a named period such as a calendar month, call the site overview with that exact range. Check annotations before explaining a spike or drop, and use the docs tools, when offered, for product questions instead of guessing. Write the answer as concise markdown that leads with the verdict. Never invent numbers: state only values from analytics you were given or read, and say so when the data cannot answer the question. Do not request or expose raw hit rows, visitor identities, IP addresses, credentials, billing mutations, site administration, goal/funnel mutation, or dashboard cookies. To show a chart or table, call show_chart with rows copied from tool results. To point to a dashboard page or the site export, call suggest_action. The dashboard lists the analytics you read as sources, so do not add a sources section.`
 	skillText = strings.TrimSpace(skillText)
 	if skillText == "" {
 		return base

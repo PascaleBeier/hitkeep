@@ -145,7 +145,7 @@ var goldenCases = []goldenCase{
 			return nil
 		},
 		check: func(t *testing.T, generation askAIGeneration, seen string) {
-			if !strings.Contains(seen, `\"comparison\":{\"total_pageviews\":37`) {
+			if !strings.Contains(seen, `\"compare_from\":\"2026-08-01T00:00:00Z\"`) || !strings.Contains(seen, `\"comparison\":{\"total_pageviews\":37`) {
 				t.Errorf("tool result lacks the August comparison: %s", seen)
 			}
 			if !strings.Contains(seen, `\"top_pages\":null`) {
@@ -200,9 +200,9 @@ var goldenCases = []goldenCase{
 		script: func(step int) []provider.StreamChunk {
 			switch step {
 			case 0:
-				return toolCallStep("show_chart", `{"type":"pie","title":"Share","rows":[]}`)
+				return toolCallStep("show_chart", `{"type":"pie","title":"Share","columns":[],"rows":[]}`)
 			case 1:
-				return toolCallStep("show_chart", `{"type":"table","title":"Top pages","rows":[{"path":"/pricing","pageviews":30}]}`)
+				return toolCallStep("show_chart", `{"type":"table","title":"Top pages","columns":["path","pageviews"],"rows":[["/pricing","30"]]}`)
 			case 2:
 				return answerStep("/pricing led September.")
 			}

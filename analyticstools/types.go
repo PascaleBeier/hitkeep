@@ -11,10 +11,13 @@ import (
 // schemas from Go types, and uuid.UUID would otherwise publish as a byte array.
 
 type SiteOverviewOutput struct {
-	SiteID string     `json:"site_id"`
-	From   string     `json:"from"`
-	To     string     `json:"to"`
-	Stats  *siteStats `json:"stats"`
+	SiteID string `json:"site_id"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	// CompareFrom and CompareTo name the comparison window, when there is one.
+	CompareFrom string     `json:"compare_from,omitempty"`
+	CompareTo   string     `json:"compare_to,omitempty"`
+	Stats       *siteStats `json:"stats"`
 }
 
 type siteStats struct {

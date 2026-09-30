@@ -92,7 +92,11 @@ var SiteOverview = Define(ToolSiteOverview, "Get HitKeep Site Overview",
 		}
 		out := toSiteStats(stats)
 		out.keep(sections, min(normalizeLimit(in.Limit), 10))
-		return SiteOverviewOutput{SiteID: call.ID.String(), From: formatTime(call.From), To: formatTime(call.To), Stats: out}, nil
+		output := SiteOverviewOutput{SiteID: call.ID.String(), From: formatTime(call.From), To: formatTime(call.To), Stats: out}
+		if !params.CompareStart.IsZero() {
+			output.CompareFrom, output.CompareTo = formatTime(params.CompareStart), formatTime(params.CompareEnd)
+		}
+		return output, nil
 	})
 
 // keep clears the sections a caller did not ask for and caps top lists.

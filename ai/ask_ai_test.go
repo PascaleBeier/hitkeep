@@ -20,16 +20,22 @@ func TestRunAskAIStreamingGenerationAnswersInPlainText(t *testing.T) {
 			id: "gpt-test",
 			streamFn: func(_ context.Context, params provider.GenerateParams) (*provider.StreamResult, error) {
 				calls++
-				if calls == 1 {
-					// Text before a tool call is draft, not the answer.
+				switch calls {
+				case 1:
+					// Text before an analytics call is draft, not the answer.
 					return providerStreamFromChunks(
-						provider.StreamChunk{Type: provider.ChunkText, Text: "Let me chart that. "},
-						provider.StreamChunk{Type: provider.ChunkToolCall, ToolCallID: "c1", ToolName: "show_chart", ToolInput: `{"type":"table","title":"Pages","rows":[{"path":"/pricing","pageviews":30}]}`},
+						provider.StreamChunk{Type: provider.ChunkText, Text: "Let me check. "},
+						provider.StreamChunk{Type: provider.ChunkToolCall, ToolCallID: "c1", ToolName: "hitkeep_get_site_overview", ToolInput: `{}`},
+						provider.StreamChunk{Type: provider.ChunkFinish, FinishReason: provider.FinishToolCalls},
+					), nil
+				case 2:
+					return providerStreamFromChunks(
+						provider.StreamChunk{Type: provider.ChunkText, Text: "**/pricing** led with 30 pageviews."},
+						provider.StreamChunk{Type: provider.ChunkToolCall, ToolCallID: "c2", ToolName: "show_chart", ToolInput: `{"type":"table","title":"Pages","columns":["path","pageviews"],"rows":[["/pricing","30"]]}`},
 						provider.StreamChunk{Type: provider.ChunkFinish, FinishReason: provider.FinishToolCalls},
 					), nil
 				}
 				return providerStreamFromChunks(
-					provider.StreamChunk{Type: provider.ChunkText, Text: "**/pricing** led with 30 pageviews."},
 					provider.StreamChunk{Type: provider.ChunkFinish, FinishReason: provider.FinishStop, Usage: provider.Usage{InputTokens: 6, OutputTokens: 4}},
 				), nil
 			},
@@ -57,14 +63,14 @@ func TestRunAskAIStreamingGenerationAnswersInPlainText(t *testing.T) {
 	if out.AnswerMarkdown != "**/pricing** led with 30 pageviews." {
 		t.Fatalf("answer = %q, want only the final step", out.AnswerMarkdown)
 	}
-	if !strings.Contains(streamed.String(), "Let me chart that.") {
+	if !strings.Contains(streamed.String(), "Let me check.") {
 		t.Fatalf("draft text was not streamed: %q", streamed.String())
 	}
 	// The snapshot ran and is the only evidence: the chart tool is not a source.
 	if len(out.Citations) != 1 || out.Citations[0] != (AskAICitation{Label: "Site overview", ToolCallID: "hitkeep_get_site_overview"}) {
 		t.Fatalf("citations = %+v", out.Citations)
 	}
-	if len(out.Charts) != 1 || out.Charts[0].Title != "Pages" || len(out.Actions) != 0 {
+	if len(out.Charts) != 1 || out.Charts[0].Rows[0]["pageviews"] != float64(30) || len(out.Actions) != 0 {
 		t.Fatalf("charts = %+v, actions = %+v", out.Charts, out.Actions)
 	}
 }
@@ -74,14 +80,17 @@ func TestAskAIOutputToolsRejectInvalidInputAndCap(t *testing.T) {
 	tools := run.outputTools()
 	chart, action := tools[0], tools[1]
 
-	if _, err := chart.Execute(context.Background(), []byte(`{"type":"pie","title":"Share","rows":[]}`)); err == nil {
+	if _, err := chart.Execute(context.Background(), []byte(`{"type":"pie","title":"Share","columns":[],"rows":[]}`)); err == nil {
 		t.Fatal("unsupported chart type accepted")
+	}
+	if _, err := chart.Execute(context.Background(), []byte(`{"type":"table","title":"T","columns":["a","b"],"rows":[["1"]]}`)); err == nil {
+		t.Fatal("ragged row accepted")
 	}
 	if _, err := action.Execute(context.Background(), []byte(`{"type":"navigate","label":"Open","target":"https://evil.example"}`)); err == nil {
 		t.Fatal("off-dashboard navigation accepted")
 	}
 	for i := range askAIMaxCharts + 1 {
-		_, err := chart.Execute(context.Background(), []byte(`{"type":"table","title":"T","rows":[]}`))
+		_, err := chart.Execute(context.Background(), []byte(`{"type":"table","title":"T","columns":["a"],"rows":[["1"]]}`))
 		if (err != nil) != (i == askAIMaxCharts) {
 			t.Fatalf("chart %d: err = %v", i, err)
 		}
@@ -142,5 +151,17 @@ func TestPromptCachingOnlyForProvidersWithCacheMarkers(t *testing.T) {
 		if got := len(promptCachingOptions(Config{Provider: providerName})); got != want {
 			t.Errorf("%s: %d caching options, want %d", providerName, got, want)
 		}
+	}
+}
+
+func TestAskAIAnswerIsTextAfterTheLastAnalyticsCall(t *testing.T) {
+	run := newAskAIRun(Config{}, AskAIRequest{Tools: []goaisdk.Tool{{Name: "hitkeep_get_site_overview"}}}, nil, func() {})
+	answer := run.answer([]goaisdk.StepResult{
+		{Text: "Let me look.", ToolCalls: []provider.ToolCall{{Name: "hitkeep_get_site_overview"}}},
+		{Text: "Traffic rose 57%.", ToolCalls: []provider.ToolCall{{Name: "suggest_action"}}},
+		{Text: "Use the button to open the dashboard."},
+	})
+	if answer != "Traffic rose 57%.\n\nUse the button to open the dashboard." {
+		t.Fatalf("answer = %q", answer)
 	}
 }
