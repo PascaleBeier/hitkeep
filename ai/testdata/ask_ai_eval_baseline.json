@@ -1,22 +1,22 @@
 {
   "claude-haiku-4.5": {
-    "passed": 8,
-    "total": 8
+    "passed": 10,
+    "total": 10
   },
   "deepseek-v4-flash": {
-    "passed": 8,
-    "total": 8
+    "passed": 10,
+    "total": 10
   },
   "gemini-3.1-flash-lite": {
-    "passed": 8,
-    "total": 8
+    "passed": 9,
+    "total": 10
   },
   "gpt-5-nano": {
-    "passed": 8,
-    "total": 8
+    "passed": 7,
+    "total": 10
   },
   "gpt-oss-120b": {
-    "passed": 7,
-    "total": 8
+    "passed": 10,
+    "total": 10
   }
 }
