@@ -22,7 +22,7 @@ type FilterInput struct {
 	// constants, so TestFilterInputSchemaDocumentsAllowedFilterTypes is what
 	// stops the two from drifting.
 	Type  string `json:"type" jsonschema:"Filter type: path, ai_bot, ai_bot_category, ai_source, hostname, referrer, referrer_host, device, country, city, provider, asn, browser, language, utm_campaign, utm_content, utm_medium, utm_source, or utm_term."`
-	Value string `json:"value" jsonschema:"Filter value."`
+	Value string `json:"value" jsonschema:"Filter value, exactly as tools return it: country uses two-letter codes such as DE, and page uses paths such as /blog."`
 }
 
 // FilterSet is embedded by inputs that accept analytics filters.
