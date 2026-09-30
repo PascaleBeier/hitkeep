@@ -236,7 +236,7 @@ func (s *service) getAnnotations(ctx context.Context, _ *mcp.CallToolRequest, in
 		SiteID:      siteID.String(),
 		From:        formatMCPTime(start),
 		To:          formatMCPTime(end),
-		Annotations: analyticstools.ToAnnotationNotes(annotations),
+		Annotations: toMCPAnnotations(annotations),
 	}, nil
 }
 

@@ -43,7 +43,6 @@ function bind(fake: ReturnType<typeof fakeChart>, overrides: Partial<AnnotationI
         canWrite: () => true,
         bucketCount: () => 5,
         isBar: () => false,
-        previewColor: () => '#a16207',
         onAdd: vi.fn(),
         onOpen: vi.fn(),
         ...overrides

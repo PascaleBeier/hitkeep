@@ -334,11 +334,6 @@ function buildSeriesOption(series: HitkeepChartSeries, defaultDesign: HitkeepCha
     };
 }
 
-/** The accent every note marker shares, so notes read as one layer across charts. */
-export function annotationAccentColor(): string {
-    return HITKEEP_CHART_PALETTE.warning;
-}
-
 /**
  * Notes are ECharts markers on the series that carries them: a dashed line
  * with a pin for a point, a tinted band for a range. Labels stay out of the
@@ -348,7 +343,8 @@ function buildAnnotationOptions(annotations: HitkeepChartAnnotations | undefined
     if (!annotations || (annotations.lines.length === 0 && annotations.areas.length === 0)) {
         return {};
     }
-    const accent = annotationAccentColor();
+    // One accent for every note marker, so notes read as one layer across charts.
+    const accent = HITKEEP_CHART_PALETTE.warning;
     const animation = motionDuration(1) > 0;
     const lanes = rangeLabelLanes(annotations.areas);
     const hoverLabel = {

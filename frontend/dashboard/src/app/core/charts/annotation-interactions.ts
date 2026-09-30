@@ -1,5 +1,6 @@
 import { graphic } from 'echarts/core';
 import type { ECharts } from 'echarts/core';
+import { HITKEEP_CHART_PALETTE } from '@core/charts/hitkeep-chart-options';
 
 export type AnnotationMarkerKind = 'line' | 'area';
 
@@ -9,7 +10,6 @@ export interface AnnotationInteractionOptions {
     bucketCount: () => number;
     /** Bars occupy whole bands; lines and areas sit on the ticks. */
     isBar: () => boolean;
-    previewColor: () => string;
     /** A click adds a point (`end` null); a drag across buckets adds a range. */
     onAdd: (start: number, end: number | null) => void;
     onOpen: (kind: AnnotationMarkerKind, dataIndex: number) => void;
@@ -68,7 +68,7 @@ export function bindAnnotationInteractions(chart: ECharts, options: AnnotationIn
         const right = Math.min(grid.x + grid.width, pixelAt(to) + pad);
         const shape = { x: left, y: grid.y, width: Math.max(2, right - left), height: grid.height, r: 4 };
         if (!preview) {
-            const color = options.previewColor();
+            const color = HITKEEP_CHART_PALETTE.warning;
             preview = new graphic.Rect({ shape, silent: true, z: 1000, style: { fill: color, opacity: 0.16, stroke: color, lineWidth: 1, lineDash: [4, 3] } });
             zr.add(preview);
         } else {

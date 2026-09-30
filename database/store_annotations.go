@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,11 +32,11 @@ func (s *Store) ListAnnotations(ctx context.Context, siteID uuid.UUID, start, en
 
 	annotations := make([]api.Annotation, 0)
 	for rows.Next() {
-		var a api.Annotation
-		if err := rows.Scan(&a.ID, &a.SiteID, &a.StartsAt, &a.EndsAt, &a.Body, &a.CreatedAt); err != nil {
+		a, err := scanAnnotation(rows)
+		if err != nil {
 			return nil, fmt.Errorf("failed to scan annotation: %w", err)
 		}
-		annotations = append(annotations, normalizeAnnotationTimes(a))
+		annotations = append(annotations, a)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to iterate annotations: %w", err)
@@ -64,27 +65,24 @@ func (s *Store) CreateAnnotation(ctx context.Context, siteID uuid.UUID, input ap
 }
 
 func (s *Store) UpdateAnnotation(ctx context.Context, siteID, id uuid.UUID, input api.AnnotationInput) (*api.Annotation, error) {
-	result, err := s.db.ExecContext(ctx, `
+	a, err := scanAnnotation(s.db.QueryRowContext(ctx, `
 		UPDATE site_annotations SET starts_at = ?, ends_at = ?, body = ?
-		WHERE id = ? AND site_id = ?`,
-		input.StartsAt.UTC(), utcPtr(input.EndsAt), strings.TrimSpace(input.Body), id, siteID)
+		WHERE id = ? AND site_id = ?
+		RETURNING id, site_id, starts_at, ends_at, body, created_at`,
+		input.StartsAt.UTC(), utcPtr(input.EndsAt), strings.TrimSpace(input.Body), id, siteID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrAnnotationNotFound
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to update annotation: %w", err)
 	}
-	if n, err := result.RowsAffected(); err != nil {
-		return nil, fmt.Errorf("failed to determine updated annotation rows: %w", err)
-	} else if n == 0 {
-		return nil, ErrAnnotationNotFound
-	}
-
-	var a api.Annotation
-	err = s.db.QueryRowContext(ctx, annotationSelect+` WHERE id = ? AND site_id = ?`, id, siteID).
-		Scan(&a.ID, &a.SiteID, &a.StartsAt, &a.EndsAt, &a.Body, &a.CreatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read updated annotation: %w", err)
-	}
-	a = normalizeAnnotationTimes(a)
 	return &a, nil
+}
+
+func scanAnnotation(row interface{ Scan(...any) error }) (api.Annotation, error) {
+	var a api.Annotation
+	err := row.Scan(&a.ID, &a.SiteID, &a.StartsAt, &a.EndsAt, &a.Body, &a.CreatedAt)
+	return normalizeAnnotationTimes(a), err
 }
 
 func (s *Store) DeleteAnnotation(ctx context.Context, siteID, id uuid.UUID) error {

@@ -8,7 +8,7 @@ import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { formatAnnotationWhen, fromDateTimeInputs, toDateTimeInputs } from '@features/annotations/annotation-dates';
 import { SiteAnnotationsService, type AnnotationDraft } from '@features/annotations/site-annotations.service';
 
-export const ANNOTATION_BODY_LIMIT = 280;
+const ANNOTATION_BODY_LIMIT = 280;
 
 interface AnnotationFormModel {
     body: string;

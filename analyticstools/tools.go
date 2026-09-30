@@ -119,27 +119,6 @@ func (b Bridge) Tools() []goaisdk.Tool {
 	return tools
 }
 
-// AnnotationNote is the model- and MCP-facing shape of a team note: no site
-// or author fields, times in RFC3339 UTC.
-type AnnotationNote struct {
-	ID       string `json:"id"`
-	StartsAt string `json:"starts_at"`
-	EndsAt   string `json:"ends_at,omitempty"`
-	Body     string `json:"body"`
-}
-
-func ToAnnotationNotes(annotations []api.Annotation) []AnnotationNote {
-	notes := make([]AnnotationNote, 0, len(annotations))
-	for _, a := range annotations {
-		note := AnnotationNote{ID: a.ID.String(), StartsAt: a.StartsAt.UTC().Format(time.RFC3339), Body: a.Body}
-		if a.EndsAt != nil {
-			note.EndsAt = a.EndsAt.UTC().Format(time.RFC3339)
-		}
-		notes = append(notes, note)
-	}
-	return notes
-}
-
 func (b Bridge) annotations(ctx context.Context, _ struct{}) (string, error) {
 	if err := b.ready(ctx); err != nil {
 		return "", err
@@ -148,7 +127,7 @@ func (b Bridge) annotations(ctx context.Context, _ struct{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return toolJSON(analyticscatalog.ToolAnnotations, b.config.SiteID, b.config.From, b.config.To, ToAnnotationNotes(annotations))
+	return toolJSON(analyticscatalog.ToolAnnotations, b.config.SiteID, b.config.From, b.config.To, annotations)
 }
 
 func (b Bridge) siteOverview(ctx context.Context, _ struct{}) (string, error) {

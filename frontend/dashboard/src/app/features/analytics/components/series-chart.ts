@@ -8,17 +8,7 @@ import { ButtonModule } from '@openng/optimus-ui/button';
 import { ChartDesignToggle } from '@components/chart-design-toggle/chart-design-toggle';
 import { bindAnnotationInteractions, type AnnotationMarkerKind } from '@core/charts/annotation-interactions';
 import { annotationMarkers } from '@core/charts/annotation-markers';
-import {
-    annotationAccentColor,
-    buildHitkeepChartMergeOptions,
-    buildHitkeepChartOptions,
-    hitkeepChartTheme,
-    resolveChartColor,
-    withChartAlpha,
-    type HitkeepChartAnnotations,
-    type HitkeepChartDesign,
-    type HitkeepChartSeries
-} from '@core/charts/hitkeep-chart-options';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, resolveChartColor, withChartAlpha, type HitkeepChartAnnotations, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
 import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { AnnotationStrip } from '@features/annotations/annotation-strip';
 import { SiteAnnotationsService } from '@features/annotations/site-annotations.service';
@@ -200,7 +190,6 @@ export class SeriesChart {
             canWrite: () => this.notes.canWrite(),
             bucketCount: () => this.data()?.length ?? 0,
             isBar: () => this.effectiveDesign() === 'bar',
-            previewColor: annotationAccentColor,
             onAdd: (start, end) => this.openNewNote(start, end),
             onOpen: (kind, index) => this.openMarker(kind, index)
         });
