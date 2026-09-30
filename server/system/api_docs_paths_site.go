@@ -588,15 +588,15 @@ func openAPIV1AdminSitePaths() map[string]any {
 		"/api/sites/{id}/annotations": map[string]any{
 			"get": op([]string{"Annotations"}, "List annotations", "Lists notes that overlap the from/to range, oldest first.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/from"), paramRef("#/components/parameters/to")}, nil,
 				map[string]any{"200": jsonSchemaResp("Annotations", map[string]any{"type": "array", "items": map[string]any{"$ref": "#/components/schemas/Annotation"}})}),
-			"post": op([]string{"Annotations"}, "Create annotation", "Adds a note at a point in time or across a range. Requires site.manage_annotations.", secCookie(), []any{paramRef("#/components/parameters/siteID")},
+			"post": op([]string{"Annotations"}, "Create annotation", "Adds a note at a point in time or across a range. Requires site.manage_annotations.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/AnnotationInput"}),
 				map[string]any{"201": jsonRefResp("Created annotation", "#/components/schemas/Annotation"), "400": errResp("Invalid annotation")}),
 		},
 		"/api/sites/{id}/annotations/{annotationID}": map[string]any{
-			"put": op([]string{"Annotations"}, "Update annotation", "Replaces a note's time and text. Requires site.manage_annotations.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/annotationID")},
+			"put": op([]string{"Annotations"}, "Update annotation", "Replaces a note's time and text. Requires site.manage_annotations.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/annotationID")},
 				jsonBody(map[string]any{"$ref": "#/components/schemas/AnnotationInput"}),
 				map[string]any{"200": jsonRefResp("Updated annotation", "#/components/schemas/Annotation"), "400": errResp("Invalid annotation"), "404": errResp("Annotation not found")}),
-			"delete": op([]string{"Annotations"}, "Delete annotation", "Deletes a note. Requires site.manage_annotations.", secCookie(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/annotationID")}, nil,
+			"delete": op([]string{"Annotations"}, "Delete annotation", "Deletes a note. Requires site.manage_annotations.", secAnyAuth(), []any{paramRef("#/components/parameters/siteID"), paramRef("#/components/parameters/annotationID")}, nil,
 				map[string]any{"204": desc("Deleted"), "404": errResp("Annotation not found")}),
 		},
 		"/api/sites/{id}/goals/timeseries": map[string]any{
