@@ -125,14 +125,14 @@ jobs:
         with:
           name: public-assets-${{ inputs.version }}
           path: public-assets.tar.gz
-          retention-days: 5
+          retention-days: 1
           compression-level: 0
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-inputs-${{ inputs.version }}
           path: ${{ runner.temp }}/hitkeep-release-inputs
-          retention-days: 5
+          retention-days: 1
           compression-level: 0
 
   build-binaries:
@@ -233,7 +233,7 @@ jobs:
           path: |
             hitkeep-${{ matrix.artifact_suffix }}
             hitkeep-cloud-${{ matrix.artifact_suffix }}
-          retention-days: 5
+          retention-days: 1
           compression-level: 0
 
       - name: Attest Binaries
@@ -331,7 +331,7 @@ jobs:
           path: |
             ${{ steps.release-artifacts.outputs.release_dir }}/*.tar.gz
             ${{ steps.release-artifacts.outputs.release_dir }}/goreleaser-SHA256SUMS
-          retention-days: 5
+          retention-days: 1
           compression-level: 0
 
   upload-release-binaries:
