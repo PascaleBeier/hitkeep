@@ -203,7 +203,10 @@ read:
 		return run.failed(err)
 	}
 	result := stream.Result()
-	if err := cmp.Or(run.sinkError(), stream.Err()); err != nil {
+	if err := run.sinkError(); err != nil {
+		return run.failed(err)
+	}
+	if err := stream.Err(); err != nil {
 		return run.failed(err)
 	}
 	rawText := raw.String()
