@@ -126,60 +126,47 @@ async function installAskAIDemoRoutes(page) {
     await page.route("**/api/sites/*/ask-ai/status", (route) => route.fulfill({ json: DEMO_ASK_AI_STATUS }));
 
     await page.route("**/api/sites/*/ask-ai/events", async (route) => {
+        // Mirrors the live flow: the server reads the snapshot (overview and
+        // notes) before the model answers, the model calls the breakdown for the
+        // change drivers, the answer streams, and the server cites the tools that
+        // ran by name with English titles the drawer translates.
+        const tool = (status, name, messageKey) => ({ type: "progress", status, message_key: messageKey, tool_call_id: `demo-${name}`, tool_name: name });
+        const read = (name) => [tool("tool_call_start", name, "askAi.progress.readingAnalytics"), tool("tool_call_finish", name, "askAi.progress.composing")];
+        const answer = [
+            "In this demo site, pageviews rose **21%** compared with last month, from 4,120 to 4,985.\n\n",
+            "- **news.ycombinator.com** drove most of it: +612 pageviews, 71% of the change.\n",
+            "- The team noted the **pricing page redesign** on September 12, which lines up with the rise."
+        ];
         const events = [
             { type: "progress", status: "accepted", message_key: "askAi.progress.accepted" },
-            { type: "progress", status: "generating", message_key: "askAi.progress.generating" },
-            {
-                type: "progress",
-                status: "tool_call_start",
-                message_key: "askAi.progress.readingAnalytics",
-                tool_call_id: "tool-site-overview",
-                tool_name: "hitkeep_get_site_overview"
-            },
-            {
-                type: "progress",
-                status: "tool_call_finish",
-                message_key: "askAi.progress.composing",
-                tool_call_id: "tool-site-overview",
-                tool_name: "hitkeep_get_site_overview"
-            },
-            {
-                type: "progress",
-                status: "tool_call_start",
-                message_key: "askAi.progress.readingAnalytics",
-                tool_call_id: "tool-ai-visibility",
-                tool_name: "hitkeep_get_ai_visibility"
-            },
-            {
-                type: "progress",
-                status: "tool_call_finish",
-                message_key: "askAi.progress.composing",
-                tool_call_id: "tool-ai-visibility",
-                tool_name: "hitkeep_get_ai_visibility"
-            },
+            ...read("hitkeep_get_annotations"),
+            ...read("hitkeep_get_site_overview"),
+            ...read("hitkeep_get_breakdown"),
+            ...answer.map((chunk) => ({ type: "delta", status: "streaming", delta_markdown: chunk })),
             {
                 type: "final",
                 status: "success",
                 message_key: "askAi.progress.complete",
                 response: {
                     run_id: "ask-ai-screenshot-demo",
-                    answer_markdown: "In this demo site, ChatGPT sent **128 visits** in the last 14 days.\n\n- 94 came from ChatGPT referrals.\n- 34 landed after OpenAI crawler fetches.\n- The docs and pricing pages were the strongest paths.",
+                    answer_markdown: answer.join(""),
                     citations: [
-                        { label: "Site overview", tool_call_id: "tool-site-overview" },
-                        { label: "AI visibility", tool_call_id: "tool-ai-visibility" }
+                        { label: "Get HitKeep Annotations", tool_call_id: "hitkeep_get_annotations" },
+                        { label: "Get HitKeep Breakdown", tool_call_id: "hitkeep_get_breakdown" },
+                        { label: "Get HitKeep Site Overview", tool_call_id: "hitkeep_get_site_overview" }
                     ],
                     charts: [
                         {
                             type: "table",
-                            title: "Top demo ChatGPT paths",
+                            title: "Biggest movers by referrer",
                             rows: [
-                                { path: "/docs", visits: 54 },
-                                { path: "/pricing", visits: 38 },
-                                { path: "/guides/analytics/ai-visibility", visits: 21 }
+                                { referrer: "news.ycombinator.com", last_month: 88, this_month: 700, change: 612 },
+                                { referrer: "(Direct)", last_month: 2300, this_month: 2443, change: 143 },
+                                { referrer: "google.com", last_month: 1732, this_month: 1842, change: 110 }
                             ]
                         }
                     ],
-                    actions: [{ type: "navigate", label: "Open AI visibility", target: "/ai-agents" }]
+                    actions: [{ type: "navigate", label: "Open the dashboard", target: "/dashboard" }]
                 }
             }
         ];
@@ -522,11 +509,11 @@ async function captureAskAI(page, record) {
     await page.locator(".ai-suggestions").waitFor({ state: "visible", timeout: 8_000 });
     record("feature-ask-ai-empty", await shoot(page, "feature-ask-ai-empty"));
 
-    const prompt = "How many hits did I get from ChatGPT in the last 14 days?";
+    const prompt = "Why did pageviews rise compared with last month?";
     await page.locator('[name="ask-ai-panel-query"]').fill(prompt);
     await page.getByRole("button", { name: /send ask ai question/i }).click();
-    await page.getByText(/In this demo site, ChatGPT sent 128 visits/i).waitFor({ state: "visible", timeout: 8_000 });
-    await page.getByText(/Top demo ChatGPT paths/i).waitFor({ state: "visible", timeout: 8_000 });
+    await page.getByText(/In this demo site, pageviews rose/i).waitFor({ state: "visible", timeout: 8_000 });
+    await page.getByText(/Biggest movers by referrer/i).waitFor({ state: "visible", timeout: 8_000 });
     await page.waitForTimeout(FORM_SETTLE);
     record("feature-ask-ai-answer", await shoot(page, "feature-ask-ai-answer"));
 
