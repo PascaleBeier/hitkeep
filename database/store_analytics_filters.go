@@ -264,6 +264,24 @@ func (s *Store) queryUTMKpis(
 	)
 }
 
+// agentsCTE classifies each distinct user agent of a "scoped" CTE once. The
+// ~200-branch pattern walk behind the browser, AI agent, and category names
+// dominates any query that runs it per hit, and sites repeat few agents.
+// Keep filters on its columns inside aggregates: a WHERE or HAVING on them is
+// pushed down to the hit scan and classifies every hit again.
+const agentsCTE = `agents AS (
+			SELECT
+				named.*,
+				hk_ai_bot_category_from_name(named.ai_bot) AS ai_bot_category
+			FROM (
+				SELECT
+					user_agent,
+					hk_browser(user_agent) AS browser,
+					hk_ai_bot(user_agent) AS ai_bot
+				FROM (SELECT DISTINCT user_agent FROM scoped)
+			) named
+		)`
+
 // queryAIKpis aggregates the AI traffic KPIs for one window. It mirrors the
 // summary row of the GetSiteStats top-list query so comparison windows carry
 // the same numbers without running a second full stats query.
@@ -277,12 +295,18 @@ func (s *Store) queryAIKpis(
 ) error {
 	//nolint:gosec // filterSQL is derived from a fixed allowlist
 	query := fmt.Sprintf(`
+		WITH scoped AS (
+			SELECT h.*
+			FROM hits h
+			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+		),
+		%s
 		SELECT
-			COUNT(*) FILTER (WHERE hk_ai_bot(h.user_agent) IS NOT NULL) AS ai_bot_hits,
+			COUNT(*) FILTER (WHERE a.ai_bot IS NOT NULL) AS ai_bot_hits,
 			COUNT(DISTINCT h.session_id) FILTER (WHERE hk_ai_source(h.referrer) IS NOT NULL) AS ai_source_visits
-		FROM hits h
-		WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
-	`, filterSQL)
+		FROM scoped h
+		LEFT JOIN agents a ON a.user_agent IS NOT DISTINCT FROM h.user_agent
+	`, filterSQL, agentsCTE)
 
 	return s.db.QueryRowContext(ctx, query, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...).Scan(
 		aiBotHits,

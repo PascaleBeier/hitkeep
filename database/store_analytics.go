@@ -35,6 +35,26 @@ func (s *Store) GetSiteAnalyticsBounds(ctx context.Context, siteID uuid.UUID) (t
 
 // GetSiteStats returns aggregated KPIs and time-series data using the AnalyticsParams struct.
 func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*api.SiteStats, error) {
+	return s.GetSiteStatsSections(ctx, params, AllSiteStatsSections)
+}
+
+// SiteStatsSections selects the optional parts of the site overview. KPIs and
+// the comparison, when requested, are always computed.
+type SiteStatsSections struct {
+	Chart bool
+	// TopLists covers every top list except landing and exit pages.
+	TopLists  bool
+	EntryExit bool
+	// Goals covers goal conversions and funnel definitions.
+	Goals bool
+}
+
+// AllSiteStatsSections is the full overview the dashboard shows.
+var AllSiteStatsSections = SiteStatsSections{Chart: true, TopLists: true, EntryExit: true, Goals: true}
+
+// GetSiteStatsSections computes only the selected sections, so a caller that
+// needs part of the overview skips the scans behind the rest.
+func (s *Store) GetSiteStatsSections(ctx context.Context, params api.AnalyticsParams, sections SiteStatsSections) (*api.SiteStats, error) {
 	// Authorization is handled by the handler middleware (SitePerm/RequirePermission).
 	// Tenant analytics stores do not contain the control-plane sites table.
 
@@ -107,12 +127,12 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		return nil, fmt.Errorf("failed to calc UTM KPIs: %w", err)
 	}
 
-	if useRollups {
+	if sections.Chart && useRollups {
 		stats.ChartData, err = s.queryHybridChartData(ctx, params, truncUnit, rollupKind)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query hybrid chart data: %w", err)
 		}
-	} else {
+	} else if sections.Chart {
 		rows, err := s.queryChartData(ctx, params, gridStart, gridEnd, truncUnit, filterSQL, filterArgs, useRollups, rollupKind)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query chart data: %w", err)
@@ -131,41 +151,83 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		}
 	}
 
+	if err := s.querySiteTopLists(ctx, params, sections, filterSQL, filterArgs, stats); err != nil {
+		return nil, err
+	}
+
+	if err := s.augmentImportedSiteStats(ctx, params, truncUnit, sections, stats); err != nil {
+		return nil, err
+	}
+
+	if sections.Goals {
+		if err := s.querySiteGoals(ctx, params, truncUnit, filterSQL, filterArgs, stats); err != nil {
+			return nil, err
+		}
+	}
+
+	// Both ends must be present: the compare params are parsed leniently, so a
+	// half-specified window would measure against [start, zero time] and report
+	// an empty baseline as a 100% drop.
+	if !params.CompareStart.IsZero() && !params.CompareEnd.IsZero() {
+		comparison, err := s.GetComparisonStats(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calc comparison stats: %w", err)
+		}
+		stats.Comparison = comparison
+	}
+
+	return stats, nil
+}
+
+// querySiteTopLists fills the selected top lists: one grouping-sets scan for
+// the dimension lists, and a session walk for landing and exit pages.
+func (s *Store) querySiteTopLists(ctx context.Context, params api.AnalyticsParams, sections SiteStatsSections, filterSQL string, filterArgs []any, stats *api.SiteStats) error {
+	if sections.TopLists {
+		if err := s.querySiteDimensionLists(ctx, params, filterSQL, filterArgs, stats); err != nil {
+			return err
+		}
+	}
+	if sections.EntryExit {
+		return s.querySiteEntryExitPages(ctx, params, filterSQL, filterArgs, stats)
+	}
+	return nil
+}
+
+func (s *Store) querySiteDimensionLists(ctx context.Context, params api.AnalyticsParams, filterSQL string, filterArgs []any, stats *api.SiteStats) error {
 	// Top lists via GROUPING SETS to keep a single scan.
 	//nolint:gosec // filterSQL is derived from a fixed allowlist
 	topQuery := fmt.Sprintf(`
-		WITH base AS (
-			-- The category derives from the agent name the inner select already
-			-- resolved, so the ~200-branch user-agent pattern walk runs once per
-			-- row instead of once for the name and once for the category.
+		WITH scoped AS (
+			SELECT h.*
+			FROM hits h
+			WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
+		),
+		%s,
+		base AS (
 			SELECT
-				classified.*,
-				hk_ai_bot_category_from_name(classified.ai_bot) AS ai_bot_category
-			FROM (
-				SELECT
-					h.path AS path,
-					hk_referrer(h.referrer) AS referrer,
-					hk_device(h.viewport_width) AS device,
-					hk_country(h.country_code) AS country,
-					COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
-					COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
-					hk_asn(h.asn, h.asn_org) AS asn,
-					hk_browser(h.user_agent) AS browser,
-					hk_ai_bot(h.user_agent) AS ai_bot,
-					hk_ai_source(h.referrer) AS ai_source,
-					h.session_id AS session_id,
-					CASE
-						WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
-						ELSE lower(split_part(TRIM(h.language), '-', 1))
-					END AS language,
-					COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)') AS utm_campaign,
-					COALESCE(NULLIF(TRIM(h.utm_content), ''), '(Unspecified)') AS utm_content,
-					COALESCE(NULLIF(TRIM(h.utm_medium), ''), '(Unspecified)') AS utm_medium,
-					COALESCE(NULLIF(TRIM(h.utm_source), ''), '(Unspecified)') AS utm_source,
-					COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
-				FROM hits h
-				WHERE h.site_id = ? AND h.timestamp >= ? AND h.timestamp <= ?%s
-			) classified
+				h.path AS path,
+				hk_referrer(h.referrer) AS referrer,
+				hk_device(h.viewport_width) AS device,
+				hk_country(h.country_code) AS country,
+				COALESCE(NULLIF(TRIM(h.city), ''), '(Unknown)') AS city,
+				COALESCE(NULLIF(TRIM(h.provider), ''), '(Unknown)') AS provider,
+				hk_asn(h.asn, h.asn_org) AS asn,
+				a.browser AS browser,
+				a.ai_bot AS ai_bot,
+				a.ai_bot_category AS ai_bot_category,
+				hk_ai_source(h.referrer) AS ai_source,
+				h.session_id AS session_id,
+				CASE
+					WHEN NULLIF(TRIM(h.language), '') IS NULL THEN '(Unspecified)'
+					ELSE lower(split_part(TRIM(h.language), '-', 1))
+				END AS language,
+				COALESCE(NULLIF(TRIM(h.utm_campaign), ''), '(Unspecified)') AS utm_campaign,
+				COALESCE(NULLIF(TRIM(h.utm_content), ''), '(Unspecified)') AS utm_content,
+				COALESCE(NULLIF(TRIM(h.utm_medium), ''), '(Unspecified)') AS utm_medium,
+				COALESCE(NULLIF(TRIM(h.utm_source), ''), '(Unspecified)') AS utm_source,
+				COALESCE(NULLIF(TRIM(h.utm_term), ''), '(Unspecified)') AS utm_term
+			FROM scoped h
+			LEFT JOIN agents a ON a.user_agent IS NOT DISTINCT FROM h.user_agent
 		),
 		agg AS (
 			SELECT
@@ -258,11 +320,11 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		FROM ranked
 		WHERE dim = '__summary__' OR rn <= 10
 		ORDER BY CASE WHEN dim = '__summary__' THEN 0 ELSE 1 END, dim, val DESC;
-	`, filterSQL, aiBotCategoryDimPrefix)
+	`, filterSQL, agentsCTE, aiBotCategoryDimPrefix)
 
 	topRows, err := s.db.QueryContext(ctx, topQuery, append([]any{params.SiteID, params.Start, params.End}, filterArgs...)...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer topRows.Close()
 
@@ -273,7 +335,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		var aiBotHits sql.NullInt64
 		var aiSourceVisits sql.NullInt64
 		if err := topRows.Scan(&dim, &name, &value, &aiBotHits, &aiSourceVisits); err != nil {
-			return nil, err
+			return err
 		}
 		if dim == "__summary__" {
 			if aiBotHits.Valid {
@@ -336,9 +398,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		}
 	}
 	if err := topRows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read top metric rows: %w", err)
+		return fmt.Errorf("failed to read top metric rows: %w", err)
 	}
 
+	return nil
+}
+
+func (s *Store) querySiteEntryExitPages(ctx context.Context, params api.AnalyticsParams, filterSQL string, filterArgs []any, stats *api.SiteStats) error {
 	//nolint:gosec // filterSQL is derived from a fixed allowlist
 	landingExitQuery := fmt.Sprintf(`
 		WITH matching_sessions AS (
@@ -399,7 +465,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 	landingExitArgs = append(landingExitArgs, params.SiteID)
 	landingExitRows, err := s.db.QueryContext(ctx, landingExitQuery, landingExitArgs...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer landingExitRows.Close()
 
@@ -407,7 +473,7 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		var kind string
 		var m api.MetricStat
 		if err := landingExitRows.Scan(&kind, &m.Name, &m.Value); err != nil {
-			return nil, err
+			return err
 		}
 		switch kind {
 		case "landing":
@@ -417,16 +483,16 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		}
 	}
 	if err := landingExitRows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read landing and exit rows: %w", err)
+		return fmt.Errorf("failed to read landing and exit rows: %w", err)
 	}
 
-	if err := s.augmentImportedSiteStats(ctx, params, truncUnit, stats); err != nil {
-		return nil, err
-	}
+	return nil
+}
 
+func (s *Store) querySiteGoals(ctx context.Context, params api.AnalyticsParams, truncUnit string, filterSQL string, filterArgs []any, stats *api.SiteStats) error {
 	goals, err := s.GetGoals(ctx, params.SiteID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch goals: %w", err)
+		return fmt.Errorf("failed to fetch goals: %w", err)
 	}
 
 	for _, goal := range goals {
@@ -434,13 +500,13 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 		if goal.Type == "event" && err == nil && canIncludeImportedSiteAggregates(params, truncUnit) {
 			importedConversions, importErr := s.queryImportedEventGoalConversions(ctx, params, goal.Value)
 			if importErr != nil {
-				return nil, importErr
+				return importErr
 			}
 			conversions += importedConversions
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to calc goal conversions: %w", err)
+			return fmt.Errorf("failed to calc goal conversions: %w", err)
 		}
 
 		rate := 0.0
@@ -458,20 +524,8 @@ func (s *Store) GetSiteStats(ctx context.Context, params api.AnalyticsParams) (*
 
 	funnels, err := s.GetFunnels(ctx, params.SiteID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch funnels: %w", err)
+		return fmt.Errorf("failed to fetch funnels: %w", err)
 	}
 	stats.Funnels = funnels
-
-	// Both ends must be present: the compare params are parsed leniently, so a
-	// half-specified window would measure against [start, zero time] and report
-	// an empty baseline as a 100% drop.
-	if !params.CompareStart.IsZero() && !params.CompareEnd.IsZero() {
-		comparison, err := s.GetComparisonStats(ctx, params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calc comparison stats: %w", err)
-		}
-		stats.Comparison = comparison
-	}
-
-	return stats, nil
+	return nil
 }

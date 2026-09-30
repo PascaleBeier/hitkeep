@@ -11,7 +11,7 @@ import (
 	"hitkeep/api"
 )
 
-func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.AnalyticsParams, truncUnit string, stats *api.SiteStats) error {
+func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.AnalyticsParams, truncUnit string, sections SiteStatsSections, stats *api.SiteStats) error {
 	if stats == nil {
 		return nil
 	}
@@ -59,11 +59,13 @@ func (s *Store) augmentImportedSiteStats(ctx context.Context, params api.Analyti
 		stats.PagesPerSession = float64(nativePageviews+importedPageviews) / float64(totalSessions)
 	}
 
-	if err := s.mergeImportedChartData(ctx, params, truncUnit, stats); err != nil {
-		return err
+	if sections.Chart {
+		if err := s.mergeImportedChartData(ctx, params, truncUnit, stats); err != nil {
+			return err
+		}
 	}
-	if err := s.mergeImportedTopLists(ctx, params, stats); err != nil {
-		return err
+	if sections.TopLists || sections.EntryExit {
+		return s.mergeImportedTopLists(ctx, params, stats)
 	}
 	return nil
 }

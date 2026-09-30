@@ -84,9 +84,12 @@ var SiteOverview = Define(ToolSiteOverview, "Get HitKeep Site Overview",
 				return SiteOverviewOutput{}, err
 			}
 		}
-		// ponytail: the store computes every section; split GetSiteStats if the
-		// top-list scan shows up in Ask AI latency.
-		stats, err := call.Analytics.GetSiteStats(ctx, params)
+		stats, err := call.Analytics.GetSiteStatsSections(ctx, params, database.SiteStatsSections{
+			Chart:     sections["chart"],
+			TopLists:  sections["pages"] || sections["sources"] || sections["audience"] || sections["ai"] || sections["utm"],
+			EntryExit: sections["pages"],
+			Goals:     sections["goals"],
+		})
 		if err != nil {
 			return SiteOverviewOutput{}, err
 		}
