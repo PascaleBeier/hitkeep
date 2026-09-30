@@ -662,6 +662,72 @@ async function captureSharedTable(page, record) {
     record("feature-shared-table", await shoot(page, "feature-shared-table", { clip }));
 }
 
+/** A live verifier status for the demo site, so the tracking screenshots show a working install. */
+function demoTrackingStatus(siteId) {
+    const minutesAgo = (minutes) => new Date(Date.now() - minutes * 60_000).toISOString();
+    return {
+        site_id: siteId,
+        tenant_id: "demo",
+        status: "live",
+        first_hit_at: minutesAgo(60 * 24 * 30),
+        last_hit_at: minutesAgo(2),
+        last_event_at: minutesAgo(6),
+        last_hostname: DEMO_SITE_DOMAIN,
+        last_event_name: "newsletter_signup",
+        last_automatic_event_at: minutesAgo(9),
+        last_automatic_event_name: "outbound_click",
+        tracker_source: "hk.js",
+        configured_domain: DEMO_SITE_DOMAIN,
+        updated_at: minutesAgo(1)
+    };
+}
+
+async function captureSiteSettings(page, record) {
+    const sites = await page.evaluate(async () => (await (await fetch("/api/sites")).json()) ?? []);
+    const siteId = sites.find((site) => site.domain === DEMO_SITE_DOMAIN)?.id;
+    if (!siteId) {
+        console.warn(`    ! ${DEMO_SITE_DOMAIN} not found, skipping site settings screenshots`);
+        return;
+    }
+    const pattern = `**/api/sites/${siteId}/tracking/status`;
+    const handler = (route) => route.fulfill({ json: demoTrackingStatus(siteId) });
+    await page.route(pattern, handler);
+    try {
+        await nav(page, `/sites/${siteId}/settings/tracking`, FORM_SETTLE);
+        await page
+            .getByText(/live tracking verifier/i)
+            .first()
+            .waitFor({ state: "visible", timeout: 8_000 });
+        const details = page.getByRole("button", { name: /details/i }).first();
+        if (await details.count()) {
+            await details.click();
+            await page.waitForTimeout(FORM_SETTLE);
+        }
+        record("feature-tracking-verifier", await shoot(page, "feature-tracking-verifier"));
+
+        const advanced = page.getByText(/advanced options/i).first();
+        if (await advanced.count()) {
+            await advanced.click();
+            await page.waitForTimeout(FORM_SETTLE);
+            await advanced.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "instant" }));
+            await page.waitForTimeout(400);
+        }
+        record("feature-site-tracking", await shoot(page, "feature-site-tracking"));
+    } catch (error) {
+        console.warn(`    ! Site tracking screenshots unavailable, continuing: ${error.message}`);
+    } finally {
+        await page.unroute(pattern, handler);
+    }
+
+    try {
+        await nav(page, `/sites/${siteId}/settings/access`, FORM_SETTLE);
+        await page.getByRole("heading", { name: /transfer site/i }).waitFor({ state: "visible", timeout: 8_000 });
+        record("feature-site-transfer", await shoot(page, "feature-site-transfer"));
+    } catch (error) {
+        console.warn(`    ! Site transfer screenshot unavailable, continuing: ${error.message}`);
+    }
+}
+
 async function openTeamSwitcher(page) {
     const trigger = page.locator('[data-testid="team-switcher-trigger"]:visible').first();
     if (!(await trigger.count())) return false;
@@ -814,36 +880,7 @@ async function run() {
                 console.warn("    ! Share dashboard button not found, skipping dialog screenshot");
             }
 
-            const siteSettingsBtn = page.getByRole("button", { name: /site settings/i }).first();
-            if (await siteSettingsBtn.count()) {
-                try {
-                    await siteSettingsBtn.click();
-                    await page.getByRole("heading", { name: /site settings/i }).waitFor({ state: "visible", timeout: 8_000 });
-                    if (await clickTab(page, "tracking", FORM_SETTLE)) {
-                        await page
-                            .getByText(/live tracking verifier/i)
-                            .first()
-                            .waitFor({ state: "visible", timeout: 8_000 });
-                        record("feature-tracking-verifier", await shoot(page, "feature-tracking-verifier"));
-                        await page
-                            .getByText(/automatic event tracking/i)
-                            .first()
-                            .waitFor({ state: "visible", timeout: 8_000 });
-                        record("feature-site-tracking", await shoot(page, "feature-site-tracking"));
-                    }
-                    if (await clickTab(page, "team", FORM_SETTLE)) {
-                        await page.getByRole("heading", { name: /transfer site/i }).waitFor({ state: "visible", timeout: 8_000 });
-                        record("feature-site-transfer", await shoot(page, "feature-site-transfer"));
-                    }
-                } catch (error) {
-                    console.warn(`    ! Site settings screenshots unavailable, continuing: ${error.message}`);
-                } finally {
-                    await page.keyboard.press("Escape").catch(() => {});
-                    await page.waitForTimeout(300);
-                }
-            } else {
-                console.warn("    ! Site settings button not found, skipping team transfer screenshot");
-            }
+            await captureSiteSettings(page, record);
 
             console.log("\n  Analytics:");
             await captureAnnotations(page, record);
