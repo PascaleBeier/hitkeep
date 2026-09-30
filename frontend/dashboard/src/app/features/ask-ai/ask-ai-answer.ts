@@ -38,7 +38,6 @@ export class AskAIAnswer {
     readonly actionRequested = output<AskAIAction>();
     protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
     protected readonly hitkeepIconUrl = computed(() => browserAppUrl(this.document, '/favicon.svg'));
-    protected readonly citationLabelKey = askAIToolLabelKey;
     protected readonly renderedMarkdown = computed(() => this.renderMarkdown(this.answer()?.answer_markdown ?? this.partialMarkdown(), this.answer()?.citations ?? []));
 
     protected actionIcon(action: AskAIAction): string {
@@ -108,6 +107,13 @@ export class AskAIAnswer {
         const numberValue = Number(value ?? 0);
         return Number.isFinite(numberValue) ? numberValue : 0;
     }
+    /** Labels a source by its tool in the active language; unknown tools keep the server's label. */
+    protected citationLabel(citation: AskAIResponse['citations'][number]): string {
+        this.activeLanguage();
+        const key = askAIToolLabelKey(citation.tool_call_id);
+        return key ? this.transloco.translate(key) : citation.label;
+    }
+
     private renderMarkdown(markdown: string, citations: AskAIResponse['citations']): string {
         if (!markdown.trim()) return '';
         const template = this.document.createElement('template');

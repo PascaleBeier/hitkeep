@@ -42,8 +42,7 @@
             <i class="pi pi-link" aria-hidden="true"></i>
             <span class="ai-evidence-label">{{ 'askAi.citations' | transloco }}</span>
             @for (citation of result.citations; track citation.tool_call_id + citation.label) {
-            @let labelKey = citationLabelKey(citation.tool_call_id);
-            <span class="ai-citation" [title]="citation.tool_call_id">{{ labelKey ? (labelKey | transloco) : citation.label }}</span>
+            <span class="ai-citation" [title]="citation.tool_call_id">{{ citationLabel(citation) }}</span>
             }
         </div>
         } @if (result.actions.length) {
