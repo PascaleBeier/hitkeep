@@ -538,6 +538,68 @@ async function captureAskAI(page, record) {
     await page.setViewportSize(DESKTOP_VIEWPORT);
 }
 
+/** Demo notes relative to today, so the chart always shows the same story on a 30-day range. */
+function demoAnnotations() {
+    const day = (daysAgo) => {
+        const date = new Date();
+        date.setUTCHours(0, 0, 0, 0);
+        date.setUTCDate(date.getUTCDate() - daysAgo);
+        return date.toISOString();
+    };
+    const note = (id, startsAgo, body, endsAgo) => ({ id, site_id: "demo", starts_at: day(startsAgo), ...(endsAgo === undefined ? {} : { ends_at: day(endsAgo) }), body, created_at: day(startsAgo) });
+    return [note("demo-campaign", 22, "Autumn newsletter campaign", 17), note("demo-pricing", 13, "Launched the new pricing page"), note("demo-outage", 6, "CDN outage (40 min)"), note("demo-launch", 2, "Product Hunt launch")];
+}
+
+async function captureAnnotations(page, record) {
+    const pattern = "**/api/sites/*/annotations*";
+    const handler = (route) => (route.request().method() === "GET" ? route.fulfill({ json: demoAnnotations() }) : route.continue());
+    await page.route(pattern, handler);
+    try {
+        await nav(page, "/dashboard", CHART_SETTLE);
+        await selectSiteByDomain(page);
+        await selectRangePreset(page, "30d");
+        const chart = page.locator("app-traffic-chart").first();
+        await chart.locator("app-annotation-strip li").first().waitFor({ state: "visible", timeout: 8_000 });
+
+        // Clip to the traffic card: the nearest bordered, rounded ancestor of the chart.
+        const clip = await chart.evaluate((element) => {
+            let card = element;
+            while (card.parentElement) {
+                const style = getComputedStyle(card);
+                if (parseFloat(style.borderTopWidth) > 0 && parseFloat(style.borderTopLeftRadius) > 0) break;
+                card = card.parentElement;
+            }
+            card.scrollIntoView({ block: "center", behavior: "instant" });
+            const rect = card.getBoundingClientRect();
+            const pad = 16;
+            return { x: Math.max(0, rect.x - pad), y: Math.max(0, rect.y - pad), width: rect.width + pad * 2, height: rect.height + pad * 2 };
+        });
+        await page.waitForTimeout(FORM_SETTLE);
+        record("analytics-annotations", await shoot(page, "analytics-annotations", { clip }));
+
+        // Drag across a few days to show the range gesture ending in the note dialog.
+        const canvas = chart.locator("canvas").first();
+        const box = await canvas.boundingBox();
+        if (box) {
+            const y = box.y + box.height * 0.55;
+            await page.mouse.move(box.x + box.width * 0.62, y);
+            await page.mouse.down();
+            await page.mouse.move(box.x + box.width * 0.7, y, { steps: 6 });
+            await page.mouse.move(box.x + box.width * 0.76, y, { steps: 6 });
+            await page.mouse.up();
+            const dialog = page.getByRole("dialog");
+            await dialog.waitFor({ state: "visible", timeout: 8_000 });
+            await page.locator("#annotation-body").fill("Spring sale landing page");
+            await page.waitForTimeout(FORM_SETTLE);
+            record("analytics-annotations-dialog", await shoot(page, "analytics-annotations-dialog"));
+            await page.keyboard.press("Escape");
+            await dialog.waitFor({ state: "hidden", timeout: 8_000 }).catch(() => {});
+        }
+    } finally {
+        await page.unroute(pattern, handler);
+    }
+}
+
 async function openTeamSwitcher(page) {
     const trigger = page.locator('[data-testid="team-switcher-trigger"]:visible').first();
     if (!(await trigger.count())) return false;
@@ -632,7 +694,8 @@ async function run() {
     };
 
     try {
-        if (SCREENSHOT_TARGET !== "ask-ai") {
+        // Targeted runs capture only their subset; the login page belongs to the full set.
+        if (SCREENSHOT_TARGET === "") {
             console.log("  Pre-auth:");
             await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
             await page.waitForSelector('input[type="password"]', { state: "visible", timeout: 10_000 });
@@ -647,6 +710,9 @@ async function run() {
         if (SCREENSHOT_TARGET === "ask-ai") {
             console.log("  Ask AI:");
             await captureAskAI(page, record);
+        } else if (SCREENSHOT_TARGET === "annotations") {
+            console.log("  Annotations:");
+            await captureAnnotations(page, record);
         } else {
             console.log("  Dashboard:");
             await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
@@ -712,6 +778,7 @@ async function run() {
             }
 
             console.log("\n  Analytics:");
+            await captureAnnotations(page, record);
             await captureRoute(page, record, "analytics-goals", "/goals", CHART_SETTLE);
             await captureRoute(page, record, "analytics-funnels", "/funnels", CHART_SETTLE);
             await captureRoute(page, record, "analytics-ecommerce", "/ecommerce", CHART_SETTLE);
