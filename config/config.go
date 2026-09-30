@@ -111,7 +111,7 @@ type Config struct {
 	MCPEnabled          bool   `env:"HITKEEP_MCP_ENABLED"            default:"false"  desc:"Enable the optional leader-only MCP server"`
 	MCPPath             string `env:"HITKEEP_MCP_PATH"               default:"/mcp"   desc:"MCP server HTTP path on the main HitKeep HTTP server"`
 	MCPMaxRangeDays     int    `env:"HITKEEP_MCP_MAX_RANGE_DAYS"     default:"366"    desc:"Maximum analytics date range in days for MCP tools"`
-	MCPDocsEnabled      bool   `env:"HITKEEP_MCP_DOCS_ENABLED"       default:"true"   desc:"Enable MCP tools and resources that read official HitKeep docs"`
+	MCPDocsEnabled      bool   `env:"HITKEEP_MCP_DOCS_ENABLED"       default:"true"   desc:"Enable MCP and Ask AI tools and resources that read official HitKeep docs"`
 	MCPDocsURL          string `env:"HITKEEP_MCP_DOCS_URL"           default:"https://hitkeep.com" desc:"Base URL for official HitKeep docs used by MCP docs tools" sensitive:"url"`
 	MCPDocsCacheMinutes int    `env:"HITKEEP_MCP_DOCS_CACHE_MINUTES" default:"60"     desc:"Minutes to cache fetched docs for MCP tools"`
 

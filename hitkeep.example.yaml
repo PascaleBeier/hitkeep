@@ -102,7 +102,7 @@ join-addr: ""
 # mcp settings
 # Minutes to cache fetched docs for MCP tools (type: integer; default: "60")
 mcp-docs-cache-minutes: 60
-# Enable MCP tools and resources that read official HitKeep docs (type: boolean; default: "true")
+# Enable MCP and Ask AI tools and resources that read official HitKeep docs (type: boolean; default: "true")
 mcp-docs-enabled: true
 # Base URL for official HitKeep docs used by MCP docs tools (type: string; default: "unset"; sensitive)
 # mcp-docs-url:
