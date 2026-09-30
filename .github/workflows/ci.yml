@@ -242,6 +242,7 @@ jobs:
             ~/.cache/hitkeep/hk/workspaces/*/e2e/report
             ~/.cache/hitkeep/hk/workspaces/*/e2e/results
           if-no-files-found: ignore
+          retention-days: 1
 
   email-review:
     name: Email visual review
@@ -307,3 +308,4 @@ jobs:
           name: email-review
           path: ~/.cache/hitkeep/hk/workspaces/*/artifacts/email-review/screenshots
           if-no-files-found: error
+          retention-days: 1

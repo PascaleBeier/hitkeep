@@ -334,7 +334,7 @@ jobs:
         with:
           name: tracker-package-${{ needs.release-please.outputs.version }}
           path: frontend/tracker/verified-tracker.tgz
-          retention-days: 5
+          retention-days: 1
           compression-level: 0
 
   docs-attestation:
