@@ -64,6 +64,7 @@ describe('AskAIControl charts', () => {
                                 charts: 'Charts',
                                 answer: 'Answer',
                                 citations: 'Sources',
+                                tools: { siteOverview: 'Site overview' },
                                 actions: 'Actions',
                                 conversation: 'Conversation',
                                 triggerAria: 'Ask AI about this site',
@@ -252,7 +253,8 @@ describe('AskAIControl charts', () => {
         component.response.set({
             ...responseWithCharts(),
             answer_markdown: 'Visits rose. [Source: hitkeep_get_site_overview]\n\nKeep [Source: unknown_tool] and hitkeep_other_tool intact.',
-            citations: [{ label: 'Site overview', tool_call_id: 'hitkeep_get_site_overview' }]
+            // The server labels citations with English tool titles; known tools are translated.
+            citations: [{ label: 'Get HitKeep Site Overview', tool_call_id: 'hitkeep_get_site_overview' }]
         });
         fixture.detectChanges();
 
@@ -261,7 +263,7 @@ describe('AskAIControl charts', () => {
         expect(answer).not.toContain('[Source: hitkeep_get_site_overview]');
         expect(answer).toContain('[Source: unknown_tool]');
         expect(answer).toContain('hitkeep_other_tool');
-        expect(document.body.querySelector('.ai-citation')?.textContent).toContain('Site overview');
+        expect(document.body.querySelector('.ai-citation')?.textContent?.trim()).toBe('Site overview');
     });
 
     it('renders useful Markdown while dropping active HTML, image loads, and unsafe links', async () => {

@@ -13,6 +13,30 @@ export interface AskAIConversationTurn {
 
 export type ToolCallProgressState = 'running' | 'done' | 'failed';
 
+const toolLabelKeys: Record<string, string> = {
+    hitkeep_get_site_overview: 'askAi.tools.siteOverview',
+    hitkeep_get_breakdown: 'askAi.tools.breakdown',
+    hitkeep_get_event_names: 'askAi.tools.eventNames',
+    hitkeep_get_event_breakdown: 'askAi.tools.eventBreakdown',
+    hitkeep_get_ecommerce: 'askAi.tools.ecommerce',
+    hitkeep_get_web_vitals: 'askAi.tools.webVitals',
+    hitkeep_get_ai_visibility: 'askAi.tools.aiVisibility',
+    hitkeep_get_annotations: 'askAi.tools.annotations',
+    hitkeep_get_funnel_stats: 'askAi.tools.funnelStats',
+    hitkeep_get_qr_campaigns: 'askAi.tools.qrCampaigns',
+    hitkeep_get_search_console_status: 'askAi.tools.searchConsole',
+    hitkeep_get_search_console: 'askAi.tools.searchConsole',
+    hitkeep_get_opportunities: 'askAi.tools.opportunities',
+    hitkeep_search_docs: 'askAi.tools.docs',
+    hitkeep_get_doc: 'askAi.tools.docs',
+    hitkeep_get_api_reference: 'askAi.tools.docs'
+};
+
+/** Returns the translation key for an Ask AI tool, or undefined for tools the dashboard does not know. */
+export function askAIToolLabelKey(toolName: string): string | undefined {
+    return toolLabelKeys[toolName];
+}
+
 export interface ToolCallProgress {
     key: string;
     toolName: string;
@@ -22,16 +46,6 @@ export interface ToolCallProgress {
 
 @Injectable()
 export class AskAISession {
-    private static readonly toolLabelKeys: Record<string, string> = {
-        hitkeep_get_site_overview: 'askAi.tools.siteOverview',
-        hitkeep_get_event_names: 'askAi.tools.eventNames',
-        hitkeep_get_event_breakdown: 'askAi.tools.eventBreakdown',
-        hitkeep_get_ecommerce: 'askAi.tools.ecommerce',
-        hitkeep_get_web_vitals: 'askAi.tools.webVitals',
-        hitkeep_get_ai_visibility: 'askAi.tools.aiVisibility',
-        hitkeep_get_annotations: 'askAi.tools.annotations'
-    };
-
     private readonly askAI = inject(AskAIService);
     private readonly siteService = inject(SiteService);
     private readonly destroyRef = inject(DestroyRef);
@@ -134,6 +148,8 @@ export class AskAISession {
     private applyStreamEvent(event: AskAIStreamEvent, query: string): void {
         if (event.type === 'progress') {
             this.progressMessageKey.set(event.message_key || 'askAi.loading');
+            // Text written before an analytics call is a preamble, not the answer.
+            if (event.status === 'tool_call_start') this.partialAnswer.set('');
             this.applyToolProgress(event);
             return;
         }
@@ -201,7 +217,7 @@ export class AskAISession {
     }
 
     private toolLabelKey(toolName: string): string {
-        return AskAISession.toolLabelKeys[toolName] ?? 'askAi.tools.analytics';
+        return askAIToolLabelKey(toolName) ?? 'askAi.tools.analytics';
     }
 
     private streamErrorKey(error: unknown): string {

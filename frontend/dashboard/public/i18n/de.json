@@ -226,6 +226,12 @@
       "webVitals": "Web Vitals",
       "aiVisibility": "AI-Sichtbarkeit",
       "annotations": "Notizen",
+      "breakdown": "Traffic-Aufschlüsselung",
+      "funnelStats": "Funnels",
+      "qrCampaigns": "QR-Kampagnen",
+      "searchConsole": "Search Console",
+      "opportunities": "Opportunities",
+      "docs": "Docs",
       "analytics": "Analytics"
     },
     "status": {

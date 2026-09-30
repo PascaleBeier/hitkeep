@@ -226,6 +226,12 @@
       "webVitals": "Web Vitals",
       "aiVisibility": "AI-zichtbaarheid",
       "annotations": "Notities",
+      "breakdown": "Verkeersuitsplitsing",
+      "funnelStats": "Funnels",
+      "qrCampaigns": "QR-campagnes",
+      "searchConsole": "Search Console",
+      "opportunities": "Kansen",
+      "docs": "Docs",
       "analytics": "Analytics"
     },
     "status": {

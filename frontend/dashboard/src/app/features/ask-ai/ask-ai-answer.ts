@@ -11,6 +11,7 @@ import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
 import { AskAIAction, AskAIChart, AskAIResponse } from '@models/analytics.types';
 import { PreferencesService } from '@services/preferences.service';
 import MarkdownIt from 'markdown-it';
+import { askAIToolLabelKey } from './ask-ai-session';
 
 const markdownConverter = new MarkdownIt({ html: false, linkify: false, typographer: false });
 
@@ -37,6 +38,7 @@ export class AskAIAnswer {
     readonly actionRequested = output<AskAIAction>();
     protected readonly chartInitOptions: EChartsInitOpts = { renderer: 'canvas' };
     protected readonly hitkeepIconUrl = computed(() => browserAppUrl(this.document, '/favicon.svg'));
+    protected readonly citationLabelKey = askAIToolLabelKey;
     protected readonly renderedMarkdown = computed(() => this.renderMarkdown(this.answer()?.answer_markdown ?? this.partialMarkdown(), this.answer()?.citations ?? []));
 
     protected actionIcon(action: AskAIAction): string {
