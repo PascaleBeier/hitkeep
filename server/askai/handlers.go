@@ -19,6 +19,7 @@ import (
 	authcore "hitkeep/auth"
 	"hitkeep/database"
 	json "hitkeep/jsonapi"
+	"hitkeep/opportunities"
 	"hitkeep/server/shared"
 	publicskills "hitkeep/skills"
 )
@@ -37,6 +38,7 @@ var errAskAIStreamWriteFailed = errors.New("ask ai stream write failed")
 
 type handler struct {
 	ctx        *shared.Context
+	docs       *analyticstools.Docs
 	quotaMu    sync.Mutex
 	quotaSlots map[uuid.UUID]*teamQuotaSlot
 }
@@ -47,6 +49,9 @@ type askAIStreamingClient interface {
 
 func Register(mux *http.ServeMux, ctx *shared.Context) {
 	h := &handler{ctx: ctx}
+	if ctx.Config.MCPDocsEnabled {
+		h.docs = analyticstools.NewDocs(ctx.Config.MCPDocsURL, time.Duration(ctx.Config.MCPDocsCacheMinutes)*time.Minute)
+	}
 	mux.HandleFunc("POST /api/sites/{id}/ask-ai", ctx.Handler(shared.HandlerConfig{
 		RequireAuth: true,
 		AllowAPIKey: true,
@@ -596,9 +601,15 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return prepared, false
 	}
-	tools := analyticstools.NewBridge(analyticstools.Config{
-		Analytics: analyticsStore, Annotations: h.ctx.Store, SiteID: siteID, UserID: userID, From: from, To: to, Filters: filters,
-	}).Tools()
+	toolSite := analyticstools.Site{ID: siteID, UserID: userID, Control: h.ctx.Store, Analytics: analyticsStore}
+	tools := append(analyticstools.Analytics(), opportunities.ReadTool)
+	tools = append(tools, analyticstools.DocsTools(h.docs)...)
+	aiTools := analyticstools.GoAI(analyticstools.Scope{
+		SiteID: siteID,
+		// The request was authorized for this one site above.
+		Resolve: func(context.Context, uuid.UUID) (analyticstools.Site, error) { return toolSite, nil },
+		From:    from, To: to, MaxRangeDays: maxRangeDays, Filters: filters,
+	}, tools...)
 	return askAIPreparedRun{
 		SiteID:       siteID,
 		RequestHash:  requestHash,
@@ -607,7 +618,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		AIRequest: hitai.AskAIRequest{
 			TeamID: teamID, SiteID: siteID, ActorID: userID, ActorType: "user", SiteDomain: site.Domain,
 			Query: request.Query, From: from, To: to, Route: request.Route, Filters: toAIAskFilters(filters), History: toAIAskHistory(request.History),
-			SkillText: publicskills.EmbeddedAnalyticsProcedurePack(), Tools: tools,
+			SkillText: publicskills.EmbeddedAnalyticsProcedurePack(), Tools: aiTools,
 		},
 	}, true
 }

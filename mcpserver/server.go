@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"hitkeep/analyticstools"
 	authcore "hitkeep/auth"
 	"hitkeep/config"
 	"hitkeep/database"
@@ -32,7 +33,7 @@ type service struct {
 	conf         *config.Config
 	store        *database.Store
 	tenantStores *database.TenantStoreManager
-	docs         *docsClient
+	docs         *analyticstools.Docs
 	apiLimiter   *shared.IPRateLimiter
 	logger       *slog.Logger
 	mcp          *mcp.Server
@@ -53,7 +54,7 @@ func NewHandler(conf *config.Config, store *database.Store, tenantStores *databa
 		logger:       logger,
 	}
 	if conf.MCPDocsEnabled {
-		svc.docs = newDocsClient(conf.MCPDocsURL, time.Duration(conf.MCPDocsCacheMinutes)*time.Minute)
+		svc.docs = analyticstools.NewDocs(conf.MCPDocsURL, time.Duration(conf.MCPDocsCacheMinutes)*time.Minute)
 	}
 	svc.apiLimiter = apiLimiter
 	svc.mcp = svc.newMCPServer()
@@ -76,14 +77,17 @@ func (s *service) newMCPServer() *mcp.Server {
 		Description: "Read-only aggregate HitKeep analytics and official documentation over a stateless MCP endpoint.",
 		Version:     s.conf.Version,
 	}, &mcp.ServerOptions{
+		Instructions: mcpInstructions,
 		Capabilities: &mcp.ServerCapabilities{
 			Tools:     &mcp.ToolCapabilities{ListChanged: false},
+			Prompts:   &mcp.PromptCapabilities{ListChanged: false},
 			Resources: &mcp.ResourceCapabilities{ListChanged: false, Subscribe: false},
 		},
 	})
 	server.AddReceivingMiddleware(s.logMiddleware(), s.cacheMiddleware())
 	s.registerTools(server)
 	s.registerResources(server)
+	registerPrompts(server)
 	return server
 }
 
@@ -111,6 +115,8 @@ func (s *service) cacheMiddleware() mcp.Middleware {
 			case *mcp.DiscoverResult:
 				setCache(&typed.Cacheable, mcpListCacheTTL)
 			case *mcp.ListToolsResult:
+				setCache(&typed.Cacheable, mcpListCacheTTL)
+			case *mcp.ListPromptsResult:
 				setCache(&typed.Cacheable, mcpListCacheTTL)
 			case *mcp.ListResourcesResult:
 				setCache(&typed.Cacheable, mcpListCacheTTL)
@@ -428,34 +434,4 @@ func rawSiteID(raw json.RawMessage) string {
 		return ""
 	}
 	return strings.TrimSpace(payload.SiteID)
-}
-
-func toMCPSearchConsoleSyncStatus(state *database.GoogleSearchConsoleSyncState) *mcpSearchConsoleSyncStatus {
-	if state == nil {
-		return nil
-	}
-	return &mcpSearchConsoleSyncStatus{
-		State:             state.State,
-		ImportedStartDate: formatOptionalMCPDate(state.ImportedStartDate),
-		ImportedEndDate:   formatOptionalMCPDate(state.ImportedEndDate),
-		LastSuccessAt:     formatOptionalMCPTime(state.LastSuccessAt),
-		LastAttemptAt:     formatOptionalMCPTime(state.LastAttemptAt),
-		LastErrorCategory: state.LastErrorCategory,
-		NextRetryAt:       formatOptionalMCPTime(state.NextRetryAt),
-		Manual:            state.Manual,
-	}
-}
-
-func formatOptionalMCPDate(ts *time.Time) string {
-	if ts == nil {
-		return ""
-	}
-	return formatMCPDate(*ts)
-}
-
-func formatOptionalMCPTime(ts *time.Time) string {
-	if ts == nil {
-		return ""
-	}
-	return formatMCPTime(*ts)
 }

@@ -1,4 +1,4 @@
-package mcpserver
+package analyticstools
 
 import (
 	"cmp"
@@ -21,16 +21,16 @@ const (
 	maxDocCacheEntries = 128
 )
 
-type docsClient struct {
+type Docs struct {
 	base       *url.URL
 	ttl        time.Duration
 	httpClient *http.Client
 
 	fetches singleflight.Group
-	pages   *lru.LRU[string, docPage]
+	pages   *lru.LRU[string, DocPage]
 }
 
-type docPage struct {
+type DocPage struct {
 	URL      string
 	Path     string
 	Markdown string
@@ -51,7 +51,7 @@ type catalogEntry struct {
 	Description string
 }
 
-func newDocsClient(baseURL string, ttl time.Duration) *docsClient {
+func NewDocs(baseURL string, ttl time.Duration) *Docs {
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
@@ -59,17 +59,17 @@ func newDocsClient(baseURL string, ttl time.Duration) *docsClient {
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		parsed, _ = url.Parse("https://hitkeep.com")
 	}
-	return &docsClient{
+	return &Docs{
 		base: parsed,
 		ttl:  ttl,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		pages: lru.NewLRU[string, docPage](maxDocCacheEntries, nil, ttl),
+		pages: lru.NewLRU[string, DocPage](maxDocCacheEntries, nil, ttl),
 	}
 }
 
-func (c *docsClient) Search(ctx context.Context, query string, limit int) ([]docSearchResult, error) {
+func (c *Docs) Search(ctx context.Context, query string, limit int) ([]docSearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, errors.New("query is required")
@@ -117,13 +117,13 @@ func (c *docsClient) Search(ctx context.Context, query string, limit int) ([]doc
 		}
 		return cmp.Compare(right.Score, left.Score)
 	})
-	return limitSlice(results, limit), nil
+	return results[:min(len(results), limit)], nil
 }
 
-func (c *docsClient) GetMarkdown(ctx context.Context, rawPath string) (docPage, error) {
+func (c *Docs) GetMarkdown(ctx context.Context, rawPath string) (DocPage, error) {
 	path, err := c.normalizePath(rawPath)
 	if err != nil {
-		return docPage{}, err
+		return DocPage{}, err
 	}
 
 	if page, ok := c.pages.Get(path); ok {
@@ -137,22 +137,22 @@ func (c *docsClient) GetMarkdown(ctx context.Context, rawPath string) (docPage, 
 
 		page, err := c.fetchMarkdown(ctx, path)
 		if err != nil {
-			return docPage{}, err
+			return DocPage{}, err
 		}
 		c.pages.Add(path, page)
 		return page, nil
 	})
 	if err != nil {
-		return docPage{}, err
+		return DocPage{}, err
 	}
-	page, ok := value.(docPage)
+	page, ok := value.(DocPage)
 	if !ok {
-		return docPage{}, errors.New("unexpected docs cache value")
+		return DocPage{}, errors.New("unexpected docs cache value")
 	}
 	return page, nil
 }
 
-func (c *docsClient) normalizePath(rawPath string) (string, error) {
+func (c *Docs) normalizePath(rawPath string) (string, error) {
 	rawPath = strings.TrimSpace(rawPath)
 	if rawPath == "" {
 		return "", errors.New("path is required")
@@ -186,33 +186,33 @@ func (c *docsClient) normalizePath(rawPath string) (string, error) {
 	return rawPath, nil
 }
 
-func (c *docsClient) fetchMarkdown(ctx context.Context, path string) (docPage, error) {
+func (c *Docs) fetchMarkdown(ctx context.Context, path string) (DocPage, error) {
 	target := *c.base
 	target.Path = path
 	target.RawQuery = ""
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
-		return docPage{}, err
+		return DocPage{}, err
 	}
 	req.Header.Set("Accept", "text/markdown")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return docPage{}, fmt.Errorf("fetch docs markdown: %w", err)
+		return DocPage{}, fmt.Errorf("fetch docs markdown: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return docPage{}, fmt.Errorf("fetch docs markdown: status %d", resp.StatusCode)
+		return DocPage{}, fmt.Errorf("fetch docs markdown: status %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocBytes+1))
 	if err != nil {
-		return docPage{}, err
+		return DocPage{}, err
 	}
 	if len(body) > maxDocBytes {
-		return docPage{}, errors.New("docs response too large")
+		return DocPage{}, errors.New("docs response too large")
 	}
-	return docPage{URL: target.String(), Path: path, Markdown: string(body)}, nil
+	return DocPage{URL: target.String(), Path: path, Markdown: string(body)}, nil
 }
 
 func parseCatalog(markdown string, base *url.URL) []catalogEntry {

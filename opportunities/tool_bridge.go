@@ -2,6 +2,7 @@ package opportunities
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,16 +38,30 @@ func NewToolBridge(config ToolBridgeConfig) ToolBridge {
 	return ToolBridge{config: config}
 }
 
+// Tools offers the evidence tools pinned to the candidate's site and window,
+// so every citation refers to data from the range the candidate measured.
 func (b ToolBridge) Tools() []goaisdk.Tool {
-	return analyticstools.NewBridge(analyticstools.Config{
-		Analytics:     b.config.Analytics,
-		SiteID:        b.config.SiteID,
-		From:          b.config.From,
-		To:            b.config.To,
-		BeforeExecute: b.authorize,
-	}).Tools()
+	return analyticstools.GoAI(analyticstools.Scope{
+		SiteID:    b.config.SiteID,
+		Resolve:   b.resolve,
+		From:      b.config.From,
+		To:        b.config.To,
+		LockRange: true,
+	}, analyticstools.Evidence()...)
 }
 
-func (b ToolBridge) authorize(ctx context.Context) error {
-	return newToolBridgeScope(b.config).authorize(ctx)
+func (b ToolBridge) resolve(ctx context.Context, siteID uuid.UUID) (analyticstools.Site, error) {
+	if err := newToolBridgeScope(b.config).authorize(ctx); err != nil {
+		return analyticstools.Site{}, err
+	}
+	if b.config.Analytics == nil {
+		return analyticstools.Site{}, errors.New("analytics store unavailable")
+	}
+	if siteID == uuid.Nil || siteID != b.config.SiteID {
+		return analyticstools.Site{}, errors.New("site scope is required")
+	}
+	if b.config.From.IsZero() || !b.config.From.Before(b.config.To) {
+		return analyticstools.Site{}, errors.New("valid date range is required")
+	}
+	return analyticstools.Site{ID: siteID, Control: b.config.Shared, Analytics: b.config.Analytics}, nil
 }

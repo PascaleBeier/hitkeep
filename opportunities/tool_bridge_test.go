@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hitkeep/analyticscatalog"
+	"hitkeep/analyticstools"
 	"hitkeep/api"
 	"hitkeep/auth"
 	"hitkeep/database"
@@ -146,14 +146,11 @@ func TestToolBridgeExposesSharedAggregateCatalogTools(t *testing.T) {
 	for _, tool := range bridge.Tools() {
 		got = append(got, tool.Name)
 	}
-	// Team notes explain data but are never Opportunity evidence, so the
-	// bridge offers every catalog tool except annotations.
-	want := make([]string, 0, len(analyticscatalog.ReadOnlyAggregateTools))
-	for _, definition := range analyticscatalog.ReadOnlyAggregateTools {
-		if definition.Name == analyticscatalog.ToolAnnotations {
-			continue
-		}
-		want = append(want, definition.Name)
+	// Team notes explain data but are never Opportunity evidence, and adding a
+	// tool here widens the evidence contract, so the set is pinned.
+	want := []string{
+		analyticstools.ToolSiteOverview, analyticstools.ToolEventNames, analyticstools.ToolEventBreakdown,
+		analyticstools.ToolEcommerce, analyticstools.ToolWebVitals, analyticstools.ToolAIVisibility,
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("expected shared aggregate tool catalog %v, got %v", want, got)
@@ -175,21 +172,21 @@ func TestToolBridgeExecutesSharedEventNamesTool(t *testing.T) {
 		To:                time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 	})
 
-	raw := executeBridgeTool(t, bridge, analyticscatalog.ToolEventNames)
+	raw := executeBridgeTool(t, bridge, analyticstools.ToolEventNames)
 	if containsRawRowField(raw) {
 		t.Fatalf("event names returned raw row field: %s", raw)
 	}
 	var body struct {
 		EvidenceID string `json:"evidence_id"`
-		SiteID     string `json:"site_id"`
 		Data       struct {
-			Names []string `json:"names"`
+			SiteID string   `json:"site_id"`
+			Names  []string `json:"names"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(raw), &body); err != nil {
 		t.Fatalf("event names returned invalid JSON: %v", err)
 	}
-	if body.EvidenceID != analyticscatalog.ToolEventNames || body.SiteID != siteID.String() {
+	if body.EvidenceID != analyticstools.ToolEventNames || body.Data.SiteID != siteID.String() {
 		t.Fatalf("expected scoped event names envelope, got %+v", body)
 	}
 	if strings.Join(body.Data.Names, ",") != "begin_checkout" {

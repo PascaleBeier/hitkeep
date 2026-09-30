@@ -10,25 +10,23 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"hitkeep/analyticstools"
 	"hitkeep/api"
 	authcore "hitkeep/auth"
 	"hitkeep/config"
 	"hitkeep/database"
 	json "hitkeep/jsonapi"
 	"hitkeep/mcptest"
-	"hitkeep/server/filterparams"
+	"hitkeep/opportunities"
 )
 
 func TestMCPLogMiddlewareDoesNotLogRawErrors(t *testing.T) {
@@ -355,40 +353,6 @@ func TestMCPRequestHostDisablesLoopbackAllowanceForProxyWithoutForwardedHost(t *
 	}
 }
 
-func TestMCPParseFiltersAllowsGeoNetworkDimensions(t *testing.T) {
-	filters, err := parseFilters([]filterInput{
-		{Type: "city", Value: "Mountain View"},
-		{Type: "provider", Value: "Google LLC"},
-		{Type: "asn", Value: "AS15169 Google LLC"},
-	})
-	if err != nil {
-		t.Fatalf("parse filters: %v", err)
-	}
-	if len(filters) != 3 {
-		t.Fatalf("expected 3 filters, got %d", len(filters))
-	}
-	if filters[0].Type != "city" || filters[1].Type != "provider" || filters[2].Type != "asn" {
-		t.Fatalf("unexpected filters: %+v", filters)
-	}
-}
-
-func TestMCPParseFiltersAllowsAIVisibilityDimensions(t *testing.T) {
-	filters, err := parseFilters([]filterInput{
-		{Type: "ai_bot", Value: "GPTBot"},
-		{Type: "ai_bot_category", Value: "ai_training_crawler"},
-		{Type: "ai_source", Value: "ChatGPT"},
-	})
-	if err != nil {
-		t.Fatalf("parse filters: %v", err)
-	}
-	if len(filters) != 3 {
-		t.Fatalf("expected 3 filters, got %d", len(filters))
-	}
-	if filters[0].Type != "ai_bot" || filters[1].Type != "ai_bot_category" || filters[2].Type != "ai_source" {
-		t.Fatalf("unexpected filters: %+v", filters)
-	}
-}
-
 func TestMCPSiteOverviewAcceptsAIVisibilityFilters(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")
@@ -433,55 +397,6 @@ func TestMCPSiteOverviewAcceptsAIVisibilityFilters(t *testing.T) {
 	}
 	if !rejected.IsError {
 		t.Fatal("expected the dashboard-only qr_code_id filter to be rejected")
-	}
-}
-
-// TestMCPFilterAllowlistDerivesFromCanonicalSet pins the one deliberate
-// difference between the REST filter set and the MCP one. A new canonical filter
-// type reaches MCP automatically; dropping it needs an explicit exclusion.
-func TestMCPFilterAllowlistDerivesFromCanonicalSet(t *testing.T) {
-	canonical := filterparams.AllowedHitFilterTypes()
-	want := make([]string, 0, len(canonical))
-	for _, filterType := range canonical {
-		if filterType == "qr_code_id" {
-			continue
-		}
-		want = append(want, filterType)
-	}
-
-	if !slices.Equal(mcpFilterTypes, want) {
-		t.Fatalf("MCP filter allowlist drifted\nwant %v\n got %v", want, mcpFilterTypes)
-	}
-	if isAllowedFilter("qr_code_id") {
-		t.Fatal("qr_code_id is a dashboard-only drill-down and must stay off the MCP surface")
-	}
-}
-
-// TestFilterInputSchemaDocumentsAllowedFilterTypes keeps the jsonschema doc
-// string honest: struct tags are compile-time constants, so the only way to stop
-// them drifting from the derived allowlist is to fail CI when they do.
-func TestFilterInputSchemaDocumentsAllowedFilterTypes(t *testing.T) {
-	field, ok := reflect.TypeFor[filterInput]().FieldByName("Type")
-	if !ok {
-		t.Fatal("filterInput has no Type field")
-	}
-
-	const prefix = "Filter type: "
-	doc := field.Tag.Get("jsonschema")
-	if !strings.HasPrefix(doc, prefix) {
-		t.Fatalf("unexpected filter type doc string %q", doc)
-	}
-
-	listed := strings.Split(strings.TrimSuffix(strings.TrimPrefix(doc, prefix), "."), ",")
-	for i, entry := range listed {
-		listed[i] = strings.TrimPrefix(strings.TrimSpace(entry), "or ")
-	}
-	slices.Sort(listed)
-
-	want := slices.Clone(mcpFilterTypes)
-	slices.Sort(want)
-	if !slices.Equal(listed, want) {
-		t.Fatalf("filterInput doc string drifted from the allowlist\nwant %v\n got %v", want, listed)
 	}
 }
 
@@ -700,7 +615,7 @@ func TestMCPToolsListAndSiteOverview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal structured content: %v", err)
 	}
-	var output siteOverviewOutput
+	var output analyticstools.SiteOverviewOutput
 	if err := json.Unmarshal(raw, &output); err != nil {
 		t.Fatalf("unmarshal output: %v", err)
 	}
@@ -790,7 +705,7 @@ func TestMCPEcommerceReturnsGeoNetworkAggregatesOnly(t *testing.T) {
 	})
 	requireSuccessfulMCPTool(t, res, err)
 	raw := marshalMCPStructuredContent(t, res)
-	var output ecommerceOutput
+	var output analyticstools.EcommerceOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal ecommerce output: %v", err)
 	}
@@ -829,7 +744,7 @@ func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 	requireSuccessfulMCPTool(t, res, err)
 
 	raw := marshalMCPStructuredContent(t, res)
-	var output webVitalsOutput
+	var output analyticstools.WebVitalsOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal output: %v", err)
 	}
@@ -876,7 +791,7 @@ func TestMCPAnnotationsReturnsScopedNotesWithoutAuthors(t *testing.T) {
 	})
 	requireSuccessfulMCPTool(t, res, err)
 	raw := marshalMCPStructuredContent(t, res)
-	var output annotationsOutput
+	var output analyticstools.AnnotationsOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal output: %v", err)
 	}
@@ -1098,7 +1013,7 @@ func TestMCPOpportunitiesExposeOnlyCitedEvidence(t *testing.T) {
 		t.Fatalf("MCP Opportunities leaked uncited evidence: %s", raw)
 	}
 
-	var output opportunitiesOutput
+	var output opportunities.ReadOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal opportunities output: %v", err)
 	}
@@ -1155,7 +1070,7 @@ func TestMCPOpportunitiesReturnsRankedFinalData(t *testing.T) {
 	})
 	requireSuccessfulMCPTool(t, res, err)
 	raw := marshalMCPStructuredContent(t, res)
-	var output opportunitiesOutput
+	var output opportunities.ReadOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal opportunities output: %v", err)
 	}
@@ -1260,7 +1175,7 @@ func requireNoMCPOpportunitySecrets(t *testing.T, raw string) {
 
 func requireMCPOpportunityOutput(t *testing.T, raw string, siteID uuid.UUID) {
 	t.Helper()
-	var output opportunitiesOutput
+	var output opportunities.ReadOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal opportunities output: %v", err)
 	}
@@ -1285,7 +1200,7 @@ func requireMCPOpportunityOutput(t *testing.T, raw string, siteID uuid.UUID) {
 	}
 }
 
-func mcpOpportunityIDs(opportunities []mcpOpportunity) []string {
+func mcpOpportunityIDs(opportunities []opportunities.SavedOpportunity) []string {
 	out := make([]string, 0, len(opportunities))
 	for _, opportunity := range opportunities {
 		out = append(out, opportunity.ID)
@@ -1751,7 +1666,7 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal doc output: %v", err)
 	}
-	var output docOutput
+	var output analyticstools.DocOutput
 	if err := json.Unmarshal(raw, &output); err != nil {
 		t.Fatalf("unmarshal doc output: %v", err)
 	}
@@ -1767,94 +1682,6 @@ func TestMCPDocsToolsFetchMarkdown(t *testing.T) {
 	}
 	if catalog.TTLMs != int((7*time.Minute)/time.Millisecond) || catalog.CacheScope != "private" {
 		t.Fatalf("docs resource cache = ttl %d scope %q, want 420000/private", catalog.TTLMs, catalog.CacheScope)
-	}
-}
-
-func TestDocsClientBlocksOtherOriginsAndCachesMarkdown(t *testing.T) {
-	requests := 0
-	docsTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		if !strings.Contains(r.Header.Get("Accept"), "text/markdown") {
-			t.Errorf("expected Accept header to include text/markdown, got %q", r.Header.Get("Accept"))
-		}
-		if r.URL.Path != "/guides/integrations/mcp/" {
-			http.NotFound(w, r)
-			return
-		}
-		w.Header().Set("Content-Type", "text/markdown")
-		_, _ = w.Write([]byte("# MCP Integration\n\nUse the official server.\n"))
-	}))
-	defer docsTS.Close()
-
-	client := newDocsClient(docsTS.URL, time.Hour)
-	for i := range 2 {
-		page, err := client.GetMarkdown(context.Background(), "/guides/integrations/mcp")
-		if err != nil {
-			t.Fatalf("GetMarkdown attempt %d: %v", i+1, err)
-		}
-		if page.Path != "/guides/integrations/mcp/" || !strings.Contains(page.Markdown, "# MCP Integration") {
-			t.Fatalf("unexpected page: %+v", page)
-		}
-	}
-	if requests != 1 {
-		t.Fatalf("expected cached second docs fetch, got %d requests", requests)
-	}
-	if _, err := client.GetMarkdown(context.Background(), "https://example.com/guides/integrations/mcp/"); err == nil {
-		t.Fatalf("expected other docs origin to be rejected")
-	}
-	if _, err := client.GetMarkdown(context.Background(), "/guides/%2e%2e/secret"); err == nil {
-		t.Fatalf("expected encoded parent traversal to be rejected")
-	}
-}
-
-func TestDocsClientCoalescesConcurrentFetches(t *testing.T) {
-	var requests atomic.Int32
-	docsTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-		time.Sleep(50 * time.Millisecond)
-		w.Header().Set("Content-Type", "text/markdown")
-		_, _ = w.Write([]byte("# MCP Integration\n"))
-	}))
-	defer docsTS.Close()
-
-	client := newDocsClient(docsTS.URL, time.Hour)
-	var wg sync.WaitGroup
-	errs := make(chan error, 20)
-	for range 20 {
-		wg.Go(func() {
-			_, err := client.GetMarkdown(context.Background(), "/guides/integrations/mcp/")
-			errs <- err
-		})
-	}
-	wg.Wait()
-	close(errs)
-
-	for err := range errs {
-		if err != nil {
-			t.Fatalf("GetMarkdown: %v", err)
-		}
-	}
-	if got := requests.Load(); got != 1 {
-		t.Fatalf("expected concurrent requests to coalesce to one fetch, got %d", got)
-	}
-}
-
-func TestDocsClientCapsCachedPages(t *testing.T) {
-	docsTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/markdown")
-		_, _ = w.Write([]byte("# " + r.URL.Path + "\n"))
-	}))
-	defer docsTS.Close()
-
-	client := newDocsClient(docsTS.URL, time.Hour)
-	for i := range maxDocCacheEntries + 5 {
-		if _, err := client.GetMarkdown(context.Background(), "/guides/page-"+strconv.Itoa(i)+"/"); err != nil {
-			t.Fatalf("GetMarkdown page %d: %v", i, err)
-		}
-	}
-
-	if got := client.pages.Len(); got != maxDocCacheEntries {
-		t.Fatalf("expected docs cache to cap at %d entries, got %d", maxDocCacheEntries, got)
 	}
 }
 
@@ -1970,7 +1797,7 @@ func setupMCPTenantSearchConsoleStore(t *testing.T) (*database.Store, *database.
 	return store, database.NewTenantStoreManager(store, t.TempDir()), site, token
 }
 
-func callSearchConsoleStatus(t *testing.T, session *mcp.ClientSession, siteID uuid.UUID) (string, searchConsoleStatusOutput) {
+func callSearchConsoleStatus(t *testing.T, session *mcp.ClientSession, siteID uuid.UUID) (string, analyticstools.SearchConsoleStatusOutput) {
 	t.Helper()
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{
 		Name:      "hitkeep_get_search_console_status",
@@ -1978,25 +1805,25 @@ func callSearchConsoleStatus(t *testing.T, session *mcp.ClientSession, siteID uu
 	})
 	requireSuccessfulMCPTool(t, res, err)
 	raw := marshalMCPStructuredContent(t, res)
-	var output searchConsoleStatusOutput
+	var output analyticstools.SearchConsoleStatusOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal output: %v", err)
 	}
 	return raw, output
 }
 
-func callSearchConsoleReport(t *testing.T, session *mcp.ClientSession, args map[string]any) searchConsoleOutput {
+func callSearchConsoleReport(t *testing.T, session *mcp.ClientSession, args map[string]any) analyticstools.SearchConsoleOutput {
 	t.Helper()
 	_, output := callSearchConsoleReportRaw(t, session, args)
 	return output
 }
 
-func callSearchConsoleReportRaw(t *testing.T, session *mcp.ClientSession, args map[string]any) (string, searchConsoleOutput) {
+func callSearchConsoleReportRaw(t *testing.T, session *mcp.ClientSession, args map[string]any) (string, analyticstools.SearchConsoleOutput) {
 	t.Helper()
 	res, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: "hitkeep_get_search_console", Arguments: args})
 	requireSuccessfulMCPTool(t, res, err)
 	raw := marshalMCPStructuredContent(t, res)
-	var output searchConsoleOutput
+	var output analyticstools.SearchConsoleOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
 		t.Fatalf("unmarshal output: %v", err)
 	}
@@ -2055,7 +1882,7 @@ func requireNoSearchConsoleSecrets(t *testing.T, rawJSON string) {
 	}
 }
 
-func requireMappedSearchConsoleStatus(t *testing.T, output searchConsoleStatusOutput, site *api.Site, teamID uuid.UUID, reason string) {
+func requireMappedSearchConsoleStatus(t *testing.T, output analyticstools.SearchConsoleStatusOutput, site *api.Site, teamID uuid.UUID, reason string) {
 	t.Helper()
 	if output.SiteID != site.ID.String() || output.TeamID != teamID.String() {
 		t.Fatalf("unexpected site/team in status: %+v", output)
@@ -2064,14 +1891,14 @@ func requireMappedSearchConsoleStatus(t *testing.T, output searchConsoleStatusOu
 	requireSearchConsoleAvailability(t, output, reason)
 }
 
-func requireMappedSearchConsoleProperty(t *testing.T, output searchConsoleStatusOutput, site *api.Site) {
+func requireMappedSearchConsoleProperty(t *testing.T, output analyticstools.SearchConsoleStatusOutput, site *api.Site) {
 	t.Helper()
 	if !output.Mapped || output.PropertyURI != "sc-domain:"+site.Domain || output.PropertyPermissionLevel != "siteOwner" {
 		t.Fatalf("expected mapped property details, got %+v", output)
 	}
 }
 
-func requireSearchConsoleAvailability(t *testing.T, output searchConsoleStatusOutput, reason string) {
+func requireSearchConsoleAvailability(t *testing.T, output analyticstools.SearchConsoleStatusOutput, reason string) {
 	t.Helper()
 	if output.SyncStatus == nil || output.SyncStatus.State != "succeeded" {
 		t.Fatalf("expected succeeded sync status, got %+v", output.SyncStatus)
@@ -2084,7 +1911,7 @@ func requireSearchConsoleAvailability(t *testing.T, output searchConsoleStatusOu
 	}
 }
 
-func requireTenantSearchConsoleDefaultReport(t *testing.T, output searchConsoleOutput) {
+func requireTenantSearchConsoleDefaultReport(t *testing.T, output analyticstools.SearchConsoleOutput) {
 	t.Helper()
 	if output.PropertyURI != "sc-domain:tenant-mcp.example.com" {
 		t.Fatalf("expected property uri, got %+v", output)
@@ -2095,7 +1922,7 @@ func requireTenantSearchConsoleDefaultReport(t *testing.T, output searchConsoleO
 	requireTenantSearchConsoleSeries(t, output)
 }
 
-func requireTenantSearchConsoleSeries(t *testing.T, output searchConsoleOutput) {
+func requireTenantSearchConsoleSeries(t *testing.T, output analyticstools.SearchConsoleOutput) {
 	t.Helper()
 	if output.Series == nil || len(output.Series.Series) != 1 || output.Series.Series[0].Clicks != 4 || output.Series.Series[0].Date != "2026-05-02" {
 		t.Fatalf("expected tenant-scoped series, got %+v", output.Series)
@@ -2105,7 +1932,7 @@ func requireTenantSearchConsoleSeries(t *testing.T, output searchConsoleOutput) 
 	}
 }
 
-func requireExplicitSearchConsoleSections(t *testing.T, output searchConsoleOutput) {
+func requireExplicitSearchConsoleSections(t *testing.T, output analyticstools.SearchConsoleOutput) {
 	t.Helper()
 	if output.Overview != nil || output.Series != nil {
 		t.Fatalf("explicit dimensions should omit unrequested overview/series, got %+v", output)
@@ -2126,7 +1953,7 @@ func requireDimensionRows(t *testing.T, rows *api.SearchConsoleDimensionResponse
 	}
 }
 
-func requireSearchConsoleSyncWarnings(t *testing.T, output searchConsoleOutput) {
+func requireSearchConsoleSyncWarnings(t *testing.T, output analyticstools.SearchConsoleOutput) {
 	t.Helper()
 	if output.Overview == nil || output.Overview.Clicks != 7 {
 		t.Fatalf("expected imported data despite sync warning, got %+v", output.Overview)
