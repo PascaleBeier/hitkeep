@@ -600,6 +600,68 @@ async function captureAnnotations(page, record) {
     }
 }
 
+async function captureReportEmailPreview(page, record) {
+    await nav(page, "/settings/reports", FORM_SETTLE);
+    await page.getByRole("button", { name: "New report" }).first().click();
+    const firstStep = page.locator(".editor-step").first();
+    await firstStep.waitFor({ state: "visible", timeout: 8_000 });
+    await firstStep.locator("input").first().fill("Weekly site summary");
+    const preview = page.locator('[data-testid="report-email-preview"]');
+    await preview.waitFor({ state: "visible", timeout: 10_000 });
+    await page.waitForTimeout(FORM_SETTLE);
+    // Frame the preview step: its heading at the top, the envelope and email header below.
+    await page
+        .locator(".editor-step")
+        .last()
+        .evaluate((step) => step.scrollIntoView({ block: "start", behavior: "instant" }));
+    await page.waitForTimeout(400);
+    record("feature-report-email-preview", await shoot(page, "feature-report-email-preview"));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+}
+
+async function captureThemeDialog(page, record) {
+    await nav(page, "/dashboard", CHART_SETTLE);
+    await selectSiteByDomain(page);
+    await page.getByRole("button", { name: "Customize theme" }).first().click();
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor({ state: "visible", timeout: 8_000 });
+    // Theme changes preview live; pick a preset so the dashboard behind shows it, then discard.
+    const teal = dialog.getByRole("button", { name: /^Teal$/ }).first();
+    if (await teal.count()) {
+        await teal.click();
+    } else {
+        await dialog
+            .getByText("Teal", { exact: true })
+            .first()
+            .click()
+            .catch(() => console.warn("    ! Teal theme preset not found"));
+    }
+    await page.waitForTimeout(CHART_SETTLE);
+    record("feature-theme-dialog", await shoot(page, "feature-theme-dialog"));
+    const cancel = dialog.getByRole("button", { name: /^Cancel$/ }).first();
+    if (await cancel.count()) {
+        await cancel.click();
+    } else {
+        await page.keyboard.press("Escape");
+    }
+    await page.waitForTimeout(FORM_SETTLE);
+}
+
+async function captureSharedTable(page, record) {
+    await nav(page, "/dashboard", CHART_SETTLE);
+    await selectSiteByDomain(page);
+    await selectRangePreset(page, "30d");
+    const card = page.locator("app-traffic-records-card").first();
+    await card.waitFor({ state: "visible", timeout: 10_000 });
+    await card.evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await page.waitForTimeout(TABLE_SETTLE);
+    const box = await card.boundingBox();
+    const pad = 16;
+    const clip = box ? { x: Math.max(0, box.x - pad), y: Math.max(0, box.y - pad), width: box.width + pad * 2, height: Math.min(box.height + pad * 2, DESKTOP_VIEWPORT.height) } : undefined;
+    record("feature-shared-table", await shoot(page, "feature-shared-table", { clip }));
+}
+
 async function openTeamSwitcher(page) {
     const trigger = page.locator('[data-testid="team-switcher-trigger"]:visible').first();
     if (!(await trigger.count())) return false;
@@ -713,6 +775,12 @@ async function run() {
         } else if (SCREENSHOT_TARGET === "annotations") {
             console.log("  Annotations:");
             await captureAnnotations(page, record);
+        } else if (SCREENSHOT_TARGET === "release") {
+            console.log("  Release highlights:");
+            await captureAnnotations(page, record);
+            await captureReportEmailPreview(page, record);
+            await captureThemeDialog(page, record);
+            await captureSharedTable(page, record);
         } else {
             console.log("  Dashboard:");
             await captureRoute(page, record, "dashboard-overview", "/dashboard", CHART_SETTLE);
@@ -837,6 +905,9 @@ async function run() {
             record("security-2fa-setup", await shoot(page, "security-2fa-setup"));
 
             await captureRoute(page, record, "feature-email-reports", "/settings/reports", FORM_SETTLE);
+            await captureReportEmailPreview(page, record);
+            await captureThemeDialog(page, record);
+            await captureSharedTable(page, record);
 
             console.log("\n  Integrations:");
             await captureRoute(page, record, "security-api-clients", "/integration/api-clients", TABLE_SETTLE);
