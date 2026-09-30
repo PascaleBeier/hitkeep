@@ -229,6 +229,20 @@ func (a *App) isRunTempRoot(root string) bool {
 	return err == nil && info.IsDir()
 }
 
+// localAIEnvironment forwards the optional AI settings a developer exported,
+// such as a provider, model, base URL, and key for trying Ask AI locally.
+// hk never invents provider credentials, and unset settings keep AI off.
+func localAIEnvironment() []string {
+	var environment []string
+	for _, entry := range os.Environ() {
+		key, value, ok := strings.Cut(entry, "=")
+		if ok && value != "" && (strings.HasPrefix(key, "HITKEEP_AI_") || key == "HITKEEP_ASK_AI_ENABLED") {
+			environment = append(environment, entry)
+		}
+	}
+	return environment
+}
+
 func (a *App) ComposeEnvironment(variant Variant) []string {
 	toolchain, _ := a.ToolchainConfig()
 	values := map[string]string{
@@ -262,6 +276,10 @@ func (a *App) ComposeEnvironment(variant Variant) []string {
 		"HITKEEP_SOCIAL_GITHUB_CLIENT_SECRET":    "hitkeep-local-github-secret",
 		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_ID":     "hitkeep-local-microsoft-client",
 		"HITKEEP_SOCIAL_MICROSOFT_CLIENT_SECRET": "hitkeep-local-microsoft-secret",
+	}
+	for _, entry := range localAIEnvironment() {
+		key, value, _ := strings.Cut(entry, "=")
+		values[key] = value
 	}
 	for key, value := range variant.Environment {
 		values[key] = replaceDefaultPorts(value, a.workspace.Ports)

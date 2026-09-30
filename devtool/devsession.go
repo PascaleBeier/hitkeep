@@ -147,6 +147,8 @@ func (a *App) StartDevDetachedObserved(ctx context.Context, request DevRequest, 
 	if agentOutputEnabled(ctx) {
 		childEnvironment = append(childEnvironment, "HK_CHILD_OUTPUT=json")
 	}
+	// The worker builds the Compose environment, so it needs the AI settings too.
+	childEnvironment = append(childEnvironment, localAIEnvironment()...)
 	command.Env = a.commandEnvironment(childEnvironment)
 	command.Stdin = nil
 	command.Stdout = nil

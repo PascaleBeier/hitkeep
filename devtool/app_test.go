@@ -312,3 +312,35 @@ func environmentValue(environment []string, name string) string {
 	}
 	return ""
 }
+
+func TestComposeEnvironmentForwardsOnlyExportedAISettings(t *testing.T) {
+	t.Setenv("HK_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	app, err := NewApp(initTestRepository(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := VariantByID("self-hosted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value := environmentValue(app.ComposeEnvironment(variant), "HITKEEP_AI_ENABLED"); value != "" {
+		t.Fatalf("AI enabled without the developer exporting it: %q", value)
+	}
+
+	t.Setenv("HITKEEP_AI_ENABLED", "true")
+	t.Setenv("HITKEEP_ASK_AI_ENABLED", "true")
+	t.Setenv("HITKEEP_AI_MODEL", "local-model")
+	t.Setenv("HITKEEP_AI_BASE_URL", "")
+	t.Setenv("HITKEEP_UNRELATED_SETTING", "leak")
+	environment := app.ComposeEnvironment(variant)
+	for name, want := range map[string]string{"HITKEEP_AI_ENABLED": "true", "HITKEEP_ASK_AI_ENABLED": "true", "HITKEEP_AI_MODEL": "local-model"} {
+		if value := environmentValue(environment, name); value != want {
+			t.Errorf("%s = %q, want %q", name, value, want)
+		}
+	}
+	for _, name := range []string{"HITKEEP_AI_BASE_URL", "HITKEEP_UNRELATED_SETTING"} {
+		if value := environmentValue(environment, name); value != "" {
+			t.Errorf("%s forwarded as %q", name, value)
+		}
+	}
+}
