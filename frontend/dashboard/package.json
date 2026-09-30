@@ -97,6 +97,9 @@
         "dompurify": "3.4.12",
         "@jsverse/transloco-optimize": {
             "glob": "^13.0.6"
+        },
+        "@scalar/json-magic": {
+            "undici": "^7.29.1"
         }
     },
     "packageExtensions": {
