@@ -227,11 +227,28 @@ func goaiSchema[In any](scope Scope) json.RawMessage {
 	if scope.LockRange {
 		dropInputs(schema, rangeInputs)
 	}
+	portable(schema)
 	raw, err := json.Marshal(schema)
 	if err != nil {
 		panic("analyticstools: encode input schema: " + err.Error())
 	}
 	return raw
+}
+
+// portable drops "null" from type unions such as a Go slice's
+// ["null","array"]: some providers, Gemini among them, reject union types in
+// tool schemas. Omitting an optional input means the same as null.
+func portable(schema *jsonschema.Schema) {
+	if schema == nil {
+		return
+	}
+	if types := slices.DeleteFunc(slices.Clone(schema.Types), func(t string) bool { return t == "null" }); len(schema.Types) > 1 && len(types) == 1 {
+		schema.Type, schema.Types = types[0], nil
+	}
+	portable(schema.Items)
+	for _, property := range schema.Properties {
+		portable(property)
+	}
 }
 
 func dropInputs(schema *jsonschema.Schema, names []string) {

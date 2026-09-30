@@ -103,7 +103,7 @@ func evalRequest(store *database.Store, site *api.Site, query string, history []
 		SiteID: site.ID, SiteDomain: site.Domain, Query: query, History: history,
 		From: evalFrom, To: evalTo, Route: "/dashboard", Tools: aiTools,
 		SkillText:  skills.EmbeddedAnalyticsProcedurePack(),
-		Snapshot:   analyticstools.Snapshot(evalFrom, evalTo),
+		Snapshot:   analyticstools.Snapshot(),
 		ToolTitles: analyticstools.Titles(analyticstools.Analytics()...),
 	})
 }

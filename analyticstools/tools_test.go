@@ -111,6 +111,14 @@ func TestScopeRanges(t *testing.T) {
 	}
 }
 
+func TestGoAISchemasAvoidTypeUnions(t *testing.T) {
+	for _, tool := range GoAI(Scope{SiteID: uuid.New()}, Analytics()...) {
+		if schema := string(tool.InputSchema); strings.Contains(schema, `"type":[`) {
+			t.Fatalf("%s schema has a type union some providers reject: %s", tool.Name, schema)
+		}
+	}
+}
+
 func TestSiteStatsKeepsRequestedSections(t *testing.T) {
 	stats := &siteStats{
 		TopPages:     make([]api.MetricStat, 10),

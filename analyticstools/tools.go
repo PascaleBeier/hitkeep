@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -35,12 +34,12 @@ func Evidence() []Tool {
 }
 
 // Snapshot is what an assistant reads before it answers, keyed by tool name:
-// the overview for the range against the previous period of the same length,
-// with the top five pages, sources, and audience rows, plus the team's notes.
-func Snapshot(from, to time.Time) map[string]string {
-	previous := from.Add(-to.Sub(from))
+// the overview KPIs for the range with the top five pages, sources, and
+// audience rows, plus the team's notes. It carries no comparison: a window
+// that differs from the one a question names misleads more than it helps.
+func Snapshot() map[string]string {
 	return map[string]string{
-		ToolSiteOverview: fmt.Sprintf(`{"compare_from":%q,"compare_to":%q,"sections":["pages","sources","audience"],"limit":5}`, formatTime(previous), formatTime(from)),
+		ToolSiteOverview: `{"sections":["pages","sources","audience"],"limit":5}`,
 		ToolAnnotations:  `{}`,
 	}
 }
