@@ -141,6 +141,22 @@ type eventNamesOutput struct {
 	Names  []string `json:"names"`
 }
 
+type annotationsOutput struct {
+	SiteID      string          `json:"site_id"`
+	From        string          `json:"from"`
+	To          string          `json:"to"`
+	Annotations []mcpAnnotation `json:"annotations"`
+}
+
+// mcpAnnotation spells IDs and times as strings: the SDK derives the output
+// schema from Go types, and uuid.UUID would otherwise publish as a byte array.
+type mcpAnnotation struct {
+	ID       string `json:"id"`
+	StartsAt string `json:"starts_at"`
+	EndsAt   string `json:"ends_at,omitempty"`
+	Body     string `json:"body"`
+}
+
 type eventBreakdownOutput struct {
 	SiteID    string           `json:"site_id"`
 	From      string           `json:"from"`

@@ -1,6 +1,6 @@
 # Traffic diagnosis procedure
 
-1. Identify the affected metric, period, comparison, suspected change date, and expected baseline.
+1. Identify the affected metric, period, comparison, suspected change date, and expected baseline. Check the team's annotations for the period first: a noted release, campaign, or outage is the strongest lead, but still confirm it against the data.
 2. Verify site scope, data availability, tracker health, exclusions, bot filtering, imports, proxy configuration, and date range before interpreting behavior.
 3. Compare overview and time shape, then source/channel mix, affected paths, event-to-traffic ratios, Search Console, Web Vitals, ecommerce, and AI-referred traffic only as relevant.
 4. Evaluate causes in order: measurement, timing or seasonality, source mix, content or route changes, experience or deploy effects, then external factors.

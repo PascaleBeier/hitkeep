@@ -12,6 +12,18 @@ func formatMCPTime(ts time.Time) string {
 	return ts.UTC().Format(time.RFC3339)
 }
 
+func toMCPAnnotations(annotations []api.Annotation) []mcpAnnotation {
+	out := make([]mcpAnnotation, 0, len(annotations))
+	for _, a := range annotations {
+		note := mcpAnnotation{ID: a.ID.String(), StartsAt: formatMCPTime(a.StartsAt), Body: a.Body}
+		if a.EndsAt != nil {
+			note.EndsAt = formatMCPTime(*a.EndsAt)
+		}
+		out = append(out, note)
+	}
+	return out
+}
+
 func formatMCPDate(ts time.Time) string {
 	return ts.UTC().Format(time.DateOnly)
 }

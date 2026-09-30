@@ -60,6 +60,7 @@ const expectedTools = new Set([
   "hitkeep_get_ecommerce",
   "hitkeep_get_ai_visibility",
   "hitkeep_get_web_vitals",
+  "hitkeep_get_annotations",
   "hitkeep_get_opportunities",
   "hitkeep_get_funnel_stats",
   "hitkeep_get_qr_campaigns",

@@ -12,6 +12,7 @@ import { WebVitalsPage } from './web-vitals';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import type { SiteSetupState } from '@services/setup-state.service';
+import { flushAnnotations } from '@testing/annotations';
 import { flushSetupState } from '@testing/setup-state';
 
 describe('WebVitalsPage', () => {
@@ -175,8 +176,9 @@ describe('WebVitalsPage', () => {
     });
 
     afterEach(() => {
-        // Drain the shared setup-state lookup for the tests that do not assert on it.
+        // Drain the shared setup-state and chart-notes lookups for the tests that do not assert on them.
         flushSetupState(httpMock, 'site-1');
+        flushAnnotations(httpMock);
         httpMock.verify();
     });
 

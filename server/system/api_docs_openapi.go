@@ -25,6 +25,7 @@ func openAPISpecV1(publicURL string) map[string]any {
 			{"name": "Sites", "description": "Site lifecycle, stats, hits, and retention endpoints."},
 			{"name": "Imports", "description": "Historical analytics import validation, upload, and lifecycle endpoints."},
 			{"name": "Goals", "description": "Goal and goal-timeseries endpoints."},
+			{"name": "Annotations", "description": "Team-visible notes on a site's timeline, shown on every chart."},
 			{"name": "Funnels", "description": "Funnel CRUD and analytics endpoints."},
 			{"name": "QR Campaigns", "description": "Dynamic QR campaign assets, print exports, redirects, attribution, and QR-scoped analytics."},
 			{"name": "Share", "description": "Share-link management and public shared analytics endpoints."},

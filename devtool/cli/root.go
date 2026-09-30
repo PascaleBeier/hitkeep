@@ -312,7 +312,7 @@ func screenshotCommand(options *options) *cobra.Command {
 			return app.CaptureDocsScreenshots(ctx, docsRequest)
 		}),
 	}
-	docs.Flags().StringVar(&docsRequest.Target, "target", "", "optional subset: ask-ai")
+	docs.Flags().StringVar(&docsRequest.Target, "target", "", "optional subset: ask-ai, annotations, or release")
 	docs.Flags().BoolVar(&docsRequest.Sync, "sync", false, "copy captures into .github/assets and ../hitkeep-docs (updates tracked files)")
 	command.AddCommand(docs)
 	return command

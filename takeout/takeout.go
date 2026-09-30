@@ -358,6 +358,8 @@ func buildTakeoutQuery(sources []takeoutQuerySource, filename, format string) st
 				fmt.Sprintf("SELECT 'qr_code' AS record_type, * FROM qr_codes WHERE %s", whereClause),
 				qrAssetTakeoutSelect(whereClause),
 				fmt.Sprintf("SELECT 'qr_code_share_link' AS record_type, * FROM qr_code_share_links WHERE %s", whereClause),
+				// Notes carry no author: takeout matches what the API and MCP expose.
+				fmt.Sprintf("SELECT 'annotation' AS record_type, id, site_id, starts_at, ends_at, body, created_at FROM site_annotations WHERE %s", whereClause),
 				opportunityTakeoutSelect(whereClause),
 				aiRunTakeoutSelect(whereClause),
 				webhookTakeoutSelect(whereClause),

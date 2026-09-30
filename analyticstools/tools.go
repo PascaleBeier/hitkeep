@@ -16,7 +16,11 @@ import (
 )
 
 type Config struct {
-	Analytics     *database.Store
+	Analytics *database.Store
+	// Annotations is the control store holding team notes. Leave it nil to
+	// withhold the annotations tool, as Opportunities does: notes explain
+	// data but must never become cited evidence.
+	Annotations   *database.Store
 	SiteID        uuid.UUID
 	UserID        uuid.UUID
 	From          time.Time
@@ -100,7 +104,7 @@ func (b Bridge) Tools() []goaisdk.Tool {
 	ecommerce := analyticscatalog.MustDefinition(analyticscatalog.ToolEcommerce)
 	webVitals := analyticscatalog.MustDefinition(analyticscatalog.ToolWebVitals)
 	aiVisibility := analyticscatalog.MustDefinition(analyticscatalog.ToolAIVisibility)
-	return []goaisdk.Tool{
+	tools := []goaisdk.Tool{
 		goaisdk.NewTool(siteOverview.Name, siteOverview.AIDescription, b.siteOverview),
 		goaisdk.NewTool(eventNames.Name, eventNames.AIDescription, b.eventNames),
 		goaisdk.NewTool(eventBreakdown.Name, eventBreakdown.AIDescription, b.eventBreakdown),
@@ -108,6 +112,22 @@ func (b Bridge) Tools() []goaisdk.Tool {
 		goaisdk.NewTool(webVitals.Name, webVitals.AIDescription, b.webVitals),
 		goaisdk.NewTool(aiVisibility.Name, aiVisibility.AIDescription, b.aiVisibility),
 	}
+	if b.config.Annotations != nil {
+		annotations := analyticscatalog.MustDefinition(analyticscatalog.ToolAnnotations)
+		tools = append(tools, goaisdk.NewTool(annotations.Name, annotations.AIDescription, b.annotations))
+	}
+	return tools
+}
+
+func (b Bridge) annotations(ctx context.Context, _ struct{}) (string, error) {
+	if err := b.ready(ctx); err != nil {
+		return "", err
+	}
+	annotations, err := b.config.Annotations.ListAnnotations(ctx, b.config.SiteID, b.config.From, b.config.To)
+	if err != nil {
+		return "", err
+	}
+	return toolJSON(analyticscatalog.ToolAnnotations, b.config.SiteID, b.config.From, b.config.To, annotations)
 }
 
 func (b Bridge) siteOverview(ctx context.Context, _ struct{}) (string, error) {

@@ -152,6 +152,41 @@
       "goBack": "Terug"
     }
   },
+  "annotations": {
+    "add": "Notitie toevoegen",
+    "addAria": "Voeg een notitie toe aan deze grafiek. Je kunt ook op de grafiek klikken of eroverheen slepen om een periode te markeren.",
+    "chart": {
+      "grouped": "{{count}} notities · {{body}}",
+      "aria": "Notities op deze grafiek: {{count}}."
+    },
+    "strip": {
+      "label": "Notities in deze periode",
+      "open": "Notitie van {{when}} openen: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Notitie toevoegen",
+      "editTitle": "Notitie bewerken",
+      "viewTitle": "Notitie",
+      "bodyLabel": "Notitie",
+      "bodyPlaceholder": "Wat is er gebeurd? Bijvoorbeeld: nieuwe prijspagina gelanceerd",
+      "bodyHint": "Iedereen met toegang tot deze site kan notities zien.",
+      "remaining": "Nog {{count}}",
+      "whenLegend": "Wanneer",
+      "startLabel": "Datum",
+      "startTimeLabel": "Starttijd",
+      "endLabel": "Tot",
+      "endTimeLabel": "Eindtijd",
+      "optional": "(optioneel)",
+      "delete": "Notitie verwijderen",
+      "confirmDelete": "Voor iedereen verwijderen",
+      "errors": {
+        "bodyRequired": "Schrijf een korte notitie.",
+        "endBeforeStart": "Het einde moet op of na het begin liggen.",
+        "saveFailed": "De notitie kon niet worden opgeslagen. Probeer het opnieuw.",
+        "deleteFailed": "De notitie kon niet worden verwijderd. Probeer het opnieuw."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Vraag Ask AI over deze site",
@@ -190,6 +225,7 @@
       "ecommerce": "E-commerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "AI-zichtbaarheid",
+      "annotations": "Notities",
       "analytics": "Analytics"
     },
     "status": {

@@ -152,6 +152,41 @@
       "goBack": "Volver"
     }
   },
+  "annotations": {
+    "add": "Añadir nota",
+    "addAria": "Añade una nota a este gráfico. También puedes hacer clic en el gráfico o arrastrar sobre él para marcar un periodo.",
+    "chart": {
+      "grouped": "{{count}} notas · {{body}}",
+      "aria": "Notas marcadas en este gráfico: {{count}}."
+    },
+    "strip": {
+      "label": "Notas en este periodo",
+      "open": "Abrir la nota del {{when}}: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Añadir nota",
+      "editTitle": "Editar nota",
+      "viewTitle": "Nota",
+      "bodyLabel": "Nota",
+      "bodyPlaceholder": "¿Qué pasó? Por ejemplo: lanzamos la nueva página de precios",
+      "bodyHint": "Todas las personas con acceso a este sitio pueden ver las notas.",
+      "remaining": "Quedan {{count}}",
+      "whenLegend": "Cuándo",
+      "startLabel": "Fecha",
+      "startTimeLabel": "Hora de inicio",
+      "endLabel": "Hasta",
+      "endTimeLabel": "Hora de fin",
+      "optional": "(opcional)",
+      "delete": "Eliminar nota",
+      "confirmDelete": "Eliminar para todos",
+      "errors": {
+        "bodyRequired": "Escribe una nota breve.",
+        "endBeforeStart": "El final debe ser igual o posterior al inicio.",
+        "saveFailed": "No se pudo guardar la nota. Inténtalo de nuevo.",
+        "deleteFailed": "No se pudo eliminar la nota. Inténtalo de nuevo."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Preguntar a Ask AI sobre este sitio",
@@ -190,6 +225,7 @@
       "ecommerce": "Comercio electrónico",
       "webVitals": "Web Vitals",
       "aiVisibility": "Visibilidad de IA",
+      "annotations": "Notas",
       "analytics": "Analíticas"
     },
     "status": {

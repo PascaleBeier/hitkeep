@@ -597,7 +597,7 @@ func (h *handler) prepareAskAI(w http.ResponseWriter, r *http.Request) (askAIPre
 		return prepared, false
 	}
 	tools := analyticstools.NewBridge(analyticstools.Config{
-		Analytics: analyticsStore, SiteID: siteID, UserID: userID, From: from, To: to, Filters: filters,
+		Analytics: analyticsStore, Annotations: h.ctx.Store, SiteID: siteID, UserID: userID, From: from, To: to, Filters: filters,
 	}).Tools()
 	return askAIPreparedRun{
 		SiteID:       siteID,

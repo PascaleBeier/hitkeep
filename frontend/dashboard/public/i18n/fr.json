@@ -152,6 +152,41 @@
       "goBack": "Retour"
     }
   },
+  "annotations": {
+    "add": "Ajouter une note",
+    "addAria": "Ajouter une note à ce graphique. Vous pouvez aussi cliquer sur le graphique ou le parcourir en glissant pour marquer une période.",
+    "chart": {
+      "grouped": "{{count}} notes · {{body}}",
+      "aria": "Notes placées sur ce graphique : {{count}}."
+    },
+    "strip": {
+      "label": "Notes sur cette période",
+      "open": "Ouvrir la note du {{when}} : {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Ajouter une note",
+      "editTitle": "Modifier la note",
+      "viewTitle": "Note",
+      "bodyLabel": "Note",
+      "bodyPlaceholder": "Que s’est-il passé ? Par exemple : lancement de la nouvelle page tarifs",
+      "bodyHint": "Toutes les personnes ayant accès à ce site voient les notes.",
+      "remaining": "Encore {{count}}",
+      "whenLegend": "Quand",
+      "startLabel": "Date",
+      "startTimeLabel": "Heure de début",
+      "endLabel": "Jusqu’au",
+      "endTimeLabel": "Heure de fin",
+      "optional": "(facultatif)",
+      "delete": "Supprimer la note",
+      "confirmDelete": "Supprimer pour tout le monde",
+      "errors": {
+        "bodyRequired": "Rédigez une courte note.",
+        "endBeforeStart": "La fin doit être identique ou postérieure au début.",
+        "saveFailed": "La note n’a pas pu être enregistrée. Réessayez.",
+        "deleteFailed": "La note n’a pas pu être supprimée. Réessayez."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Interroger Ask AI sur ce site",
@@ -190,6 +225,7 @@
       "ecommerce": "E-commerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "Visibilité AI",
+      "annotations": "Notes",
       "analytics": "Analytics"
     },
     "status": {

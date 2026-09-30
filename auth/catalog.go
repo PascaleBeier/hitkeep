@@ -35,6 +35,7 @@ func SiteCapabilityCatalog() []CapabilityEntry {
 		{Key: "view", Value: string(PermSiteView)},
 		{Key: "manageData", Value: string(PermSiteManageData)},
 		{Key: "manageGoals", Value: string(PermSiteManageGoals)},
+		{Key: "manageAnnotations", Value: string(PermSiteManageAnnotations)},
 		{Key: "manageTeam", Value: string(PermSiteManageTeam)},
 		{Key: "delete", Value: string(PermSiteDelete)},
 		{Key: "manageWebhooks", Value: string(PermSiteManageWebhooks)},
@@ -112,12 +113,13 @@ func writeRoleCapabilities(b *strings.Builder, name string, roles []string, capa
 		if roleIndex == len(roles)-1 {
 			comma = ""
 		}
-		if len(roleCapabilities) <= 6 {
-			refs := make([]string, 0, len(roleCapabilities))
-			for _, capability := range roleCapabilities {
-				refs = append(refs, capabilityRef(capability, capabilityRefs))
-			}
-			fmt.Fprintf(b, "    %s: [%s]%s\n", role, strings.Join(refs, ", "), comma)
+		refs := make([]string, 0, len(roleCapabilities))
+		for _, capability := range roleCapabilities {
+			refs = append(refs, capabilityRef(capability, capabilityRefs))
+		}
+		// Match the dashboard formatter (oxfmt, printWidth 250): a list that fits on one line stays there.
+		if line := fmt.Sprintf("    %s: [%s]%s", role, strings.Join(refs, ", "), comma); len(line) <= 250 {
+			b.WriteString(line + "\n")
 			continue
 		}
 		fmt.Fprintf(b, "    %s: [\n", role)

@@ -1,12 +1,17 @@
-import { ChangeDetectionStrategy, Component, afterRenderEffect, computed, input, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, afterRenderEffect, computed, input, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { TranslocoLocaleService } from '@jsverse/transloco-locale';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import type { ECharts, EChartsCoreOption, EChartsInitOpts } from 'echarts/core';
+import { ButtonModule } from '@openng/optimus-ui/button';
 import { ChartDesignToggle } from '@components/chart-design-toggle/chart-design-toggle';
-import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, resolveChartColor, withChartAlpha, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
+import { bindAnnotationInteractions, type AnnotationMarkerKind } from '@core/charts/annotation-interactions';
+import { annotationMarkers } from '@core/charts/annotation-markers';
+import { buildHitkeepChartMergeOptions, buildHitkeepChartOptions, hitkeepChartTheme, resolveChartColor, withChartAlpha, type HitkeepChartAnnotations, type HitkeepChartDesign, type HitkeepChartSeries } from '@core/charts/hitkeep-chart-options';
 import { provideHitkeepEcharts } from '@core/charts/hitkeep-echarts.provider';
+import { AnnotationStrip } from '@features/annotations/annotation-strip';
+import { SiteAnnotationsService } from '@features/annotations/site-annotations.service';
 import { ChartDesignPreferencesService } from '@services/chart-design-preferences.service';
 import { PreferencesService } from '@services/preferences.service';
 import { ThemeManagerService } from '@services/theme-manager.service';
@@ -32,12 +37,17 @@ export interface SeriesDefinition {
 @Component({
     selector: 'app-series-chart',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ChartDesignToggle, NgxEchartsDirective, TranslocoPipe],
+    imports: [AnnotationStrip, ButtonModule, ChartDesignToggle, NgxEchartsDirective, TranslocoPipe],
     providers: [provideHitkeepEcharts()],
     template: `
-        @if (showDesignSelector() && !showSkeleton() && hasData()) {
-            <div class="mb-2 flex justify-end">
-                <app-chart-design-toggle [value]="effectiveDesign()" (valueChange)="setSelectedDesign($event)" />
+        @if ((showDesignSelector() || notes.canWrite()) && !showSkeleton() && hasData()) {
+            <div class="mb-2 flex items-center justify-end gap-2">
+                @if (notes.canWrite()) {
+                    <p-button type="button" size="small" severity="secondary" icon="pi pi-bookmark" [text]="true" [label]="'annotations.add' | transloco" [ariaLabel]="'annotations.addAria' | transloco" (onClick)="addNote()" />
+                }
+                @if (showDesignSelector()) {
+                    <app-chart-design-toggle [value]="effectiveDesign()" (valueChange)="setSelectedDesign($event)" />
+                }
             </div>
         }
         <div class="h-80 w-full relative" role="img" [attr.aria-label]="accessibilityLabel()">
@@ -59,6 +69,9 @@ export interface SeriesDefinition {
         </div>
         @if (comparisonLabel()) {
             <p class="text-xs text-[var(--p-text-muted-color)] text-right mt-2">{{ 'comparison.vsLabel' | transloco }} {{ comparisonLabel() }}</p>
+        }
+        @if (!showSkeleton() && hasData()) {
+            <app-annotation-strip [annotations]="markers().visible" [granularity]="granularity()" (selected)="notes.openExisting($event, granularity())" />
         }
     `
 })
@@ -83,8 +96,24 @@ export class SeriesChart {
     private localeService = inject(TranslocoLocaleService);
     private transloco = inject(TranslocoService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
+    protected readonly notes = inject(SiteAnnotationsService);
+    private unbindNotes: (() => void) | null = null;
 
     protected readonly effectiveDesign = computed(() => this.designPrefs.design() ?? this.design());
+    protected readonly granularity = computed(() => (this.isShortRange() ? 'hour' : 'day'));
+    protected readonly markers = computed(() => annotationMarkers(this.data() || [], this.notes.annotations()));
+
+    private readonly chartAnnotations = computed((): HitkeepChartAnnotations => {
+        this.activeLanguage();
+        const { lines, areas } = this.markers();
+        return {
+            lines: lines.map(({ index, annotations }) => ({
+                index,
+                label: annotations.length > 1 ? this.transloco.translate('annotations.chart.grouped', { count: annotations.length, body: annotations[0].body }) : annotations[0].body
+            })),
+            areas: areas.map(({ start, end, annotation }) => ({ start, end, label: annotation.body }))
+        };
+    });
 
     protected hasData = computed(() => {
         const data = this.data() || [];
@@ -98,7 +127,9 @@ export class SeriesChart {
     protected accessibilityLabel = computed(() => {
         this.activeLanguage();
         const count = this.data()?.length || 0;
-        return this.transloco.translate(this.ariaLabelKey(), { count });
+        const label = this.transloco.translate(this.ariaLabelKey(), { count });
+        const notes = this.markers().visible.length;
+        return notes > 0 ? `${label} ${this.transloco.translate('annotations.chart.aria', { count: notes })}` : label;
     });
 
     protected chartFrameOptions = computed((): EChartsCoreOption => {
@@ -131,6 +162,9 @@ export class SeriesChart {
     });
 
     constructor() {
+        this.notes.load();
+        inject(DestroyRef).onDestroy(() => this.unbindNotes?.());
+
         // ngx-echarts merges without `replaceMerge`, which only stayed invisible
         // while every reload tore the chart down. Now that a range switch keeps
         // the instance alive, a series the new data dropped — a comparison twin,
@@ -151,6 +185,40 @@ export class SeriesChart {
 
     protected onChartInit(chart: ECharts): void {
         this.chartInstance.set(chart);
+        this.unbindNotes?.();
+        this.unbindNotes = bindAnnotationInteractions(chart, {
+            canWrite: () => this.notes.canWrite(),
+            bucketCount: () => this.data()?.length ?? 0,
+            isBar: () => this.effectiveDesign() === 'bar',
+            onAdd: (start, end) => this.openNewNote(start, end),
+            onOpen: (kind, index) => this.openMarker(kind, index)
+        });
+    }
+
+    /** The toolbar button: a point on the newest bucket, which the reader can move in the dialog. */
+    protected addNote(): void {
+        const last = (this.data()?.length ?? 0) - 1;
+        if (last >= 0) {
+            this.openNewNote(last, null);
+        }
+    }
+
+    private openNewNote(start: number, end: number | null): void {
+        const data = this.data() ?? [];
+        const startPoint = data[start];
+        if (!startPoint) {
+            return;
+        }
+        const endPoint = end === null ? undefined : data[end];
+        this.notes.open({ startsAt: new Date(startPoint.time), endsAt: endPoint ? new Date(endPoint.time) : null, body: '', granularity: this.granularity() });
+    }
+
+    private openMarker(kind: AnnotationMarkerKind, index: number): void {
+        const markers = this.markers();
+        const annotation = kind === 'line' ? markers.lines[index]?.annotations[0] : markers.areas[index]?.annotation;
+        if (annotation) {
+            this.notes.openExisting(annotation, this.granularity());
+        }
     }
 
     protected setSelectedDesign(value: HitkeepChartDesign): void {
@@ -170,6 +238,10 @@ export class SeriesChart {
             dashed: s.dashed,
             smooth: s.smooth
         }));
+        // Notes explain the current period, so they ride on its first series only.
+        if (raw.length > 0 && chartSeries[0]) {
+            chartSeries[0].annotations = this.chartAnnotations();
+        }
 
         if (includeComparison) {
             for (const s of series) {

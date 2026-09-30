@@ -4,13 +4,41 @@ import { TranslocoTestingModule } from '@jsverse/transloco';
 import { provideTranslocoLocale } from '@jsverse/transloco-locale';
 import { SeriesChart } from '@features/analytics/components/series-chart';
 import { ReportSubjectService } from '@services/report-subject.service';
+import { SiteAnnotationsService } from '@features/annotations/site-annotations.service';
+import type { Annotation } from '@models/analytics.types';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
+
+function stubAnnotations() {
+    return {
+        annotations: signal<Annotation[]>([]),
+        canWrite: signal(false),
+        load: vi.fn(),
+        open: vi.fn(),
+        openExisting: vi.fn()
+    };
+}
+
+/** A live ECharts instance as far as SeriesChart touches it. */
+function liveChart(setOption = vi.fn(), disposed = false) {
+    const handlers = new Map<string, (params: unknown) => void>();
+    return {
+        setOption,
+        handlers,
+        isDisposed: () => disposed,
+        on: (name: string, fn: (params: unknown) => void) => handlers.set(name, fn),
+        off: vi.fn(),
+        getZr: () => ({ on: vi.fn(), off: vi.fn(), setCursorStyle: vi.fn() })
+    };
+}
 
 describe('SeriesChart', () => {
     let component: SeriesChart;
     let fixture: ComponentFixture<SeriesChart>;
+    let notes: ReturnType<typeof stubAnnotations>;
 
     beforeEach(async () => {
+        notes = stubAnnotations();
         await TestBed.configureTestingModule({
             imports: [
                 SeriesChart,
@@ -24,6 +52,7 @@ describe('SeriesChart', () => {
                 })
             ],
             providers: [
+                { provide: SiteAnnotationsService, useValue: notes },
                 provideTranslocoLocale({
                     defaultLocale: 'en-US',
                     langToLocaleMapping: {
@@ -104,7 +133,7 @@ describe('SeriesChart', () => {
 
     it('patches a live chart with replaceMerge so dropped series cannot linger', async () => {
         const setOption = vi.fn();
-        const chart = { setOption, isDisposed: () => false };
+        const chart = liveChart(setOption);
         fixture.componentRef.setInput('data', [{ time: '2026-07-01T00:00:00Z', count: 5 }]);
         fixture.componentRef.setInput('comparisonData', [{ time: '2026-06-30T00:00:00Z', count: 3 }]);
         fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
@@ -132,7 +161,7 @@ describe('SeriesChart', () => {
         fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
         fixture.detectChanges();
 
-        (component as unknown as { onChartInit: (chart: unknown) => void }).onChartInit({ setOption, isDisposed: () => true });
+        (component as unknown as { onChartInit: (chart: unknown) => void }).onChartInit(liveChart(setOption, true));
         fixture.componentRef.setInput('data', [{ time: '2026-07-02T00:00:00Z', count: 9 }]);
         fixture.detectChanges();
         await fixture.whenStable();
@@ -164,5 +193,68 @@ describe('SeriesChart', () => {
 
         expect(fixture.debugElement.query(By.css('.pi-spinner'))).toBeTruthy();
         expect(fixture.debugElement.query(By.css('[echarts]'))).toBeNull();
+    });
+
+    describe('annotations', () => {
+        const days = [
+            { time: '2026-07-01T00:00:00Z', count: 5 },
+            { time: '2026-07-02T00:00:00Z', count: 9 },
+            { time: '2026-07-03T00:00:00Z', count: 4 }
+        ];
+        const launch: Annotation = { id: 'n1', site_id: 's', starts_at: '2026-07-02T09:00:00Z', body: 'Launch', created_at: '2026-07-02T09:00:00Z' };
+        const campaign: Annotation = { id: 'n2', site_id: 's', starts_at: '2026-07-01T00:00:00Z', ends_at: '2026-07-03T00:00:00Z', body: 'Campaign', created_at: '2026-07-01T00:00:00Z' };
+
+        beforeEach(() => {
+            fixture.componentRef.setInput('data', days);
+            fixture.componentRef.setInput('series', [{ key: 'count', label: 'Events', color: '#2563eb' }]);
+        });
+
+        it('asks for notes once a chart exists', () => {
+            expect(notes.load).toHaveBeenCalled();
+        });
+
+        it('draws notes on the current series only and lists them for keyboard readers', () => {
+            notes.annotations.set([launch, campaign]);
+            fixture.componentRef.setInput('comparisonData', days);
+            fixture.detectChanges();
+
+            const merge = (component as unknown as { chartMergeOptions: () => { series: { name: string; markLine?: { data: unknown[] }; markArea?: { data: unknown[] } }[] } }).chartMergeOptions();
+            const current = merge.series.find((series) => series.name === 'Events');
+            expect(current?.markLine?.data).toEqual([{ xAxis: 1, name: 'Launch' }]);
+            expect(current?.markArea?.data).toEqual([[{ xAxis: 0, name: 'Campaign', label: { distance: 6 } }, { xAxis: 2 }]]);
+            expect(merge.series.find((series) => series.name !== 'Events')?.markLine).toBeUndefined();
+
+            const chips = fixture.debugElement.queryAll(By.css('app-annotation-strip button'));
+            expect(chips.map((chip) => chip.nativeElement.textContent)).toEqual([expect.stringContaining('Campaign'), expect.stringContaining('Launch')]);
+            chips[1].nativeElement.click();
+            expect(notes.openExisting).toHaveBeenCalledWith(launch, 'day');
+        });
+
+        it('offers the add button only to people who can write notes', () => {
+            fixture.detectChanges();
+            expect(fixture.debugElement.query(By.css('p-button'))).toBeNull();
+
+            notes.canWrite.set(true);
+            fixture.detectChanges();
+            fixture.debugElement.query(By.css('p-button button')).nativeElement.click();
+            expect(notes.open).toHaveBeenCalledWith({ startsAt: new Date('2026-07-03T00:00:00Z'), endsAt: null, body: '', granularity: 'day' });
+        });
+
+        it('opens the note behind a clicked marker', () => {
+            notes.annotations.set([launch, campaign]);
+            fixture.detectChanges();
+            const chart = liveChart();
+            (component as unknown as { onChartInit: (chart: unknown) => void }).onChartInit(chart);
+
+            chart.handlers.get('click')?.({ componentType: 'markArea', dataIndex: 0 });
+            expect(notes.openExisting).toHaveBeenCalledWith(campaign, 'day');
+        });
+
+        it('counts notes in the chart label', () => {
+            notes.annotations.set([launch]);
+            fixture.detectChanges();
+            const label = fixture.debugElement.query(By.css('div[role="img"]')).nativeElement.getAttribute('aria-label');
+            expect(label).toContain('annotations.chart.aria');
+        });
     });
 });

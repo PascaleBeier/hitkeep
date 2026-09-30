@@ -25,7 +25,7 @@ var readmeScreenshots = []string{
 }
 
 // docsScreenshotTargets are the optional subsets the curated script supports.
-var docsScreenshotTargets = []string{"", "ask-ai"}
+var docsScreenshotTargets = []string{"", "ask-ai", "annotations", "release"}
 
 // DocsScreenshotRequest selects the curated docs screenshot run.
 type DocsScreenshotRequest struct {
@@ -48,7 +48,7 @@ type DocsScreenshotResult struct {
 func (a *App) CaptureDocsScreenshots(ctx context.Context, request DocsScreenshotRequest) (DocsScreenshotResult, error) {
 	request.Target = strings.ToLower(strings.TrimSpace(request.Target))
 	if !slices.Contains(docsScreenshotTargets, request.Target) {
-		return DocsScreenshotResult{}, fmt.Errorf("unknown docs screenshot target %q; supported: ask-ai", request.Target)
+		return DocsScreenshotResult{}, fmt.Errorf("unknown docs screenshot target %q; supported: ask-ai, annotations, release", request.Target)
 	}
 	status, err := a.DevStatus(ctx)
 	if err != nil {

@@ -19,6 +19,7 @@ export const SITE_CAPABILITIES = {
     view: 'site.view',
     manageData: 'site.manage_data',
     manageGoals: 'site.manage_goals',
+    manageAnnotations: 'site.manage_annotations',
     manageTeam: 'site.manage_team',
     delete: 'site.delete',
     manageWebhooks: 'site.manage_webhooks'
@@ -57,6 +58,7 @@ export const INSTANCE_ROLE_CAPABILITIES = {
         SITE_CAPABILITIES.view,
         SITE_CAPABILITIES.manageData,
         SITE_CAPABILITIES.manageGoals,
+        SITE_CAPABILITIES.manageAnnotations,
         SITE_CAPABILITIES.manageTeam,
         SITE_CAPABILITIES.delete,
         SITE_CAPABILITIES.manageWebhooks
@@ -77,9 +79,9 @@ export const INSTANCE_ROLE_CAPABILITIES = {
 } as const satisfies Record<string, readonly AccessCapability[]>;
 
 export const SITE_ROLE_CAPABILITIES = {
-    owner: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks, SITE_CAPABILITIES.delete],
-    admin: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks],
-    editor: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageGoals],
+    owner: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks, SITE_CAPABILITIES.delete],
+    admin: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageData, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations, SITE_CAPABILITIES.manageTeam, SITE_CAPABILITIES.manageWebhooks],
+    editor: [SITE_CAPABILITIES.view, SITE_CAPABILITIES.manageGoals, SITE_CAPABILITIES.manageAnnotations],
     viewer: [SITE_CAPABILITIES.view]
 } as const satisfies Record<string, readonly AccessCapability[]>;
 

@@ -152,6 +152,41 @@
       "goBack": "Indietro"
     }
   },
+  "annotations": {
+    "add": "Aggiungi nota",
+    "addAria": "Aggiungi una nota a questo grafico. Puoi anche fare clic sul grafico o trascinare per segnare un periodo.",
+    "chart": {
+      "grouped": "{{count}} note · {{body}}",
+      "aria": "Note segnate su questo grafico: {{count}}."
+    },
+    "strip": {
+      "label": "Note in questo periodo",
+      "open": "Apri la nota del {{when}}: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Aggiungi nota",
+      "editTitle": "Modifica nota",
+      "viewTitle": "Nota",
+      "bodyLabel": "Nota",
+      "bodyPlaceholder": "Cosa è successo? Per esempio: pubblicata la nuova pagina prezzi",
+      "bodyHint": "Chiunque abbia accesso a questo sito può vedere le note.",
+      "remaining": "Ne restano {{count}}",
+      "whenLegend": "Quando",
+      "startLabel": "Data",
+      "startTimeLabel": "Ora di inizio",
+      "endLabel": "Fino al",
+      "endTimeLabel": "Ora di fine",
+      "optional": "(facoltativo)",
+      "delete": "Elimina nota",
+      "confirmDelete": "Elimina per tutti",
+      "errors": {
+        "bodyRequired": "Scrivi una breve nota.",
+        "endBeforeStart": "La fine deve essere uguale o successiva all’inizio.",
+        "saveFailed": "Non è stato possibile salvare la nota. Riprova.",
+        "deleteFailed": "Non è stato possibile eliminare la nota. Riprova."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Chiedi ad Ask AI informazioni su questo sito",
@@ -190,6 +225,7 @@
       "ecommerce": "E-commerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "Visibilità AI",
+      "annotations": "Note",
       "analytics": "Analytics"
     },
     "status": {

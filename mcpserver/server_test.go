@@ -844,6 +844,61 @@ func TestMCPWebVitalsReturnsAggregateOnly(t *testing.T) {
 	}
 }
 
+func TestMCPAnnotationsReturnsScopedNotesWithoutAuthors(t *testing.T) {
+	store, site, token := setupMCPStore(t)
+	ctx := context.Background()
+	authorID, err := store.CreateUser(ctx, "annotation-author@example.test", "hash")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	otherSite, err := store.CreateSite(ctx, authorID, "unscoped-annotations.example.test")
+	if err != nil {
+		t.Fatalf("CreateSite: %v", err)
+	}
+	now := time.Now().UTC()
+	end := now.Add(time.Hour)
+	if _, err := store.CreateAnnotation(ctx, site.ID, api.AnnotationInput{StartsAt: now, EndsAt: &end, Body: "Pricing launch"}, authorID); err != nil {
+		t.Fatalf("CreateAnnotation: %v", err)
+	}
+	if _, err := store.CreateAnnotation(ctx, otherSite.ID, api.AnnotationInput{StartsAt: now, Body: "Other team"}, authorID); err != nil {
+		t.Fatalf("CreateAnnotation other: %v", err)
+	}
+
+	conf := testMCPConfig(t, "")
+	ts := httptest.NewServer(NewHandler(conf, store, nil, nil, testMCPLogger()))
+	defer ts.Close()
+	session := connectMCPClient(t, ts.URL+conf.MCPPath, token)
+	defer session.Close()
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "hitkeep_get_annotations",
+		Arguments: map[string]any{"site_id": site.ID.String()},
+	})
+	requireSuccessfulMCPTool(t, res, err)
+	raw := marshalMCPStructuredContent(t, res)
+	var output annotationsOutput
+	if err := json.Unmarshal([]byte(raw), &output); err != nil {
+		t.Fatalf("unmarshal output: %v", err)
+	}
+	if len(output.Annotations) != 1 || output.Annotations[0].Body != "Pricing launch" || output.Annotations[0].EndsAt == "" {
+		t.Fatalf("annotations = %+v", output.Annotations)
+	}
+	if strings.Contains(raw, "created_by") || strings.Contains(raw, authorID.String()) {
+		t.Fatalf("annotations must not expose authors: %s", raw)
+	}
+
+	rejected, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "hitkeep_get_annotations",
+		Arguments: map[string]any{"site_id": otherSite.ID.String()},
+	})
+	if err != nil {
+		t.Fatalf("CallTool: %v", err)
+	}
+	if !rejected.IsError {
+		t.Fatalf("expected tool error for unscoped site")
+	}
+}
+
 func TestMCPWebVitalsReturnsGeoNetworkBreakdown(t *testing.T) {
 	store, site, token := setupMCPStore(t)
 	conf := testMCPConfig(t, "")

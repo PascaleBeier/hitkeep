@@ -28,7 +28,8 @@ export class AskAISession {
         hitkeep_get_event_breakdown: 'askAi.tools.eventBreakdown',
         hitkeep_get_ecommerce: 'askAi.tools.ecommerce',
         hitkeep_get_web_vitals: 'askAi.tools.webVitals',
-        hitkeep_get_ai_visibility: 'askAi.tools.aiVisibility'
+        hitkeep_get_ai_visibility: 'askAi.tools.aiVisibility',
+        hitkeep_get_annotations: 'askAi.tools.annotations'
     };
 
     private readonly askAI = inject(AskAIService);

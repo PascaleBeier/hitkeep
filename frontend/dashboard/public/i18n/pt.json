@@ -152,6 +152,41 @@
       "goBack": "Voltar"
     }
   },
+  "annotations": {
+    "add": "Adicionar nota",
+    "addAria": "Adicione uma nota a este gráfico. Também pode clicar no gráfico ou arrastar sobre ele para marcar um período.",
+    "chart": {
+      "grouped": "{{count}} notas · {{body}}",
+      "aria": "Notas marcadas neste gráfico: {{count}}."
+    },
+    "strip": {
+      "label": "Notas neste período",
+      "open": "Abrir a nota de {{when}}: {{body}}"
+    },
+    "dialog": {
+      "addTitle": "Adicionar nota",
+      "editTitle": "Editar nota",
+      "viewTitle": "Nota",
+      "bodyLabel": "Nota",
+      "bodyPlaceholder": "O que aconteceu? Por exemplo: lançámos a nova página de preços",
+      "bodyHint": "Todas as pessoas com acesso a este site podem ver as notas.",
+      "remaining": "Faltam {{count}}",
+      "whenLegend": "Quando",
+      "startLabel": "Data",
+      "startTimeLabel": "Hora de início",
+      "endLabel": "Até",
+      "endTimeLabel": "Hora de fim",
+      "optional": "(opcional)",
+      "delete": "Eliminar nota",
+      "confirmDelete": "Eliminar para todos",
+      "errors": {
+        "bodyRequired": "Escreva uma nota curta.",
+        "endBeforeStart": "O fim tem de ser igual ou posterior ao início.",
+        "saveFailed": "Não foi possível guardar a nota. Tente novamente.",
+        "deleteFailed": "Não foi possível eliminar a nota. Tente novamente."
+      }
+    }
+  },
   "askAi": {
     "triggerPlaceholder": "Ask AI",
     "triggerAria": "Perguntar ao Ask AI sobre este site",
@@ -190,6 +225,7 @@
       "ecommerce": "E-commerce",
       "webVitals": "Web Vitals",
       "aiVisibility": "Visibilidade de AI",
+      "annotations": "Notas",
       "analytics": "Analytics"
     },
     "status": {
