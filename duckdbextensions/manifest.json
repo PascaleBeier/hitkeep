@@ -1,65 +1,65 @@
 {
-  "version": "v1.5.5",
+  "version": "v1.5.6",
   "artifacts": {
     "linux_amd64/aws.duckdb_extension.gz": {
-      "archive_sha256": "7454a7830b21e678f1700c6cc428540be3a688e959c81515fd1bfc0a538db3b3",
-      "sha256": "1bbf923fb64efd33a6ae69fb96d74cbd474fd003cfd3d5127c06f9a9a6901156"
+      "archive_sha256": "9d9bbd40e131f5e1314d6a7a82584b680f64a38fe771d4048275d48aa405852e",
+      "sha256": "582a2753fe2870199c6dc0325e215c54515a77b15f43b5c96c118e62f8e08708"
     },
     "linux_amd64/excel.duckdb_extension.gz": {
-      "archive_sha256": "74a67c4a8b2571bf2933a5bdc3ac01712906bf4a4b5e651346702e941ea3581c",
-      "sha256": "9063a4f13804d3d1bdc37d37bde735f0779791971d3b909f5cc87ff3f8814483"
+      "archive_sha256": "7a257c48b971415ac1e6a429dd1fef31f5a2a6080ce21f207aa4946a753cb0f3",
+      "sha256": "c20df21ba8c81dd2c813aa772c8d409557f1fe76eb8306cb3e6c67ced7683d23"
     },
     "linux_amd64/httpfs.duckdb_extension.gz": {
-      "archive_sha256": "7cdd52a3135388718884a9b71e3987ba723002121e8e9de399c4ed619d824a05",
-      "sha256": "887c392b1e49128d11667c81e3698d8b00dfdeb456771acf66d05a0f74f7b7d8"
+      "archive_sha256": "19e6906934a845487c96f9c94beee250c71e32bb9be260eb27ad96939a1df5f0",
+      "sha256": "ff36e7d2561e21b958c243c6bd5f6a10cfc055a98ea76c0280b94728b57588e2"
     },
     "linux_arm64/aws.duckdb_extension.gz": {
-      "archive_sha256": "c0c2ff813d07a1f69a3c06fb69663b93299f1145dbaab9aaeee1be4003da7170",
-      "sha256": "4c891b0833524e00db01269033dfafcbe6acea8c8fed7afd23874664ee7d1545"
+      "archive_sha256": "7be5627a03495959bc033755fe4184db6cbc1d391c16790d3dad06fc14c79606",
+      "sha256": "2f19aa1213bb15091282cbcee498a742980c0b625e0a2ae370ec4f335986ef27"
     },
     "linux_arm64/excel.duckdb_extension.gz": {
-      "archive_sha256": "039c1e3461b66569db9c93527a60e8c25dc0a90aa3a81b28467c3a4c32d49e18",
-      "sha256": "2dafda01ad0caacdba3fa4c52b1b8048d18268c95dfa95c9079943415a57dac0"
+      "archive_sha256": "7812ff6e1d73ac52fbbc5188d039dc4ceb2c44909466d6405c5abb282a17f0b2",
+      "sha256": "9b79a08fe2532a0426eb0600bad37f67a9b983b7997eb047d07436461e639529"
     },
     "linux_arm64/httpfs.duckdb_extension.gz": {
-      "archive_sha256": "0820e0b5b74efaa23608c239df8e744a68943318d530b483a529eace19cb5475",
-      "sha256": "eba6e263e395a83966090f1f11ade63630b1b21422f0f2813858d179d42ea1e9"
+      "archive_sha256": "b18472a0e85cbf15ca4ebbe335173f87b62a074cd0f26072d4c756205c6239d0",
+      "sha256": "ae940d800b7f938a4848d0eebcffb28dda0bbed76987f11dc55faa6d1a86db0d"
     },
     "osx_amd64/aws.duckdb_extension.gz": {
-      "archive_sha256": "99daaf77a77d203d550f4eba9a6f56acb4f5062401f372c312bcaad21b4cc2f5",
-      "sha256": "14b64c2033d60b70da6d200a1be09aceef7f0b319a616483bc0bf7710ffb1963"
+      "archive_sha256": "839ffb975568fe2c431be48b3b814acdcde7b3736bd48f71726a31ae41e2c99d",
+      "sha256": "5d5beb7fec779dd1b2d61ce5c2490f8c744ce9f99618cb4329f6607ccd9f527b"
     },
     "osx_amd64/excel.duckdb_extension.gz": {
-      "archive_sha256": "1d2bd5aed588f49a9b6a571a258749b555b72ab1993957fb3cb0cb7b0e47714f",
-      "sha256": "b0a2a4ac801a8e1dbe9e1121d972a87c0e3ec74a989db3403386a35f24598104"
+      "archive_sha256": "551bb3c1a8b8c579e9e308a74f9a70b18669461dc1789d0123931ad890172d12",
+      "sha256": "dc2458dbe31c98a20082cf15b1281b27aec48f0a77e19af0197a6ac130eaf7cd"
     },
     "osx_amd64/httpfs.duckdb_extension.gz": {
-      "archive_sha256": "f445c2692f863bff82609c7061e6e273a4d9fd3b6695e56a6ebc18bd502ed464",
-      "sha256": "a2f48ae06834c165ae73db71f2320360a4b30e7acf4c87187b2241caa48a990d"
+      "archive_sha256": "788e9be58359aef4cf9ecc58ea053ba4cdb8d802729f1adbd5101c85ad36247f",
+      "sha256": "acf7f025758c71069a97507659ba890f90b7e5ce96f45acc71f3d9391c92b86b"
     },
     "osx_arm64/aws.duckdb_extension.gz": {
-      "archive_sha256": "2bde12c71c010ef3e4e510504dce276eb4ae77dea150ade1a4de632832604bbf",
-      "sha256": "39c5d8143f5af2cbfd95db4693aa61168ab75f06c87eb14fc02b64769bc48032"
+      "archive_sha256": "fa7a74da760c8a609b81704942817f9599cac1c9efbc8c9a7a3ee8691dddeb85",
+      "sha256": "911b68461fdd989e0c9e74926b197c8a05727bfafc05df38baa47ece42174f1c"
     },
     "osx_arm64/excel.duckdb_extension.gz": {
-      "archive_sha256": "1167dd3d36ad7747413655d8f415c425132b8970ddcfb3bb08e12ddb58364938",
-      "sha256": "9500a2841e8b3dda698e1e541fb58e76920f25ac752931de61d9b0fc7d8e97ec"
+      "archive_sha256": "327c04c3b0c850592c50637f46e4d91e280978a393bc3b889f6d555aba08240d",
+      "sha256": "8c48572e5d2d11f85664221dc708bd0f76602cf90604e300d784eca61522e51f"
     },
     "osx_arm64/httpfs.duckdb_extension.gz": {
-      "archive_sha256": "758acc0b0c4fbf09506f387ff6f52826b1038b7b6849ded39928d2f992945230",
-      "sha256": "10514b4ef19f80bf4ec4bf90c124f5d34625f2606263b40ae8ec7979905bb779"
+      "archive_sha256": "b9f9ca8e64d913a80d6666a370e0e518ee4cc8ecb9990a2b9d2273204d8caad4",
+      "sha256": "0cde1f5acd1970bfd414b11f5e945a1eddd8425e96e273f6411538d8fe3d951d"
     },
     "windows_amd64/aws.duckdb_extension.gz": {
-      "archive_sha256": "a9dc3b3d5d5e04f503f69b0b6d4be74b3c28db386ed24b560d2b474bb8305e4d",
-      "sha256": "a04d6b00e5f5ca941cd7b5875daf424d9fa0082aba4655960149c5432a554532"
+      "archive_sha256": "0634bb55621407af5567ab3db810c2f30d9e9b188844f9929ba202a46cc38080",
+      "sha256": "008cb2809add3afb7e5bcdf27655be129099d1b35b52d3248969a5a055f4c627"
     },
     "windows_amd64/excel.duckdb_extension.gz": {
-      "archive_sha256": "a50d8bbb8d37b036ea7366206c082dc8b90f4f902f7d5799f028bc07d41a995d",
-      "sha256": "2d05072ea6de99b27341c59b5352cf242c430440513410a1bce07bf2734b20c9"
+      "archive_sha256": "37c0c8424bb572b5b2d8f2cbf714fc72db220e30d4f131b85cbdcd7408fc9ae5",
+      "sha256": "c22ea1d85cf50654772e3b0b41ed2d534df0f05d4072ae3c678dc26fbd954682"
     },
     "windows_amd64/httpfs.duckdb_extension.gz": {
-      "archive_sha256": "bb4a9f2721c43439006e6e776364a748d2469f92dfe5e5ebe365ed10e2be0e78",
-      "sha256": "65661c40463e74751993e8a7cb7b4c8906be9218319616a0bdfc1b4ae9ffdf9a"
+      "archive_sha256": "e23aa882afd8aa24dacb8290920fec03b5188bb60038bdf6b963035a93d989cf",
+      "sha256": "9b0b0202cfa34f94f12bd9b2698002735bbcd0c1bd5fda2e85450583efd18e94"
     }
   }
 }
