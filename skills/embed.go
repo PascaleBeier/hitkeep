@@ -46,16 +46,10 @@ func AnalyticsProcedures() []Procedure {
 // EmbeddedAnalyticsProcedurePack returns the transport-neutral analytics
 // procedures used to ground HitKeep Ask AI.
 func EmbeddedAnalyticsProcedurePack() string {
-	var builder strings.Builder
-	for _, path := range embeddedAnalyticsProcedureFiles {
-		data, err := skillFS.ReadFile(path)
-		if err != nil {
-			return ""
-		}
-		if builder.Len() > 0 {
-			builder.WriteString("\n\n---\n\n")
-		}
-		builder.Write(data)
+	procedures := AnalyticsProcedures()
+	parts := make([]string, 0, len(procedures))
+	for _, procedure := range procedures {
+		parts = append(parts, procedure.Markdown)
 	}
-	return builder.String()
+	return strings.Join(parts, "\n\n---\n\n")
 }

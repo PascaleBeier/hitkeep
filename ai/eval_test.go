@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -235,7 +236,7 @@ func (m *scriptedStreamModel) Capabilities() provider.ModelCapabilities {
 }
 
 func (m *scriptedStreamModel) DoGenerate(context.Context, provider.GenerateParams) (*provider.GenerateResult, error) {
-	return nil, context.Canceled
+	return nil, errors.New("the eval model only streams")
 }
 
 func (m *scriptedStreamModel) DoStream(_ context.Context, params provider.GenerateParams) (*provider.StreamResult, error) {

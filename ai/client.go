@@ -374,8 +374,9 @@ func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptIn
 	started := time.Now()
 	var output OpportunityCandidateProposal
 	temperatureOpts := temperatureOptions(s.model, 0.2)
-	structuredOutputOpts := append(mantleStructuredOutputOptions(s.conf), promptCachingOptions(s.conf)...)
-	options := make([]goaisdk.Option, 0, 10+len(temperatureOpts)+len(structuredOutputOpts))
+	structuredOutputOpts := mantleStructuredOutputOptions(s.conf)
+	cachingOpts := promptCachingOptions(s.conf)
+	options := make([]goaisdk.Option, 0, 10+len(temperatureOpts)+len(structuredOutputOpts)+len(cachingOpts))
 	options = append(options,
 		goaisdk.WithSystem(opportunitySystemPrompt()),
 		goaisdk.WithPrompt(opportunityPrompt(string(inputJSON))),
@@ -439,6 +440,7 @@ func (s *Service) runOpportunityProposalGeneration(ctx context.Context, promptIn
 	)
 	options = append(options, temperatureOpts...)
 	options = append(options, structuredOutputOpts...)
+	options = append(options, cachingOpts...)
 	result, err := goaisdk.GenerateObject[OpportunityCandidateProposal](timeoutCtx, s.model, options...)
 	latency := time.Since(started)
 	output, usage, err = finalizeOpportunityGeneration(result, usage, err, decodeResult, validate)

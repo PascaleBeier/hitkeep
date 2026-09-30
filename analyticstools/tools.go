@@ -350,7 +350,8 @@ var QRCampaigns = Define(ToolQRCampaigns, "Get HitKeep QR Campaigns",
 		qrs = qrs[:min(len(qrs), normalizeLimit(in.Limit))]
 		campaigns := make([]qrCampaign, 0, len(qrs))
 		for _, qr := range qrs {
-			stats, err := call.Analytics.GetSiteStats(ctx, api.AnalyticsParams{
+			// The KPI-only query: a campaign needs totals, not the full overview scan.
+			stats, err := call.Analytics.GetSiteOverviewStats(ctx, api.AnalyticsParams{
 				SiteID: call.ID, Start: call.From, End: call.To,
 				Filters: []api.Filter{{Type: "qr_code_id", Value: qr.ID.String()}},
 			})

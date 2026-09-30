@@ -199,9 +199,6 @@ read:
 		}
 	}
 
-	if err := run.sinkError(); err != nil {
-		return run.failed(err)
-	}
 	result := stream.Result()
 	if err := run.sinkError(); err != nil {
 		return run.failed(err)

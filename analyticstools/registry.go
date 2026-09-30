@@ -25,8 +25,6 @@ type Tool struct {
 	Name        string
 	Title       string
 	Description string
-	// OpenWorld marks tools that fetch outside HitKeep, such as official docs.
-	OpenWorld bool
 
 	goai func(Scope) goaisdk.Tool
 	mcp  func(*mcp.Server, Scope)
@@ -90,12 +88,12 @@ func Define[In, Out any](name, title, description string, run func(context.Conte
 	return define(name, title, description, false, run)
 }
 
+// define also takes openWorld, which marks tools that fetch outside HitKeep.
 func define[In, Out any](name, title, description string, openWorld bool, run func(context.Context, Call, In) (Out, error)) Tool {
 	return Tool{
 		Name:        name,
 		Title:       title,
 		Description: description,
-		OpenWorld:   openWorld,
 		goai: func(scope Scope) goaisdk.Tool {
 			return goaisdk.Tool{
 				Name:        name,
