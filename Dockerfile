@@ -4,25 +4,10 @@ ARG GOLANG_VERSION=required-by-hk
 ARG NODE_VERSION=required-by-hk
 ARG NPM_VERSION
 
-FROM buildpack-deps:bookworm AS frontend-dev
+FROM node:${NODE_VERSION}-bookworm AS frontend-dev
 
-ARG NODE_VERSION
 ARG NPM_VERSION
-ARG TARGETARCH
-RUN case "${TARGETARCH}" in \
-      amd64) node_arch="x64" ;; \
-      arm64) node_arch="arm64" ;; \
-      *) echo "unsupported Node build architecture: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    node_archive="node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
-    curl --fail --show-error --silent --location --remote-name \
-      "https://nodejs.org/dist/v${NODE_VERSION}/${node_archive}"; \
-    curl --fail --show-error --silent --location --remote-name \
-      "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt"; \
-    grep " ${node_archive}$" SHASUMS256.txt | sha256sum --check --strict; \
-    tar --extract --xz --file "${node_archive}" --directory /usr/local --strip-components=1 --no-same-owner; \
-    rm "${node_archive}" SHASUMS256.txt; \
-    npm install --global "npm@${NPM_VERSION}"
+RUN npm install --global "npm@${NPM_VERSION}"
 
 FROM frontend-dev AS frontend-builder
 
@@ -46,47 +31,9 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-COPY analyticscatalog ./analyticscatalog
-COPY analyticstools ./analyticstools
-COPY appurl ./appurl
-COPY assetstore ./assetstore
-COPY cluster ./cluster
-COPY cmd ./cmd
-COPY config ./config
-COPY exportfmt ./exportfmt
-COPY hklog ./hklog
-COPY ai ./ai
-COPY aianalytics ./aianalytics
-COPY api ./api
-COPY auth ./auth
-COPY blocking ./blocking
-COPY database ./database
-COPY devtool ./devtool
-COPY duckdbextensions ./duckdbextensions
-COPY entitlements ./entitlements
-COPY importables ./importables
-COPY ingest ./ingest
-COPY ipmeta ./ipmeta
-COPY mailer ./mailer
-COPY mcpserver ./mcpserver
-COPY opportunities ./opportunities
-COPY searchconsole ./searchconsole
-COPY security ./security
-COPY server ./server
-COPY socialauth ./socialauth
-COPY sso ./sso
-COPY takeout ./takeout
-COPY webhookdispatcher ./webhookdispatcher
-COPY webhooks ./webhooks
-COPY worker ./worker
-COPY jsonapi ./jsonapi
-COPY listrefresh ./listrefresh
-COPY localization ./localization
-COPY mailables ./mailables
-COPY realtime ./realtime
-COPY reporting ./reporting
-COPY skills ./skills
-COPY public/embed.go ./public/embed.go
+# .dockerignore keeps the context to sources; go build compiles only what
+# cmd/hitkeep imports, so new or removed packages need no change here.
+COPY . .
 COPY --from=frontend-builder /workspace/public/ ./public/
 
 RUN --mount=type=cache,target=/go/pkg/mod \

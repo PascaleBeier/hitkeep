@@ -20,6 +20,8 @@ repomix-output.xml
 public/*
 !public/embed.go
 frontend/dashboard/node_modules
+frontend/dashboard/.angular
+frontend/dashboard/coverage
 frontend/dashboard/dist
 frontend/dashboard/test-results
 frontend/dashboard/playwright-report
