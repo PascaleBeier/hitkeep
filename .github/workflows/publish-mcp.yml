@@ -59,7 +59,10 @@ jobs:
       - uses: $/.github/actions/setup-node-npm
 
       - name: Validate MCP registry metadata
-        run: ./hk qa pr --gate mcp-schema
+        run: |
+          set -euo pipefail
+          plan_id="$(./hk qa plan pr --output json | jq -r '.data.plan_id')"
+          ./hk qa pr --plan-id "$plan_id" --gate mcp-schema
 
   publish:
     needs: validate

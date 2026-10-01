@@ -25,4 +25,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
       - name: Run canonical acceptance gate
-        run: ./hk qa full --gate default-tenant-migration-acceptance
+        run: |
+          set -euo pipefail
+          plan_id="$(./hk qa plan full --output json | jq -r '.data.plan_id')"
+          ./hk qa full --plan-id "$plan_id" --gate default-tenant-migration-acceptance
