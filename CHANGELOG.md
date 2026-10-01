@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.14.0](https://github.com/PascaleBeier/hitkeep/compare/v2.13.18...v2.14.0) (2026-10-01)
+
+
+### Features
+
+* **ai:** breakdown tool with change drivers for MCP and Ask AI ([e859d01](https://github.com/PascaleBeier/hitkeep/commit/e859d015237a004d28edc68f3c3a0135526758bd))
+* **annotations:** chart annotations ([#383](https://github.com/PascaleBeier/hitkeep/issues/383)) ([d533c72](https://github.com/PascaleBeier/hitkeep/commit/d533c72154c028961f9665449607cce559412255))
+* **ask-ai:** add conversational UI and cloud entitlements ([fe70a62](https://github.com/PascaleBeier/hitkeep/commit/fe70a627a9c77fce26d6ce6aab190f149ea5ad43))
+* **ask-ai:** one generation path with history turns, prompt caching, and forgiving validation ([34a0b88](https://github.com/PascaleBeier/hitkeep/commit/34a0b88df862c82effcad8d7c52b7a282ffed163))
+* **ask-ai:** plain-text answers, chart and action tools, and a data snapshot before the model answers ([6561a5e](https://github.com/PascaleBeier/hitkeep/commit/6561a5edf1604c936e4dbdb344c54f601b365765))
+* **ask-ai:** translated source chips, tool labels for every tool, and no lingering draft text ([8dd7da5](https://github.com/PascaleBeier/hitkeep/commit/8dd7da5d6c0507c29d6b0188f56f8675b4867a1b))
+* **cloud:** clarify signup and checkout recovery ([177bd2a](https://github.com/PascaleBeier/hitkeep/commit/177bd2a2e4ccd2df62c40c1b2c08ddb7c1cb0d87))
+* **mail:** add the HitKeep icon to the email header ([#381](https://github.com/PascaleBeier/hitkeep/issues/381)) ([f67dacf](https://github.com/PascaleBeier/hitkeep/commit/f67dacf20d5bcc8c4f304b0185226e3c4401fe5e))
+* **mail:** add versioned email fixture catalog and client checks ([#376](https://github.com/PascaleBeier/hitkeep/issues/376)) ([1b3164f](https://github.com/PascaleBeier/hitkeep/commit/1b3164f51268033e02079afa6be030a98ec46dbe))
+* **mail:** fix dark mode, mobile layout, and privacy in email design ([#377](https://github.com/PascaleBeier/hitkeep/issues/377)) ([e182d1c](https://github.com/PascaleBeier/hitkeep/commit/e182d1c44dfd5c33833e9af72101594b18532cdb))
+* **reports:** preview the exact report email in the editor ([#378](https://github.com/PascaleBeier/hitkeep/issues/378)) ([59abbc5](https://github.com/PascaleBeier/hitkeep/commit/59abbc539cb67592d45c11ea9d67aff8358b2ce1))
+* **theme:** runtime theme manager with saveable themes, appearance mode and density ([#358](https://github.com/PascaleBeier/hitkeep/issues/358)) ([4f3adce](https://github.com/PascaleBeier/hitkeep/commit/4f3adceefe2c88815ceae9e9de959a5f636349a4))
+
+
+### Bug Fixes
+
+* **ai:** document filter value formats for models ([29de9aa](https://github.com/PascaleBeier/hitkeep/commit/29de9aa8018dc36621e7d5ec9a26461c87948834))
+* **ai:** keep internal tool errors away from the model provider ([6630ffc](https://github.com/PascaleBeier/hitkeep/commit/6630ffccf81d087b3fcfac6da51acf380ebada9d))
+* **ai:** portable tool schemas and a comparison-free snapshot ([fde5ad6](https://github.com/PascaleBeier/hitkeep/commit/fde5ad6c72e7c40c02904ab3bd20dae8a5b1e064))
+* **ask-ai:** answer text after analytics calls, portable chart schema, last-step nudge, and named comparison windows ([674e40f](https://github.com/PascaleBeier/hitkeep/commit/674e40f7c502506e84476f0c3949eb35f3acaf30))
+* **ask-ai:** check sink and stream errors separately ([8102bc7](https://github.com/PascaleBeier/hitkeep/commit/8102bc72448c2b910e4a6ca372835fde58fc092e))
+* **ask-ai:** serialize stream sink writes from tool goroutines ([c983a37](https://github.com/PascaleBeier/hitkeep/commit/c983a370bbb4e32f997cfffb90a37e2b55d97069))
+* **auth:** accept configured region in social signup ([98f227e](https://github.com/PascaleBeier/hitkeep/commit/98f227e7a85fa368d24f01a5ede7cc44d511ec72))
+* **config:** complete configuration migration and release handoff ([fdd096a](https://github.com/PascaleBeier/hitkeep/commit/fdd096a5b2f0738b7224d08122bf24ff5858c4f6))
+* **database:** bundle DuckDB extensions for offline startup ([#355](https://github.com/PascaleBeier/hitkeep/issues/355)) ([7290ae3](https://github.com/PascaleBeier/hitkeep/commit/7290ae3ea7d9f8af190b0b8d1c649ba2351f6418))
+* **data:** skip timestamp-only refresh PR updates ([7779735](https://github.com/PascaleBeier/hitkeep/commit/7779735f6a8b37b0210bb0acdbe40aefb9c107d3))
+* **dependencies:** update Go to 1.27.1 and refresh module dependencies ([758c304](https://github.com/PascaleBeier/hitkeep/commit/758c304341fb79a4a5695279819b7f093f2053e4))
+* **deps:** pin a patched undici for the API reference ([b655471](https://github.com/PascaleBeier/hitkeep/commit/b65547103cecf2af0616a33dbb4d95e367bd819e))
+* **docker:** copy the whole source tree and use the official Node image ([e2fb4c8](https://github.com/PascaleBeier/hitkeep/commit/e2fb4c855e0c4e54d19e7f7db0cb74b6b808abc2))
+* **i18n:** complete and unify Spanish dashboard translations ([#354](https://github.com/PascaleBeier/hitkeep/issues/354)) ([da5e61d](https://github.com/PascaleBeier/hitkeep/commit/da5e61deadbff73086b69f8a9238ad5a3e9d854f))
+* publish tracker from local tarball ([#328](https://github.com/PascaleBeier/hitkeep/issues/328)) ([bfdf60f](https://github.com/PascaleBeier/hitkeep/commit/bfdf60fbfd9ad309f84c2062afd656d5611afd0c))
+* **security:** fix frontend dep issues ([92bb642](https://github.com/PascaleBeier/hitkeep/commit/92bb6424490e8544de47a10fa859cec319a3bdf2))
+* share npm trusted publishing token ([#332](https://github.com/PascaleBeier/hitkeep/issues/332)) ([228e71b](https://github.com/PascaleBeier/hitkeep/commit/228e71b1066c8108c0fa067a8e6d3ef93a7d5d57))
+* wait for npm package visibility ([#331](https://github.com/PascaleBeier/hitkeep/issues/331)) ([3481cff](https://github.com/PascaleBeier/hitkeep/commit/3481cff4845ebdc630770f9b80136525e830ba4a))
+
+
+### Performance Improvements
+
+* **database:** classify AI activity agents and referrers once per distinct value ([9882229](https://github.com/PascaleBeier/hitkeep/commit/988222908ce1be353c5c3b6c28bb8c2e38ea9e6a))
+* **database:** classify each user agent once, and compute only the requested overview sections ([062b50b](https://github.com/PascaleBeier/hitkeep/commit/062b50ba9cf040e500319f98aa6d8c17d7118212))
+
 ## [2.13.18](https://github.com/PascaleBeier/hitkeep/compare/v2.13.17...v2.13.18) (2026-09-01)
 
 
