@@ -366,7 +366,7 @@ jobs:
         env:
           DOCS_REPOSITORY: PascaleBeier/hitkeep-docs
           # Finite v1→v2 transition: v1 remains receiver-only for in-flight callers.
-          DOCS_WORKFLOW_SHA256: 812c7896202be86362a5c384c17b8e87c461fac1353ec44210c79b15b4e58c08
+          DOCS_WORKFLOW_SHA256: 84296ee4afc6a75645d5b96339828a1f47aedd699e0506d01865b20eabdf2ac8
           GH_TOKEN: ${{ secrets.HITKEEP_DOCS_DISPATCH_TOKEN }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         shell: bash
@@ -536,11 +536,12 @@ jobs:
             npm publish "$tarball" --tag latest || true
           fi
           latest=""
-          for attempt in {1..6}; do
+          # The registry can take minutes to serve a new version.
+          for attempt in {1..30}; do
             existing="$(npm view "@hitkeep/tracker@${VERSION}" dist.integrity 2>/dev/null || true)"
             latest="$(npm view @hitkeep/tracker dist-tags.latest 2>/dev/null || true)"
             [[ "$existing" == "$integrity" && "$latest" == "$VERSION" ]] && break
-            sleep 2
+            sleep 5
           done
           if [[ "$existing" != "$integrity" ]]; then
             echo "published @hitkeep/tracker@${VERSION} does not match the verified artifact" >&2
@@ -800,8 +801,8 @@ jobs:
           artifact="hitkeep-cloud-linux-arm64"
           checksum_dir="$(mktemp -d)"
           trap 'rm -rf "$checksum_dir"' EXIT
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_dir" --pattern checksums.txt
-          ARTIFACT_SHA256="$(awk -v artifact="$artifact" '$2 == artifact || $2 == "*" artifact { print $1 }' "$checksum_dir/checksums.txt")"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$checksum_dir" --pattern SHA256SUMS
+          ARTIFACT_SHA256="$(awk -v artifact="$artifact" '$2 == artifact || $2 == "*" artifact { print $1 }' "$checksum_dir/SHA256SUMS")"
           if [[ ! "$ARTIFACT_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
             echo "missing exact release checksum for $artifact" >&2
             exit 1
