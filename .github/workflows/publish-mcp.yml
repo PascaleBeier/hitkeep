@@ -87,7 +87,7 @@ jobs:
           publisher_sha256="a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc"
           curl --fail --silent --show-error --location "$publisher_url" --output "$publisher_archive"
           printf '%s  %s\n' "$publisher_sha256" "$publisher_archive" | sha256sum --check --status
-          tar xz "$publisher_archive" mcp-publisher
+          tar -xzf "$publisher_archive" mcp-publisher
 
       - name: Authenticate to MCP Registry
         run: ./mcp-publisher login github-oidc
