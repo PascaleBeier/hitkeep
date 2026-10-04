@@ -218,6 +218,38 @@ func TestHandleGetFaviconGracefullyFallsBackWhenUpstreamHasNoIcon(t *testing.T) 
 	}
 }
 
+func TestHandleGetFaviconPassesRevalidationThrough(t *testing.T) {
+	h, store, _ := setupTestEnv(t)
+	defer store.Close()
+
+	originalTransport := faviconProxyTransport
+	defer func() {
+		faviconProxyTransport = originalTransport
+	}()
+
+	faviconProxyTransport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Header.Get("If-None-Match") != `"icon-v1"` {
+			t.Errorf("expected the browser's validator upstream, got %q", req.Header.Get("If-None-Match"))
+		}
+		return &http.Response{
+			StatusCode: http.StatusNotModified,
+			Header:     http.Header{"Etag": []string{`"icon-v1"`}},
+			Body:       http.NoBody,
+		}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/favicon/example.com", nil)
+	req.SetPathValue("domain", "example.com")
+	req.Header.Set("If-None-Match", `"icon-v1"`)
+	w := httptest.NewRecorder()
+
+	h.handleGetFavicon().ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotModified {
+		t.Fatalf("expected status %d so the browser keeps its cached icon, got %d", http.StatusNotModified, w.Code)
+	}
+}
+
 func TestFaviconProxyErrorKindUsesStableCategories(t *testing.T) {
 	for _, test := range []struct {
 		name string
