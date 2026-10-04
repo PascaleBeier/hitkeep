@@ -189,7 +189,7 @@ func searchConsoleFactValues(input SearchConsoleFactInput) []driver.Value {
 }
 
 func (s *Store) GetSearchConsoleOverview(ctx context.Context, params api.SearchConsoleReportParams) (api.SearchConsoleOverview, error) {
-	where, args := searchConsoleReportWhere(params)
+	where, args := searchConsoleSliceWhere(params, "")
 	var overview api.SearchConsoleOverview
 	if err := s.db.QueryRowContext(ctx, `
 		SELECT
@@ -214,7 +214,7 @@ func (s *Store) GetSearchConsoleOverview(ctx context.Context, params api.SearchC
 }
 
 func (s *Store) GetSearchConsoleSeries(ctx context.Context, params api.SearchConsoleReportParams) (api.SearchConsoleSeriesResponse, error) {
-	where, args := searchConsoleReportWhere(params)
+	where, args := searchConsoleSliceWhere(params, "")
 	// #nosec G202 -- where is built from fixed clauses and parameterized values only.
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT
@@ -255,6 +255,33 @@ func (s *Store) GetSearchConsoleSeries(ctx context.Context, params api.SearchCon
 	return response, nil
 }
 
+// ListSearchConsoleAudienceTotalsDays returns the days in the range that have
+// audience totals.
+func (s *Store) ListSearchConsoleAudienceTotalsDays(ctx context.Context, siteID uuid.UUID, propertyURI string, start, end time.Time) ([]time.Time, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT DISTINCT date
+		FROM search_console_facts
+		WHERE site_id = ? AND property_uri = ? AND data_state = 'final' AND `+searchConsoleAudienceTotals+` AND date BETWEEN ? AND ?
+	`, siteID, strings.TrimSpace(propertyURI), searchConsoleReportDate(start), searchConsoleReportDate(end))
+	if err != nil {
+		return nil, fmt.Errorf("query Search Console audience totals days: %w", err)
+	}
+	defer rows.Close()
+
+	var days []time.Time
+	for rows.Next() {
+		var day time.Time
+		if err := rows.Scan(&day); err != nil {
+			return nil, fmt.Errorf("scan Search Console audience totals day: %w", err)
+		}
+		days = append(days, searchConsoleReportDate(day))
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read Search Console audience totals days: %w", err)
+	}
+	return days, nil
+}
+
 func (s *Store) GetSearchConsoleDimension(ctx context.Context, params api.SearchConsoleReportParams, dimension string) (api.SearchConsoleDimensionResponse, error) {
 	column, ok := searchConsoleDimensionColumn(dimension)
 	if !ok {
@@ -266,7 +293,7 @@ func (s *Store) GetSearchConsoleDimension(ctx context.Context, params api.Search
 	if params.Limit > 100 {
 		params.Limit = 100
 	}
-	where, args := searchConsoleReportWhere(params)
+	where, args := searchConsoleSliceWhere(params, dimension)
 	args = append(args, params.Limit)
 	// #nosec G202 -- column is selected through searchConsoleDimensionColumn; where values stay parameterized.
 	rows, err := s.db.QueryContext(ctx, `
@@ -320,6 +347,43 @@ func searchConsoleDimensionColumn(dimension string) (string, bool) {
 	default:
 		return "", false
 	}
+}
+
+// Each imported day holds three shapes of rows. Google omits anonymized
+// searches from any request grouped by query, and from page requests also
+// grouped by country or device, so only the two query-free shapes carry full
+// totals: page totals and audience totals. Query rows serve the query report,
+// combinations neither totals shape covers, and days imported before totals.
+const (
+	searchConsolePageTotals     = "(query = '' AND country = '' AND device = '')"
+	searchConsoleAudienceTotals = "(query = '' AND page = '')"
+	searchConsoleQueryRows      = "query <> ''"
+)
+
+// searchConsoleSliceWhere selects the one shape of rows that answers a report
+// grouped by dimension ("" for overview and series) under params' filters.
+func searchConsoleSliceWhere(params api.SearchConsoleReportParams, dimension string) (string, []any) {
+	where, args := searchConsoleReportWhere(params)
+	byPage := dimension == "page" || strings.TrimSpace(params.Page) != "" || strings.TrimSpace(params.Path) != ""
+	byAudience := dimension == "country" || dimension == "device" || strings.TrimSpace(params.Country) != "" || strings.TrimSpace(params.Device) != ""
+	totals := searchConsoleAudienceTotals
+	switch {
+	case dimension == "query" || byPage && byAudience:
+		return where + " AND " + searchConsoleQueryRows, args
+	case byPage:
+		totals = searchConsolePageTotals
+	}
+	// Days imported before totals existed fall back to their query rows until
+	// a manual sync re-imports them. Unqualified columns in the subquery refer
+	// to its own rows.
+	return where + ` AND (` + totals + ` OR (` + searchConsoleQueryRows + ` AND NOT EXISTS (
+		SELECT 1 FROM search_console_facts totals
+		WHERE totals.site_id = search_console_facts.site_id
+			AND totals.property_uri = search_console_facts.property_uri
+			AND totals.data_state = search_console_facts.data_state
+			AND totals.date = search_console_facts.date
+			AND ` + totals + `
+	)))`, args
 }
 
 func searchConsoleReportWhere(params api.SearchConsoleReportParams) (string, []any) {

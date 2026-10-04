@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,6 +61,9 @@ func TestSearchConsoleSyncWorkerInitialSyncImportsRecentFinalizedRows(t *testing
 	requireInitialSearchConsoleQuery(t, source, fixture.propertyURI)
 	requireSearchConsoleImportedClicks(t, fixture.tenantMgr, fixture.site.ID, 10)
 	requireSearchConsoleSucceededState(t, fixture.shared, fixture.site.ID, "2026-02-03", "2026-05-03")
+	if state, err := fixture.shared.GetGoogleSearchConsoleSyncState(ctx, fixture.site.ID); err != nil || state.TotalsBackfilledPropertyURI != fixture.propertyURI {
+		t.Fatalf("expected the first sync to record its property as backfilled, got state=%+v err=%v", state, err)
+	}
 	requireSearchConsoleStartAudit(t, fixture.shared, fixture.teamID, fixture.site.ID)
 	requireSearchConsolePreparedAudit(t, fixture.shared, fixture.teamID, fixture.site.ID)
 	requireSearchConsoleImportAudit(t, fixture.shared, fixture.teamID, fixture.site.ID)
@@ -372,8 +377,8 @@ func TestSearchConsoleSyncWorkerRecurringSyncRechecksRecentCompletedDays(t *test
 	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
 		t.Fatalf("import site: %v", err)
 	}
-	if len(source.queries) != 7 {
-		t.Fatalf("expected seven daily recurring queries, got %+v", source.queries)
+	if len(source.queries) != 21 {
+		t.Fatalf("expected three requests for each of seven daily recurring windows, got %d queries", len(source.queries))
 	}
 	firstQuery := source.queries[0].Query
 	lastQuery := source.queries[len(source.queries)-1].Query
@@ -383,6 +388,141 @@ func TestSearchConsoleSyncWorkerRecurringSyncRechecksRecentCompletedDays(t *test
 			firstQuery.StartDate.Format(time.DateOnly), firstQuery.EndDate.Format(time.DateOnly),
 			lastQuery.StartDate.Format(time.DateOnly), lastQuery.EndDate.Format(time.DateOnly))
 	}
+}
+
+func TestSearchConsoleSyncWorkerManualSyncBackfillsAnonymizedClicks(t *testing.T) {
+	ctx := context.Background()
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-anonymized@test.dev", "gsc-anonymized.example.com")
+	defer fixture.shared.Close()
+	lastSuccess := time.Date(2026, 5, 4, 12, 0, 0, 0, time.UTC)
+	if err := fixture.shared.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
+		SiteID: fixture.site.ID, TeamID: fixture.teamID, State: "pending", Manual: true, LastSuccessAt: &lastSuccess,
+	}); err != nil {
+		t.Fatalf("request manual sync: %v", err)
+	}
+	tenantStore, _, err := fixture.tenantMgr.ResolveSiteStore(ctx, fixture.site.ID)
+	if err != nil {
+		t.Fatalf("resolve tenant store: %v", err)
+	}
+	// Every click came from anonymized searches, so the named query has none.
+	// The date is outside the seven-day recurring window.
+	date := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
+	page := "https://gsc-anonymized.example.com/landing"
+	detail := searchconsole.SearchAnalyticsRow{
+		Date: date, Query: "visible query", Page: page, Country: "USA", Device: "DESKTOP",
+		Clicks: 0, Impressions: 40, Position: 20, DataState: searchconsole.DataStateFinal,
+	}
+	if err := importSearchConsoleRows(ctx, tenantStore, []searchconsole.SearchAnalyticsRow{detail}, fixture.site.ID, fixture.propertyURI,
+		searchConsoleSyncWindow{Start: date, End: date}, lastSuccess); err != nil {
+		t.Fatalf("seed legacy query-only import: %v", err)
+	}
+	total := detail
+	total.Query = ""
+	total.Clicks, total.Impressions, total.CTR, total.Position = 6, 100, 0.06, 12
+	// Every search on this day was anonymized, so the old import stored nothing.
+	anonymousOnly := total
+	anonymousOnly.Date, anonymousOnly.Clicks = time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC), 4
+	// Days before March 15 have no traffic, so they never gain totals.
+	source := &fakeSearchConsoleSource{
+		rows:   []searchconsole.SearchAnalyticsRow{detail},
+		totals: []searchconsole.SearchAnalyticsRow{total, anonymousOnly},
+	}
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
+	worker.now = func() time.Time { return time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC) }
+
+	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
+		t.Fatalf("manual sync: %v", err)
+	}
+	if len(source.queries) != 270 {
+		t.Fatalf("expected the seven-day window plus 83 backfilled days, got %d queries", len(source.queries))
+	}
+	params := api.SearchConsoleReportParams{SiteID: fixture.site.ID, PropertyURI: fixture.propertyURI, Start: date, End: date}
+	overview, err := tenantStore.GetSearchConsoleOverview(ctx, params)
+	if err != nil {
+		t.Fatalf("get overview: %v", err)
+	}
+	if overview.Clicks != 6 || overview.Impressions != 100 || overview.CTR != 0.06 || overview.AveragePosition != 12 {
+		t.Fatalf("expected query-free totals, got %+v", overview)
+	}
+	queries, err := tenantStore.GetSearchConsoleDimension(ctx, params, "query")
+	if err != nil {
+		t.Fatalf("get query report: %v", err)
+	}
+	if len(queries.Rows) != 1 || queries.Rows[0].Value != detail.Query || queries.Rows[0].Clicks != 0 || queries.Rows[0].Impressions != 40 {
+		t.Fatalf("expected only the named query row, got %+v", queries)
+	}
+	anonymousDay := params
+	anonymousDay.Start, anonymousDay.End = anonymousOnly.Date, anonymousOnly.Date
+	if overview, err := tenantStore.GetSearchConsoleOverview(ctx, anonymousDay); err != nil || overview.Clicks != 4 {
+		t.Fatalf("expected a day without named queries to gain its clicks, got overview=%+v err=%v", overview, err)
+	}
+	pages, err := tenantStore.GetSearchConsoleDimension(ctx, params, "page")
+	if err != nil {
+		t.Fatalf("get page report: %v", err)
+	}
+	if len(pages.Rows) != 1 || pages.Rows[0].Value != page || pages.Rows[0].Clicks != 6 {
+		t.Fatalf("expected page report to keep anonymized clicks, got %+v", pages)
+	}
+	state, err := fixture.shared.GetGoogleSearchConsoleSyncState(ctx, fixture.site.ID)
+	if err != nil {
+		t.Fatalf("get sync state: %v", err)
+	}
+	if state == nil || state.State != "succeeded" || state.Manual || state.TotalsBackfilledPropertyURI != fixture.propertyURI {
+		t.Fatalf("expected successful backfill to clear the manual request and record the property, got %+v", state)
+	}
+
+	// The backfill is recorded, so the next manual sync skips the older days,
+	// including the empty ones that never gained totals.
+	if err := fixture.shared.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
+		SiteID: fixture.site.ID, TeamID: fixture.teamID, State: "pending", Manual: true, LastSuccessAt: state.LastSuccessAt,
+		ImportedStartDate: state.ImportedStartDate, ImportedEndDate: state.ImportedEndDate,
+	}); err != nil {
+		t.Fatalf("request another manual sync: %v", err)
+	}
+	source.queries = nil
+	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
+		t.Fatalf("second manual sync: %v", err)
+	}
+	if len(source.queries) != 21 {
+		t.Fatalf("expected only the seven-day window after backfill, got %d queries", len(source.queries))
+	}
+}
+
+func TestSearchConsoleSyncWorkerInitialSyncResumesAfterFailure(t *testing.T) {
+	ctx := context.Background()
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-resume@test.dev", "gsc-resume.example.com")
+	defer fixture.shared.Close()
+	// One row of traffic on every day of the initial range, 2026-02-03 to 2026-05-03.
+	var rows []searchconsole.SearchAnalyticsRow
+	for day := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC); !day.After(time.Date(2026, 5, 3, 0, 0, 0, 0, time.UTC)); day = day.AddDate(0, 0, 1) {
+		rows = append(rows, searchconsole.SearchAnalyticsRow{
+			Date: day, Query: "q", Page: "https://gsc-resume.example.com/", Country: "USA", Device: "DESKTOP",
+			Clicks: 1, Impressions: 10, DataState: searchconsole.DataStateFinal,
+		})
+	}
+	source := &fakeSearchConsoleSource{
+		rows:      rows,
+		errOnDate: map[string]error{"2026-04-01": searchconsole.ClassifiedError(searchconsole.CategoryGoogleUnavailable, errors.New("unavailable"))},
+	}
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
+	worker.now = func() time.Time { return time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC) }
+
+	if err := worker.ImportSite(ctx, fixture.site.ID); err == nil {
+		t.Fatal("expected the first sync to fail on 2026-04-01")
+	}
+	// 2026-05-03 back to 2026-04-02 committed before the failure.
+	source.errOnDate = nil
+	source.queries = nil
+	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
+		t.Fatalf("retry first sync: %v", err)
+	}
+	// The retry fetches the seven recent days and the 58 older days that never
+	// committed, not the 25 older days that did.
+	if len(source.queries) != 65*3 {
+		t.Fatalf("expected the retry to skip committed days, got %d queries", len(source.queries))
+	}
+	requireSearchConsoleImportedClicks(t, fixture.tenantMgr, fixture.site.ID, 90)
+	requireSearchConsoleSucceededState(t, fixture.shared, fixture.site.ID, "2026-02-03", "2026-05-03")
 }
 
 func TestSearchConsoleSyncWorkerRunDueImportsReadySitesAndContinuesAfterFailure(t *testing.T) {
@@ -612,8 +752,17 @@ func initialSearchConsoleRows() []searchconsole.SearchAnalyticsRow {
 
 func requireInitialSearchConsoleQuery(t *testing.T, source *fakeSearchConsoleSource, propertyURI string) {
 	t.Helper()
-	if len(source.queries) != 90 {
-		t.Fatalf("expected 90 daily Search Analytics queries, got %d", len(source.queries))
+	if len(source.queries) != 270 {
+		t.Fatalf("expected three requests for each of 90 daily windows, got %d queries", len(source.queries))
+	}
+	// Each day's requests run concurrently, so they may arrive in any order.
+	var dimensionSets []string
+	for _, q := range source.queries[:3] {
+		dimensionSets = append(dimensionSets, strings.Join(q.Query.Dimensions, ","))
+	}
+	slices.Sort(dimensionSets)
+	if got := strings.Join(dimensionSets, " | "); got != "date,country,device | date,page | date,query,page,country,device" {
+		t.Fatalf("expected query rows plus page and audience totals, got %s", got)
 	}
 	query := source.queries[0]
 	if query.Token.RefreshToken != "refresh-token" {
@@ -632,9 +781,6 @@ func requireInitialSearchConsoleQuery(t *testing.T, source *fakeSearchConsoleSou
 	if query.Query.DataState != searchconsole.DataStateFinal {
 		t.Fatalf("expected final data state, got %q", query.Query.DataState)
 	}
-	if strings.Join(query.Query.Dimensions, ",") != "date,query,page,country,device" {
-		t.Fatalf("unexpected dimensions: %+v", query.Query.Dimensions)
-	}
 }
 
 func requireSearchConsoleImportedClicks(t *testing.T, tenantMgr *database.TenantStoreManager, siteID uuid.UUID, expected int) {
@@ -644,12 +790,19 @@ func requireSearchConsoleImportedClicks(t *testing.T, tenantMgr *database.Tenant
 	if err != nil {
 		t.Fatalf("resolve tenant store: %v", err)
 	}
-	var clicks int
-	if err := tenantStore.DB().QueryRowContext(ctx, "SELECT COALESCE(SUM(clicks), 0) FROM search_console_facts WHERE site_id = ?", siteID).Scan(&clicks); err != nil {
-		t.Fatalf("sum clicks: %v", err)
+	mapping, err := tenantMgr.Shared().GetGoogleSearchConsoleSiteMapping(ctx, siteID)
+	if err != nil {
+		t.Fatalf("get mapping: %v", err)
 	}
-	if clicks != expected {
-		t.Fatalf("expected imported clicks=%d, got %d", expected, clicks)
+	overview, err := tenantStore.GetSearchConsoleOverview(ctx, api.SearchConsoleReportParams{
+		SiteID: siteID, PropertyURI: mapping.PropertyURI,
+		Start: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("get imported overview: %v", err)
+	}
+	if overview.Clicks != expected {
+		t.Fatalf("expected imported clicks=%d, got %d", expected, overview.Clicks)
 	}
 }
 
@@ -685,7 +838,7 @@ func requireSearchConsoleImportAudit(t *testing.T, shared *database.Store, teamI
 	if entries[0].Outcome != "success" || entries[0].TargetType != "site" || entries[0].TargetID != siteID.String() {
 		t.Fatalf("unexpected sync import audit entry: %+v", entries[0])
 	}
-	if !strings.Contains(entries[0].Details, "imported_rows=2") || strings.Contains(entries[0].Details, "hitkeep analytics") || strings.Contains(entries[0].Details, "privacy analytics") {
+	if !strings.Contains(entries[0].Details, "imported_rows=6") || strings.Contains(entries[0].Details, "hitkeep analytics") || strings.Contains(entries[0].Details, "privacy analytics") {
 		t.Fatalf("expected aggregate import audit without query payloads, got %q", entries[0].Details)
 	}
 }
@@ -702,7 +855,7 @@ func requireSearchConsolePreparedAudit(t *testing.T, shared *database.Store, tea
 	if entries[0].Outcome != "success" || entries[0].TargetType != "site" || entries[0].TargetID != siteID.String() {
 		t.Fatalf("unexpected sync import prepared audit entry: %+v", entries[0])
 	}
-	if !strings.Contains(entries[0].Details, "prepared_rows=2") || strings.Contains(entries[0].Details, "hitkeep analytics") || strings.Contains(entries[0].Details, "privacy analytics") {
+	if !strings.Contains(entries[0].Details, "prepared_rows=6") || strings.Contains(entries[0].Details, "hitkeep analytics") || strings.Contains(entries[0].Details, "privacy analytics") {
 		t.Fatalf("expected aggregate prepared audit without query payloads, got %q", entries[0].Details)
 	}
 }
@@ -771,9 +924,13 @@ func (s *blockingSearchConsoleSource) QuerySearchAnalytics(ctx context.Context, 
 
 type fakeSearchConsoleSource struct {
 	rows          []searchconsole.SearchAnalyticsRow
+	totals        []searchconsole.SearchAnalyticsRow // rows for query-free requests; defaults to rows
 	rowsBySiteURL map[string][]searchconsole.SearchAnalyticsRow
 	errBySiteURL  map[string]error
 	err           error
+	queryErr      error // fails only query-grouped requests
+	errOnDate     map[string]error
+	queriesMu     sync.Mutex
 	queries       []fakeSearchConsoleQuery
 }
 
@@ -790,17 +947,51 @@ func (f *fakeSearchConsoleSource) ListProperties(ctx context.Context, token sear
 }
 
 func (f *fakeSearchConsoleSource) QuerySearchAnalytics(ctx context.Context, token searchconsole.Token, query searchconsole.SearchAnalyticsQuery) ([]searchconsole.SearchAnalyticsRow, error) {
+	f.queriesMu.Lock()
 	f.queries = append(f.queries, fakeSearchConsoleQuery{Token: token, Query: query})
+	f.queriesMu.Unlock()
 	if f.err != nil {
 		return nil, f.err
 	}
 	if f.errBySiteURL != nil && f.errBySiteURL[query.SiteURL] != nil {
 		return nil, f.errBySiteURL[query.SiteURL]
 	}
-	if f.rowsBySiteURL != nil {
-		return searchConsoleRowsInQueryRange(f.rowsBySiteURL[query.SiteURL], query), nil
+	if err := f.errOnDate[query.StartDate.Format(time.DateOnly)]; err != nil {
+		return nil, err
 	}
-	return searchConsoleRowsInQueryRange(f.rows, query), nil
+	byQuery := slices.Contains(query.Dimensions, "query")
+	if byQuery && f.queryErr != nil {
+		return nil, f.queryErr
+	}
+	rows := f.rows
+	if f.rowsBySiteURL != nil {
+		rows = f.rowsBySiteURL[query.SiteURL]
+	}
+	if !byQuery && f.totals != nil {
+		rows = f.totals
+	}
+	filtered := searchConsoleRowsInQueryRange(rows, query)
+	for i := range filtered {
+		clearUngroupedSearchConsoleDimensions(&filtered[i], query.Dimensions)
+	}
+	return filtered, nil
+}
+
+// clearUngroupedSearchConsoleDimensions mirrors Google, which leaves out the
+// dimensions a request does not group by.
+func clearUngroupedSearchConsoleDimensions(row *searchconsole.SearchAnalyticsRow, dimensions []string) {
+	if !slices.Contains(dimensions, "query") {
+		row.Query = ""
+	}
+	if !slices.Contains(dimensions, "page") {
+		row.Page = ""
+	}
+	if !slices.Contains(dimensions, "country") {
+		row.Country = ""
+	}
+	if !slices.Contains(dimensions, "device") {
+		row.Device = ""
+	}
 }
 
 func searchConsoleRowsInQueryRange(rows []searchconsole.SearchAnalyticsRow, query searchconsole.SearchAnalyticsQuery) []searchconsole.SearchAnalyticsRow {

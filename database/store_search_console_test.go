@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hitkeep/api"
 	tenantmigrations "hitkeep/database/migrations/tenant"
 )
 
@@ -404,6 +405,114 @@ func TestReplaceSearchConsoleFactsMaximumDailyPageUnderLowMemoryLimit(t *testing
 	}
 	if count != rowCount {
 		t.Fatalf("expected %d low-memory facts, got %d", rowCount, count)
+	}
+}
+
+func TestSearchConsoleReportsUseTotalsWithoutDoubleCountingQueryDetails(t *testing.T) {
+	ctx := context.Background()
+	store := newSearchConsoleTenantTestStore(t)
+	siteID := uuid.New()
+	date := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	legacyDate := date.AddDate(0, 0, -1)
+	property := "sc-domain:example.com"
+	detail := SearchConsoleFactInput{
+		SiteID: siteID, PropertyURI: property, Date: date, Query: "visible query",
+		Page: "https://example.com/landing", Country: "USA", Device: "DESKTOP",
+		Clicks: 2, Impressions: 40, Position: 20, DataState: "final",
+	}
+	pageTotal := detail
+	pageTotal.Query, pageTotal.Country, pageTotal.Device = "", "", ""
+	pageTotal.Clicks, pageTotal.Impressions, pageTotal.Position = 6, 100, 12
+	audienceTotal := detail
+	audienceTotal.Query, audienceTotal.Page = "", ""
+	audienceTotal.Clicks, audienceTotal.Impressions, audienceTotal.Position = 6, 100, 12
+	legacy := detail
+	legacy.Date, legacy.Query, legacy.Clicks, legacy.Impressions = legacyDate, "legacy query", 3, 50
+	scope := SearchConsoleFactScope{SiteID: siteID, PropertyURI: property, StartDate: legacyDate, EndDate: date, DataState: "final"}
+	if err := store.ReplaceSearchConsoleFacts(ctx, scope, []SearchConsoleFactInput{detail, pageTotal, audienceTotal, legacy}); err != nil {
+		t.Fatalf("seed mixed totals and legacy data: %v", err)
+	}
+	// Totals for another site, property or data state must not hide this
+	// site's legacy rows.
+	otherSite, otherProperty, otherState := audienceTotal, audienceTotal, audienceTotal
+	otherSite.SiteID = uuid.New()
+	otherProperty.PropertyURI = "sc-domain:other.example"
+	otherState.DataState = "all"
+	for _, other := range []SearchConsoleFactInput{otherSite, otherProperty, otherState} {
+		other.Date = legacyDate
+		if err := store.ReplaceSearchConsoleFacts(ctx, SearchConsoleFactScope{
+			SiteID: other.SiteID, PropertyURI: other.PropertyURI, StartDate: legacyDate, EndDate: legacyDate, DataState: other.DataState,
+		}, []SearchConsoleFactInput{other}); err != nil {
+			t.Fatalf("seed unrelated totals: %v", err)
+		}
+	}
+
+	totalsDays, err := store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, property, legacyDate, date)
+	if err != nil {
+		t.Fatalf("list audience totals days: %v", err)
+	}
+	if len(totalsDays) != 1 || !totalsDays[0].Equal(date) {
+		t.Fatalf("expected only this site's totals day %s, got %v", date, totalsDays)
+	}
+
+	params := api.SearchConsoleReportParams{SiteID: siteID, PropertyURI: property, Start: legacyDate, End: date}
+	overview, err := store.GetSearchConsoleOverview(ctx, params)
+	if err != nil {
+		t.Fatalf("get overview: %v", err)
+	}
+	if overview.Clicks != 9 || overview.Impressions != 150 || overview.CTR != 0.06 || overview.AveragePosition != (12.0*100+20*50)/150 {
+		t.Fatalf("expected totals plus legacy fallback, got %+v", overview)
+	}
+	series, err := store.GetSearchConsoleSeries(ctx, params)
+	if err != nil {
+		t.Fatalf("get series: %v", err)
+	}
+	if len(series.Series) != 2 || series.Series[0].Clicks != 3 || series.Series[1].Clicks != 6 || series.Series[1].Impressions != 100 {
+		t.Fatalf("expected daily totals without double counting, got %+v", series)
+	}
+	for _, dimension := range []string{"page", "country", "device"} {
+		result, err := store.GetSearchConsoleDimension(ctx, params, dimension)
+		if err != nil {
+			t.Fatalf("get %s report: %v", dimension, err)
+		}
+		if len(result.Rows) != 1 || result.Rows[0].Clicks != 9 || result.Rows[0].Impressions != 150 {
+			t.Fatalf("expected %s totals without double counting, got %+v", dimension, result)
+		}
+	}
+	queries, err := store.GetSearchConsoleDimension(ctx, params, "query")
+	if err != nil {
+		t.Fatalf("get query report: %v", err)
+	}
+	if len(queries.Rows) != 2 || queries.Rows[0].Value != "legacy query" || queries.Rows[0].Clicks != 3 ||
+		queries.Rows[1].Value != "visible query" || queries.Rows[1].Clicks != 2 || queries.Rows[1].Impressions != 40 {
+		t.Fatalf("expected only named query rows, got %+v", queries)
+	}
+
+	day := params
+	day.Start = date
+	filters := []struct {
+		name  string
+		apply func(*api.SearchConsoleReportParams)
+	}{
+		{"page", func(p *api.SearchConsoleReportParams) { p.Page = detail.Page }},
+		{"path", func(p *api.SearchConsoleReportParams) { p.Path = "/landing" }},
+		{"country", func(p *api.SearchConsoleReportParams) { p.Country = "us" }},
+		{"device", func(p *api.SearchConsoleReportParams) { p.Device = "desktop" }},
+	}
+	for _, filter := range filters {
+		filtered := day
+		filter.apply(&filtered)
+		result, err := store.GetSearchConsoleOverview(ctx, filtered)
+		if err != nil || result.Clicks != 6 || result.Impressions != 100 {
+			t.Fatalf("%s filter lost anonymized clicks: result=%+v err=%v", filter.name, result, err)
+		}
+	}
+	// Neither totals shape groups by page and country together, so that
+	// combination can only use the query rows.
+	combined := day
+	combined.Page, combined.Country = detail.Page, "us"
+	if result, err := store.GetSearchConsoleOverview(ctx, combined); err != nil || result.Clicks != 2 || result.Impressions != 40 {
+		t.Fatalf("expected page and country filters to use query rows, got result=%+v err=%v", result, err)
 	}
 }
 

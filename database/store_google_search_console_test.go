@@ -299,6 +299,38 @@ func TestListGoogleSearchConsoleSyncCandidatesSelectsDueConnectedMappings(t *tes
 	}
 }
 
+func TestGoogleSearchConsoleSyncStateKeepsBackfilledPropertyAcrossUpserts(t *testing.T) {
+	ctx := context.Background()
+	store := newSharedTestFixtureStore(t)
+	userID, teamID := createGoogleSearchConsoleTestTeam(t, store)
+	siteID := seedGoogleSearchConsoleCandidateSite(t, store, userID, teamID, "backfilled.example.com")
+
+	upsert := func(input GoogleSearchConsoleSyncStateInput) *GoogleSearchConsoleSyncState {
+		t.Helper()
+		input.SiteID, input.TeamID = siteID, teamID
+		if err := store.UpsertGoogleSearchConsoleSyncState(ctx, input); err != nil {
+			t.Fatalf("upsert sync state: %v", err)
+		}
+		state, err := store.GetGoogleSearchConsoleSyncState(ctx, siteID)
+		if err != nil || state == nil {
+			t.Fatalf("get sync state: state=%+v err=%v", state, err)
+		}
+		return state
+	}
+
+	if state := upsert(GoogleSearchConsoleSyncStateInput{State: "pending"}); state.TotalsBackfilledPropertyURI != "" {
+		t.Fatalf("expected no backfilled property on a new row, got %q", state.TotalsBackfilledPropertyURI)
+	}
+	upsert(GoogleSearchConsoleSyncStateInput{State: "succeeded", TotalsBackfilledPropertyURI: "sc-domain:example.com"})
+	// Failure and manual-request writes rebuild the row without the field.
+	if state := upsert(GoogleSearchConsoleSyncStateInput{State: "failed", Manual: true}); state.TotalsBackfilledPropertyURI != "sc-domain:example.com" {
+		t.Fatalf("expected a later upsert to keep the backfilled property, got %q", state.TotalsBackfilledPropertyURI)
+	}
+	if state := upsert(GoogleSearchConsoleSyncStateInput{State: "succeeded", TotalsBackfilledPropertyURI: "sc-domain:other.example"}); state.TotalsBackfilledPropertyURI != "sc-domain:other.example" {
+		t.Fatalf("expected a new backfill to replace the property, got %q", state.TotalsBackfilledPropertyURI)
+	}
+}
+
 func createGoogleSearchConsoleTestTeam(t *testing.T, store *Store) (uuid.UUID, uuid.UUID) {
 	t.Helper()
 	return createGoogleSearchConsoleTestTeamWithEmail(t, store, "gsc-owner@test.dev")
