@@ -48,6 +48,11 @@ func (h *handler) handleGetFavicon() http.HandlerFunc {
 			Transport: faviconProxyTransport,
 			ModifyResponse: func(resp *http.Response) error {
 				resp.Header.Set("Cache-Control", "public, max-age=86400")
+				if resp.StatusCode == http.StatusNotModified {
+					// The browser revalidated its cached icon. An empty 204
+					// would replace that icon with nothing for a day.
+					return nil
+				}
 				if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 					_ = resp.Body.Close()
 					resp.StatusCode = http.StatusNoContent
