@@ -47,6 +47,7 @@ var siteStatsResetAnalyticsSteps = []siteStatsResetStep{
 	{table: "imported_dimension_daily", family: "imports", query: "DELETE FROM imported_dimension_daily WHERE site_id = ?"},
 	{table: "imported_traffic_daily", family: "imports", query: "DELETE FROM imported_traffic_daily WHERE site_id = ?"},
 	{table: "search_console_facts", family: "search_console", query: "DELETE FROM search_console_facts WHERE site_id = ?"},
+	{table: "search_console_totals_days", family: "search_console", query: "DELETE FROM search_console_totals_days WHERE site_id = ?"},
 	{table: "goal_rollups_hourly", family: "rollups", query: "DELETE FROM goal_rollups_hourly WHERE site_id = ?"},
 	{table: "goal_rollups_daily", family: "rollups", query: "DELETE FROM goal_rollups_daily WHERE site_id = ?"},
 	{table: "goal_rollups_monthly", family: "rollups", query: "DELETE FROM goal_rollups_monthly WHERE site_id = ?"},

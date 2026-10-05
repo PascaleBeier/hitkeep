@@ -39,6 +39,9 @@ type SearchConsoleFactScope struct {
 	StartDate   time.Time
 	EndDate     time.Time
 	DataState   string
+	// TotalsComplete means all query-free totals were fetched for the range,
+	// including dates for which Google returned no rows.
+	TotalsComplete bool
 }
 
 var searchConsoleFactColumns = []string{
@@ -95,6 +98,21 @@ func (s *Store) ReplaceSearchConsoleFacts(ctx context.Context, scope SearchConso
 			}
 		}
 
+		if _, err := conn.ExecContext(ctx, `
+			DELETE FROM search_console_totals_days
+			WHERE site_id = ? AND property_uri = ? AND data_state = ? AND date BETWEEN ? AND ?
+		`, normalizedScope.SiteID, normalizedScope.PropertyURI, normalizedScope.DataState, normalizedScope.StartDate, normalizedScope.EndDate); err != nil {
+			return fmt.Errorf("delete replaced Search Console totals checkpoints: %w", err)
+		}
+		if normalizedScope.TotalsComplete {
+			if _, err := conn.ExecContext(ctx, `
+				INSERT INTO search_console_totals_days (site_id, property_uri, data_state, date)
+				SELECT ?, ?, ?, day::DATE
+				FROM generate_series(?::DATE, ?::DATE, INTERVAL 1 DAY) dates(day)
+			`, normalizedScope.SiteID, normalizedScope.PropertyURI, normalizedScope.DataState, normalizedScope.StartDate, normalizedScope.EndDate); err != nil {
+				return fmt.Errorf("record Search Console totals checkpoints: %w", err)
+			}
+		}
 		if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 			return fmt.Errorf("commit Search Console fact replacement: %w", err)
 		}
@@ -255,13 +273,18 @@ func (s *Store) GetSearchConsoleSeries(ctx context.Context, params api.SearchCon
 	return response, nil
 }
 
-// ListSearchConsoleAudienceTotalsDays returns the days in the range that have
-// audience totals.
+// ListSearchConsoleAudienceTotalsDays returns days whose totals were imported,
+// including empty responses. Facts imported before checkpoints existed remain
+// evidence of completion.
 func (s *Store) ListSearchConsoleAudienceTotalsDays(ctx context.Context, siteID uuid.UUID, propertyURI string, start, end time.Time) ([]time.Time, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT date
-		FROM search_console_facts
-		WHERE site_id = ? AND property_uri = ? AND data_state = 'final' AND `+searchConsoleAudienceTotals+` AND date BETWEEN ? AND ?
+		SELECT DISTINCT date FROM (
+			SELECT site_id, property_uri, data_state, date FROM search_console_totals_days
+			UNION ALL
+			SELECT site_id, property_uri, data_state, date FROM search_console_facts
+			WHERE `+searchConsoleAudienceTotals+`
+		) completed
+		WHERE site_id = ? AND property_uri = ? AND data_state = 'final' AND date BETWEEN ? AND ?
 	`, siteID, strings.TrimSpace(propertyURI), searchConsoleReportDate(start), searchConsoleReportDate(end))
 	if err != nil {
 		return nil, fmt.Errorf("query Search Console audience totals days: %w", err)

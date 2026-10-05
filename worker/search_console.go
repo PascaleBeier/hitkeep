@@ -296,10 +296,9 @@ func searchConsoleSyncDays(windows []searchConsoleSyncWindow) []searchConsoleSyn
 }
 
 // searchConsoleCatchUpDays returns the recent window's days, then every older
-// day in the initial range without audience totals, newest first. Each day
-// commits on its own, so a sync cut short skips the finished days next time.
-// Days with no traffic never gain totals and are fetched again until a sync
-// completes and records the backfill.
+// day in the initial range without completed totals, newest first. Each day
+// commits on its own, including empty responses, so a sync cut short skips
+// the finished days next time.
 func searchConsoleCatchUpDays(ctx context.Context, tenantStore *database.Store, siteID uuid.UUID, propertyURI string, now time.Time) ([]searchConsoleSyncWindow, error) {
 	recent := searchConsoleRecentWindow(now)
 	older := searchConsoleSyncWindow{Start: searchConsoleInitialWindow(now).Start, End: recent.Start.AddDate(0, 0, -1)}
@@ -384,6 +383,7 @@ func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, r
 	}
 	return tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
 		SiteID: siteID, PropertyURI: propertyURI, StartDate: window.Start, EndDate: window.End, DataState: searchconsole.DataStateFinal,
+		TotalsComplete: true,
 	}, inputs)
 }
 

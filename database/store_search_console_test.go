@@ -173,12 +173,14 @@ func TestReplaceSearchConsoleFactsSupportsIndexedCompatibilitySchema(t *testing.
 		t.Fatalf("connect compatibility store: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	createSQL, err := tenantmigrations.Fs.ReadFile("0008_create_search_console_facts.sql")
-	if err != nil {
-		t.Fatalf("read indexed compatibility schema: %v", err)
-	}
-	if _, err := store.DB().ExecContext(ctx, string(createSQL)); err != nil {
-		t.Fatalf("create indexed compatibility schema: %v", err)
+	for _, migration := range []string{"0008_create_search_console_facts.sql", "0017_create_search_console_totals_days.sql"} {
+		createSQL, err := tenantmigrations.Fs.ReadFile(migration)
+		if err != nil {
+			t.Fatalf("read compatibility schema %s: %v", migration, err)
+		}
+		if _, err := store.DB().ExecContext(ctx, string(createSQL)); err != nil {
+			t.Fatalf("create compatibility schema %s: %v", migration, err)
+		}
 	}
 
 	siteID := uuid.New()
@@ -262,6 +264,7 @@ func TestReplaceSearchConsoleFactsRollsBackDeleteWhenAppendFails(t *testing.T) {
 	rowDate := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	scope := SearchConsoleFactScope{
 		SiteID: siteID, PropertyURI: "sc-domain:example.com", StartDate: rowDate, EndDate: rowDate, DataState: "final",
+		TotalsComplete: true,
 	}
 	original := SearchConsoleFactInput{
 		SiteID: siteID, PropertyURI: scope.PropertyURI, Date: rowDate, Query: "kept after rollback",
@@ -277,6 +280,7 @@ func TestReplaceSearchConsoleFactsRollsBackDeleteWhenAppendFails(t *testing.T) {
 	replacement := original
 	replacement.Query = "must not commit"
 	replacement.Clicks = 9
+	scope.EndDate = rowDate.AddDate(0, 0, 1)
 	if err := store.ReplaceSearchConsoleFacts(ctx, scope, []SearchConsoleFactInput{replacement}); err == nil {
 		t.Fatal("expected appender setup failure")
 	}
@@ -291,6 +295,10 @@ func TestReplaceSearchConsoleFactsRollsBackDeleteWhenAppendFails(t *testing.T) {
 	}
 	if query != original.Query || clicks != original.Clicks {
 		t.Fatalf("expected original fact after rollback, got query=%q clicks=%d", query, clicks)
+	}
+	days, err := store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, scope.PropertyURI, scope.StartDate, scope.EndDate)
+	if err != nil || len(days) != 1 || !days[0].Equal(rowDate) {
+		t.Fatalf("failed replacement changed completion checkpoints: %v, err=%v", days, err)
 	}
 }
 
@@ -513,6 +521,66 @@ func TestSearchConsoleReportsUseTotalsWithoutDoubleCountingQueryDetails(t *testi
 	combined.Page, combined.Country = detail.Page, "us"
 	if result, err := store.GetSearchConsoleOverview(ctx, combined); err != nil || result.Clicks != 2 || result.Impressions != 40 {
 		t.Fatalf("expected page and country filters to use query rows, got result=%+v err=%v", result, err)
+	}
+}
+
+func TestSearchConsoleCompletedEmptyDaysFollowReplacementAndReset(t *testing.T) {
+	ctx := t.Context()
+	store := newSearchConsoleTenantTestStore(t)
+	siteID := uuid.New()
+	date := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	scope := SearchConsoleFactScope{
+		SiteID: siteID, PropertyURI: "sc-domain:empty.example", StartDate: date, EndDate: date.AddDate(0, 0, 1),
+		DataState: "final", TotalsComplete: true,
+	}
+	if err := store.ReplaceSearchConsoleFacts(ctx, scope, nil); err != nil {
+		t.Fatalf("import empty totals: %v", err)
+	}
+	days, err := store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, scope.PropertyURI, scope.StartDate, scope.EndDate)
+	if err != nil || len(days) != 2 {
+		t.Fatalf("expected two completed empty days, got %v, err=%v", days, err)
+	}
+	if err := store.ReplaceSearchConsoleFacts(ctx, scope, nil); err != nil {
+		t.Fatalf("repeat empty import: %v", err)
+	}
+	var count int
+	if err := store.DB().QueryRowContext(ctx, `SELECT count(*) FROM search_console_totals_days WHERE site_id = ?`, siteID).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("repeated import duplicated checkpoints: count=%d, err=%v", count, err)
+	}
+	otherState := scope
+	otherState.DataState = "all"
+	if err := store.ReplaceSearchConsoleFacts(ctx, otherState, nil); err != nil {
+		t.Fatalf("import non-final totals: %v", err)
+	}
+	days, err = store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, scope.PropertyURI, date, date.AddDate(0, 0, 1))
+	if err != nil || len(days) != 2 {
+		t.Fatalf("non-final import changed final checkpoints: %v, err=%v", days, err)
+	}
+	for _, other := range []SearchConsoleFactScope{
+		{SiteID: uuid.New(), PropertyURI: scope.PropertyURI, StartDate: date, EndDate: date},
+		{SiteID: siteID, PropertyURI: "sc-domain:other.example", StartDate: date, EndDate: date},
+	} {
+		days, err := store.ListSearchConsoleAudienceTotalsDays(ctx, other.SiteID, other.PropertyURI, other.StartDate, other.EndDate)
+		if err != nil || len(days) != 0 {
+			t.Fatalf("checkpoint leaked into another scope: %v, err=%v", days, err)
+		}
+	}
+
+	// A legacy replacement invalidates only the replaced date's completion.
+	scope.EndDate, scope.TotalsComplete = date, false
+	if err := store.ReplaceSearchConsoleFacts(ctx, scope, nil); err != nil {
+		t.Fatalf("replace without totals: %v", err)
+	}
+	days, err = store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, scope.PropertyURI, date, date.AddDate(0, 0, 1))
+	if err != nil || len(days) != 1 || !days[0].Equal(date.AddDate(0, 0, 1)) {
+		t.Fatalf("expected only the untouched day's checkpoint, got %v, err=%v", days, err)
+	}
+	if _, err := store.resetSiteAnalyticsMeasurements(ctx, siteID); err != nil {
+		t.Fatalf("reset empty imports: %v", err)
+	}
+	days, err = store.ListSearchConsoleAudienceTotalsDays(ctx, siteID, scope.PropertyURI, date, date.AddDate(0, 0, 1))
+	if err != nil || len(days) != 0 {
+		t.Fatalf("reset left completed days behind: %v, err=%v", days, err)
 	}
 }
 

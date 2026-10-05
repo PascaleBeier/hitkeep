@@ -412,8 +412,12 @@ func TestSearchConsoleSyncWorkerManualSyncBackfillsAnonymizedClicks(t *testing.T
 		Date: date, Query: "visible query", Page: page, Country: "USA", Device: "DESKTOP",
 		Clicks: 0, Impressions: 40, Position: 20, DataState: searchconsole.DataStateFinal,
 	}
-	if err := importSearchConsoleRows(ctx, tenantStore, []searchconsole.SearchAnalyticsRow{detail}, fixture.site.ID, fixture.propertyURI,
-		searchConsoleSyncWindow{Start: date, End: date}, lastSuccess); err != nil {
+	if err := tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
+		SiteID: fixture.site.ID, PropertyURI: fixture.propertyURI, StartDate: date, EndDate: date,
+	}, []database.SearchConsoleFactInput{{
+		Date: date, Query: detail.Query, Page: detail.Page, Country: detail.Country, Device: detail.Device,
+		Clicks: detail.Clicks, Impressions: detail.Impressions, Position: detail.Position, ImportedAt: lastSuccess,
+	}}); err != nil {
 		t.Fatalf("seed legacy query-only import: %v", err)
 	}
 	total := detail
@@ -422,7 +426,7 @@ func TestSearchConsoleSyncWorkerManualSyncBackfillsAnonymizedClicks(t *testing.T
 	// Every search on this day was anonymized, so the old import stored nothing.
 	anonymousOnly := total
 	anonymousOnly.Date, anonymousOnly.Clicks = time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC), 4
-	// Days before March 15 have no traffic, so they never gain totals.
+	// Days before March 15 have no traffic, but still get completion checkpoints.
 	source := &fakeSearchConsoleSource{
 		rows:   []searchconsole.SearchAnalyticsRow{detail},
 		totals: []searchconsole.SearchAnalyticsRow{total, anonymousOnly},
@@ -472,7 +476,7 @@ func TestSearchConsoleSyncWorkerManualSyncBackfillsAnonymizedClicks(t *testing.T
 	}
 
 	// The backfill is recorded, so the next manual sync skips the older days,
-	// including the empty ones that never gained totals.
+	// including the empty ones.
 	if err := fixture.shared.UpsertGoogleSearchConsoleSyncState(ctx, database.GoogleSearchConsoleSyncStateInput{
 		SiteID: fixture.site.ID, TeamID: fixture.teamID, State: "pending", Manual: true, LastSuccessAt: state.LastSuccessAt,
 		ImportedStartDate: state.ImportedStartDate, ImportedEndDate: state.ImportedEndDate,
@@ -522,6 +526,40 @@ func TestSearchConsoleSyncWorkerInitialSyncResumesAfterFailure(t *testing.T) {
 		t.Fatalf("expected the retry to skip committed days, got %d queries", len(source.queries))
 	}
 	requireSearchConsoleImportedClicks(t, fixture.tenantMgr, fixture.site.ID, 90)
+	requireSearchConsoleSucceededState(t, fixture.shared, fixture.site.ID, "2026-02-03", "2026-05-03")
+}
+
+func TestSearchConsoleSyncWorkerInitialSyncResumesEmptyDaysAfterFailure(t *testing.T) {
+	ctx := t.Context()
+	fixture := newSearchConsoleWorkerFixture(t, "gsc-empty-resume@test.dev", "gsc-empty-resume.example.com")
+	defer fixture.shared.Close()
+	source := &fakeSearchConsoleSource{
+		rows: []searchconsole.SearchAnalyticsRow{{
+			Date: time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC), Query: "q",
+			Page: "https://gsc-empty-resume.example.com/", Country: "USA", Device: "DESKTOP",
+			Clicks: 1, Impressions: 10, DataState: searchconsole.DataStateFinal,
+		}},
+		errOnDate: map[string]error{"2026-04-01": context.DeadlineExceeded},
+	}
+	worker := NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
+	worker.now = func() time.Time { return time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC) }
+	if err := worker.ImportSite(ctx, fixture.site.ID); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected first sync to time out, got %v", err)
+	}
+
+	// Empty days through April 2 committed before the timeout. Retrying one
+	// of those older days must not prevent reaching the oldest day's traffic.
+	source.errOnDate = map[string]error{"2026-04-02": errors.New("completed empty day was fetched again")}
+	source.queries = nil
+	worker = NewSearchConsoleSyncWorker(fixture.tenantMgr, source)
+	worker.now = func() time.Time { return time.Date(2026, 5, 5, 12, 0, 0, 0, time.UTC) }
+	if err := worker.ImportSite(ctx, fixture.site.ID); err != nil {
+		t.Fatalf("resume past completed empty days: %v", err)
+	}
+	if len(source.queries) != 65*3 {
+		t.Fatalf("expected seven recent days plus 58 unfinished days, got %d queries", len(source.queries))
+	}
+	requireSearchConsoleImportedClicks(t, fixture.tenantMgr, fixture.site.ID, 1)
 	requireSearchConsoleSucceededState(t, fixture.shared, fixture.site.ID, "2026-02-03", "2026-05-03")
 }
 
