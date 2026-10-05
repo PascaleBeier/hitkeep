@@ -9,15 +9,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-// reviewedDocsV2Pin is the reviewed digest of the private docs receiver workflow.
-const reviewedDocsV2Pin = "812c7896202be86362a5c384c17b8e87c461fac1353ec44210c79b15b4e58c08"
-
 func TestReleaseCallerMatchesCurrentDocsV2Receiver(t *testing.T) {
 	raw := readReleaseWorkflow(t)
+	// The release workflow owns the reviewed pin; do not duplicate its digest here.
+	pins := regexp.MustCompile(`(?m)^          DOCS_WORKFLOW_SHA256: ([a-f0-9]{64})$`).FindAllStringSubmatch(raw, -1)
+	if len(pins) != 1 || strings.Count(raw, "attestation_schema=hitkeep.docs-attestation/v2") != 2 {
+		t.Fatal("release caller must have one immutable docs receiver pin and use the v2 schema for both dispatches")
+	}
+	pin := pins[0][1]
 	docsWorkflow, err := os.ReadFile(filepath.Join("..", "..", "hitkeep-docs", ".github", "workflows", "sync-hitkeep-release.yml"))
 	if errors.Is(err, os.ErrNotExist) {
 		t.Skip("optional cross-repository check requires the private docs checkout; producer contracts are checked independently")
@@ -27,11 +31,8 @@ func TestReleaseCallerMatchesCurrentDocsV2Receiver(t *testing.T) {
 	}
 	digest := sha256.Sum256(docsWorkflow)
 	want := hex.EncodeToString(digest[:])
-	if reviewedDocsV2Pin != want {
-		t.Fatalf("reviewed docs v2 pin = %s, want %s", reviewedDocsV2Pin, want)
-	}
-	if !strings.Contains(raw, "DOCS_WORKFLOW_SHA256: "+want) || strings.Count(raw, "attestation_schema=hitkeep.docs-attestation/v2") != 2 {
-		t.Fatal("release caller is not pinned to the v2 docs receiver")
+	if pin != want {
+		t.Fatalf("release workflow docs receiver pin = %s, want %s; review the receiver change before updating the workflow pin", pin, want)
 	}
 }
 
