@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.14.1](https://github.com/PascaleBeier/hitkeep/compare/v2.14.0...v2.14.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* **favicon:** keep the browser's cached icon when it revalidates ([#389](https://github.com/PascaleBeier/hitkeep/issues/389)) ([ddb7862](https://github.com/PascaleBeier/hitkeep/commit/ddb78629bba4d7f863733ec977c78deafcccb9e9))
+* **search-console:** count clicks from anonymized searches ([#388](https://github.com/PascaleBeier/hitkeep/issues/388)) ([15cd7cc](https://github.com/PascaleBeier/hitkeep/commit/15cd7ccd99006e69b24649e7ffbaf76cb5aa757c))
+
 ## [2.14.0](https://github.com/PascaleBeier/hitkeep/compare/v2.13.18...v2.14.0) (2026-10-01)
 
 
