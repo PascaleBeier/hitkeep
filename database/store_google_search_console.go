@@ -87,6 +87,9 @@ type GoogleSearchConsoleSyncStateInput struct {
 	LastErrorCategory string
 	NextRetryAt       *time.Time
 	Manual            bool
+	// TotalsBackfilledPropertyURI records a completed backfill. An empty value
+	// keeps the stored one, so callers that rebuild the row cannot clear it.
+	TotalsBackfilledPropertyURI string
 }
 
 type GoogleSearchConsoleSyncState struct {
@@ -100,7 +103,10 @@ type GoogleSearchConsoleSyncState struct {
 	LastErrorCategory string
 	NextRetryAt       *time.Time
 	Manual            bool
-	UpdatedAt         time.Time
+	// TotalsBackfilledPropertyURI is the property whose older imported days
+	// all carry query-free totals, or empty when none has been backfilled.
+	TotalsBackfilledPropertyURI string
+	UpdatedAt                   time.Time
 }
 
 type GoogleSearchConsoleSyncCandidate struct {
@@ -501,8 +507,8 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 		INSERT INTO google_search_console_sync_state (
 			site_id, team_id, state, imported_start_date, imported_end_date,
 			last_success_at, last_attempt_at, last_error_category, next_retry_at,
-			manual, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+			manual, totals_backfilled_property_uri, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
 		ON CONFLICT (site_id) DO UPDATE SET
 			team_id = excluded.team_id,
 			state = excluded.state,
@@ -513,6 +519,10 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 			last_error_category = excluded.last_error_category,
 			next_retry_at = excluded.next_retry_at,
 			manual = excluded.manual,
+			totals_backfilled_property_uri = COALESCE(
+				NULLIF(excluded.totals_backfilled_property_uri, ''),
+				google_search_console_sync_state.totals_backfilled_property_uri
+			),
 			updated_at = now()
 	`,
 		input.SiteID,
@@ -525,6 +535,7 @@ func upsertGoogleSearchConsoleSyncState(ctx context.Context, exec sqlExecContext
 		strings.TrimSpace(input.LastErrorCategory),
 		nullableTimePtr(input.NextRetryAt),
 		input.Manual,
+		strings.TrimSpace(input.TotalsBackfilledPropertyURI),
 	)
 	if err != nil {
 		return fmt.Errorf("upsert Google Search Console sync state: %w", err)
@@ -538,7 +549,7 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 	err := s.db.QueryRowContext(ctx, `
 		SELECT site_id, team_id, state, imported_start_date, imported_end_date,
 			last_success_at, last_attempt_at, last_error_category, next_retry_at,
-			manual, updated_at
+			manual, COALESCE(totals_backfilled_property_uri, ''), updated_at
 		FROM google_search_console_sync_state
 		WHERE site_id = ?
 		LIMIT 1
@@ -553,6 +564,7 @@ func (s *Store) GetGoogleSearchConsoleSyncState(ctx context.Context, siteID uuid
 		&state.LastErrorCategory,
 		&nextRetry,
 		&state.Manual,
+		&state.TotalsBackfilledPropertyURI,
 		&state.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {

@@ -45,6 +45,7 @@ var defaultTenantSplitFixtureTables = []string{
 	"qr_code_opens",
 	"rollup_dirty_buckets",
 	"search_console_facts",
+	"search_console_totals_days",
 	"session_rollups_daily",
 	"session_rollups_hourly",
 	"session_rollups_monthly",

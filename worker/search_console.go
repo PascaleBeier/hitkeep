@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"hitkeep/database"
 	"hitkeep/hklog"
@@ -126,7 +128,10 @@ func (w *SearchConsoleSyncWorker) runDueAndLog(ctx context.Context, limit int, l
 	}
 }
 
-const searchConsoleRunDueTimeout = time.Minute
+const (
+	searchConsoleRunDueTimeout        = time.Minute
+	searchConsoleFailureRecordTimeout = 10 * time.Second
+)
 
 func (w *SearchConsoleSyncWorker) RunDue(ctx context.Context, limit int) (SearchConsoleSyncRunSummary, error) {
 	ctx, cancel := context.WithTimeout(ctx, searchConsoleRunDueTimeout)
@@ -199,13 +204,34 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 		return err
 	}
 	windows := searchConsoleSyncWindows(now, state)
-	importedRows := 0
-	for _, window := range searchConsoleSyncDays(windows) {
-		query := searchConsoleSyncQuery(mapping.PropertyURI, window)
-		rows, err := w.source.QuerySearchAnalytics(ctx, googleSearchConsoleToken(conn), query)
+	days := searchConsoleSyncDays(windows)
+	// The first sync, or a manual one, brings every day in the initial range up
+	// to date once per property. After that, manual syncs skip the older days.
+	totalsComplete := state != nil && state.TotalsBackfilledPropertyURI == mapping.PropertyURI
+	if !totalsComplete && (state == nil || state.LastSuccessAt == nil || state.Manual) {
+		days, err = searchConsoleCatchUpDays(ctx, tenantStore, siteID, mapping.PropertyURI, now)
 		if err != nil {
+			return err
+		}
+		totalsComplete = true
+	}
+	token := googleSearchConsoleToken(conn)
+	importedRows := 0
+	for _, window := range days {
+		// Replace the day only after every request succeeds.
+		queries := searchConsoleSyncQueries(mapping.PropertyURI, window)
+		results := make([][]searchconsole.SearchAnalyticsRow, len(queries))
+		group, groupCtx := errgroup.WithContext(ctx)
+		for i, query := range queries {
+			group.Go(func() (err error) {
+				results[i], err = w.source.QuerySearchAnalytics(groupCtx, token, query)
+				return err
+			})
+		}
+		if err := group.Wait(); err != nil {
 			return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageQuery, err)
 		}
+		rows := slices.Concat(results...)
 		if err := importSearchConsoleRows(ctx, tenantStore, rows, siteID, mapping.PropertyURI, window, now); err != nil {
 			return w.recordSyncFailure(ctx, *mapping, searchConsoleSyncStageImport, err)
 		}
@@ -225,6 +251,9 @@ func (w *SearchConsoleSyncWorker) ImportSite(ctx context.Context, siteID uuid.UU
 		LastAttemptAt:     &now,
 		Manual:            false,
 	}
+	if totalsComplete {
+		successState.TotalsBackfilledPropertyURI = mapping.PropertyURI
+	}
 	successAudit := searchConsoleSyncAuditParams(ctx, shared, *mapping, importedRows)
 	if err := shared.UpsertGoogleSearchConsoleSyncStateWithAudit(ctx, successState, successAudit); err != nil {
 		return err
@@ -238,12 +267,20 @@ type searchConsoleSyncWindow struct {
 }
 
 func searchConsoleSyncWindows(now time.Time, state *database.GoogleSearchConsoleSyncState) []searchConsoleSyncWindow {
-	end := searchConsoleDate(now.AddDate(0, 0, -2))
 	if state != nil && state.LastSuccessAt != nil {
-		return []searchConsoleSyncWindow{{Start: end.AddDate(0, 0, -6), End: end}}
+		return []searchConsoleSyncWindow{searchConsoleRecentWindow(now)}
 	}
-	start := end.AddDate(0, 0, -89)
-	return []searchConsoleSyncWindow{{Start: start, End: end}}
+	return []searchConsoleSyncWindow{searchConsoleInitialWindow(now)}
+}
+
+func searchConsoleRecentWindow(now time.Time) searchConsoleSyncWindow {
+	end := searchConsoleDate(now.AddDate(0, 0, -2))
+	return searchConsoleSyncWindow{Start: end.AddDate(0, 0, -6), End: end}
+}
+
+func searchConsoleInitialWindow(now time.Time) searchConsoleSyncWindow {
+	end := searchConsoleDate(now.AddDate(0, 0, -2))
+	return searchConsoleSyncWindow{Start: end.AddDate(0, 0, -89), End: end}
 }
 
 func searchConsoleSyncDays(windows []searchConsoleSyncWindow) []searchConsoleSyncWindow {
@@ -256,6 +293,30 @@ func searchConsoleSyncDays(windows []searchConsoleSyncWindow) []searchConsoleSyn
 		}
 	}
 	return days
+}
+
+// searchConsoleCatchUpDays returns the recent window's days, then every older
+// day in the initial range without completed totals, newest first. Each day
+// commits on its own, including empty responses, so a sync cut short skips
+// the finished days next time.
+func searchConsoleCatchUpDays(ctx context.Context, tenantStore *database.Store, siteID uuid.UUID, propertyURI string, now time.Time) ([]searchConsoleSyncWindow, error) {
+	recent := searchConsoleRecentWindow(now)
+	older := searchConsoleSyncWindow{Start: searchConsoleInitialWindow(now).Start, End: recent.Start.AddDate(0, 0, -1)}
+	withTotals, err := tenantStore.ListSearchConsoleAudienceTotalsDays(ctx, siteID, propertyURI, older.Start, older.End)
+	if err != nil {
+		return nil, err
+	}
+	done := make(map[string]bool, len(withTotals))
+	for _, day := range withTotals {
+		done[day.Format(time.DateOnly)] = true
+	}
+	days := searchConsoleSyncDays([]searchConsoleSyncWindow{recent})
+	for _, day := range searchConsoleSyncDays([]searchConsoleSyncWindow{older}) {
+		if !done[day.Start.Format(time.DateOnly)] {
+			days = append(days, day)
+		}
+	}
+	return days, nil
 }
 
 func mergedSearchConsoleImportedRange(state *database.GoogleSearchConsoleSyncState, windows []searchConsoleSyncWindow) (*time.Time, *time.Time) {
@@ -275,16 +336,29 @@ func mergedSearchConsoleImportedRange(state *database.GoogleSearchConsoleSyncSta
 	return &start, &end
 }
 
-func searchConsoleSyncQuery(propertyURI string, window searchConsoleSyncWindow) searchconsole.SearchAnalyticsQuery {
-	return searchconsole.SearchAnalyticsQuery{
-		SiteURL:         propertyURI,
-		StartDate:       window.Start,
-		EndDate:         window.End,
-		Dimensions:      []string{"date", "query", "page", "country", "device"},
-		DataState:       searchconsole.DataStateFinal,
-		AggregationType: "auto",
-		RowLimit:        25000,
+// searchConsoleSyncQueries returns one day's requests. Google omits anonymized
+// searches from rows grouped by query, and from rows grouped by page together
+// with country or device, so page and audience totals are separate requests
+// next to the query rows.
+func searchConsoleSyncQueries(propertyURI string, window searchConsoleSyncWindow) []searchconsole.SearchAnalyticsQuery {
+	dimensionSets := [][]string{
+		{"date", "query", "page", "country", "device"},
+		{"date", "page"},
+		{"date", "country", "device"},
 	}
+	queries := make([]searchconsole.SearchAnalyticsQuery, 0, len(dimensionSets))
+	for _, dimensions := range dimensionSets {
+		queries = append(queries, searchconsole.SearchAnalyticsQuery{
+			SiteURL:         propertyURI,
+			StartDate:       window.Start,
+			EndDate:         window.End,
+			Dimensions:      dimensions,
+			DataState:       searchconsole.DataStateFinal,
+			AggregationType: "auto",
+			RowLimit:        25000,
+		})
+	}
+	return queries
 }
 
 func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, rows []searchconsole.SearchAnalyticsRow, siteID uuid.UUID, propertyURI string, window searchConsoleSyncWindow, importedAt time.Time) error {
@@ -309,10 +383,15 @@ func importSearchConsoleRows(ctx context.Context, tenantStore *database.Store, r
 	}
 	return tenantStore.ReplaceSearchConsoleFacts(ctx, database.SearchConsoleFactScope{
 		SiteID: siteID, PropertyURI: propertyURI, StartDate: window.Start, EndDate: window.End, DataState: searchconsole.DataStateFinal,
+		TotalsComplete: true,
 	}, inputs)
 }
 
 func (w *SearchConsoleSyncWorker) recordSyncFailure(ctx context.Context, mapping database.GoogleSearchConsoleSiteMapping, stage string, syncErr error) error {
+	// The sync often fails because ctx expired or was canceled; the failure
+	// must still be recorded so the retry backs off and drops the manual flag.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), searchConsoleFailureRecordTimeout)
+	defer cancel()
 	now := w.now().UTC()
 	diagnostic := searchconsole.DiagnoseError(syncErr)
 	category := diagnostic.Category
