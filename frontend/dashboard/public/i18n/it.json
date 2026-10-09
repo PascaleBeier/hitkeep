@@ -1651,10 +1651,6 @@
       "siteSettingsAria": "Impostazioni sito"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Siti",
-        "settings": "Impostazioni"
-      },
       "title": "Impostazioni sito",
       "tabs": {
         "general": "Generale",

@@ -1,14 +1,17 @@
 <div class="page-frame">
+    @if (breadcrumbItems().length || subtitle()) {
     <app-page-header>
         <ng-template appPageHeaderLeft>
             <div class="page-frame__heading">
+                @if (breadcrumbItems().length) {
                 <app-page-breadcrumb [items]="breadcrumbItems()" />
-                @if (subtitle()) {
+                } @if (subtitle()) {
                 <p class="page-frame__subtitle">{{ subtitle() }}</p>
                 }
             </div>
         </ng-template>
     </app-page-header>
+    }
 
     <div class="page-frame__body">
         <ng-content />

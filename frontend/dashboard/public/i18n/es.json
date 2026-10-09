@@ -1860,10 +1860,6 @@
       "siteSettingsAria": "Configuración del sitio"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sitios",
-        "settings": "Configuración"
-      },
       "title": "Configuración del sitio",
       "tabs": {
         "general": "General",

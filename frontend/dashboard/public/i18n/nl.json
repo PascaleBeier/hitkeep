@@ -1642,10 +1642,6 @@
       "siteSettingsAria": "Site-instellingen"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Instellingen"
-      },
       "title": "Site-instellingen",
       "tabs": {
         "general": "Algemeen",

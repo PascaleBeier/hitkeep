@@ -1728,10 +1728,6 @@
       "siteSettingsAria": "Site settings"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Settings"
-      },
       "title": "Site settings",
       "tabs": {
         "general": "General",

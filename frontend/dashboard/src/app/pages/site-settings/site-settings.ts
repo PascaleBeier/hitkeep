@@ -5,7 +5,6 @@ import { TranslocoService } from '@jsverse/transloco';
 import { TabsModule } from '@openng/optimus-ui/tabs';
 import { filter, map } from 'rxjs';
 
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { INSTANCE_CAPABILITIES, SITE_CAPABILITIES } from '@core/access/capabilities';
 import { injectActiveLang } from '@core/i18n/active-lang';
@@ -68,11 +67,6 @@ export class SiteSettingsPage {
             }
         ];
         return tabs.filter((tab) => tab.visible);
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('sites.settings.breadcrumb.sites') }, { label: this.site()?.domain ?? '' }, { label: this.transloco.translate('sites.settings.breadcrumb.settings'), isCurrent: true }];
     });
 
     private activeChildSegment(): SiteSettingsSection {

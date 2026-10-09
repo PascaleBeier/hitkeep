@@ -1644,10 +1644,6 @@
       "siteSettingsAria": "Configurações do site"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Configurações"
-      },
       "title": "Configurações do site",
       "tabs": {
         "general": "Geral",

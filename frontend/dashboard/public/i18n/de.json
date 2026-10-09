@@ -1693,10 +1693,6 @@
       "siteSettingsAria": "Seiteneinstellungen"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Seiten",
-        "settings": "Einstellungen"
-      },
       "title": "Seiteneinstellungen",
       "tabs": {
         "general": "Allgemein",

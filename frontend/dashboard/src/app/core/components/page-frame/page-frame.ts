@@ -10,6 +10,6 @@ import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header'
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PageFrame {
-    breadcrumbItems = input.required<PageBreadcrumbItem[]>();
+    breadcrumbItems = input<PageBreadcrumbItem[]>([]);
     subtitle = input('');
 }

@@ -55,4 +55,27 @@ describe('PageFrame', () => {
         expect(pageHeaderRight()).toBeNull();
         expect(fixture.nativeElement.querySelector('.page-frame__subtitle')?.textContent).toContain('Scheduled delivery');
     });
+
+    it('skips the shared heading when there is no breadcrumb or subtitle', () => {
+        TestBed.resetTestingModule();
+        @Component({
+            imports: [PageFrame],
+            template: `
+                <app-page-frame>
+                    <main>Bare frame</main>
+                </app-page-frame>
+            `
+        })
+        class BareFrameHost {}
+        TestBed.configureTestingModule({
+            imports: [BareFrameHost],
+            providers: [{ provide: MainLayoutContextService, useValue: context }]
+        });
+        const bareFixture = TestBed.createComponent(BareFrameHost);
+        bareFixture.detectChanges();
+
+        expect(bareFixture.nativeElement.querySelector('.page-frame__body main')?.textContent).toContain('Bare frame');
+        expect(bareFixture.nativeElement.querySelector('app-page-header')).toBeNull();
+        expect(pageHeaderLeft()).toBeNull();
+    });
 });
