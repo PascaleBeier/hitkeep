@@ -605,9 +605,13 @@ export class Dashboard {
                     this.clearConversionSubject();
                     // If there is no conversion chip to clear, no signal would
                     // cause this effect to run again for the new site. Start
-                    // the activity request here so a site switch cannot leave
-                    // the old report visible or skip the new site's cards.
-                    if (!hadConversion) this.loadAIActivityForCurrentRange();
+                    // the activity and report requests here so a site switch
+                    // cannot leave the previous site's report visible or skip
+                    // the new site's cards.
+                    if (!hadConversion) {
+                        this.loadAIActivityForCurrentRange();
+                        this.loadStatsForCurrentRange();
+                    }
                 });
                 this.conversionSiteId = siteId;
                 return;
