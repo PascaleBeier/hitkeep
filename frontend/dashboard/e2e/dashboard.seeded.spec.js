@@ -299,14 +299,14 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
     await expect(teamSwitcher).toBeVisible();
     await expect(teamSwitcher).toContainText("Acme Analytics");
 
-    await page.getByRole("button", { name: /share dashboard/i }).click();
-    await expect(page.getByRole("dialog").getByText("Share dashboard")).toBeVisible();
-    await expect(page.getByRole("button", { name: /generate/i })).toBeVisible();
-    await page.getByRole("button", { name: /close/i }).click();
-
     await page.getByRole("button", { name: /site settings/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/general$/);
     await expect(page.getByRole("tab", { name: /general/i })).toHaveAttribute("aria-selected", "true");
+
+    await page.getByRole("tab", { name: /share/i }).click();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/share$/);
+    await expect(page.getByRole("button", { name: /generate/i })).toBeVisible();
+
     await page.getByRole("tab", { name: /tracking/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
     await expect(page.getByTestId("tracking-snippet")).toContainText("hk.js");

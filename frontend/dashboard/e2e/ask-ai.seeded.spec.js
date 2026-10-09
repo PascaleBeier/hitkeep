@@ -72,7 +72,8 @@ test("ask ai answers with a chart, page link, and export action", async ({ page 
     await login(page, "/dashboard");
     await expect(page.locator("html")).toHaveClass(/p-dark/);
 
-    await page.getByRole("button", { name: "Ask AI about this site" }).click();
+    await page.getByRole("button", { name: "Open user menu" }).click();
+    await page.getByRole("menuitem", { name: "Ask AI" }).click();
     await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
     const askInput = page.getByRole("textbox", { name: "Ask AI prompt" });
     await expect(askInput).toBeVisible();
@@ -97,7 +98,8 @@ test("ask ai answers with a chart, page link, and export action", async ({ page 
 
     await page.goBack();
     await expect(page).toHaveURL(/\/dashboard(?:\?.*)?$/);
-    await page.getByRole("button", { name: "Ask AI about this site" }).click();
+    await page.getByRole("button", { name: "Open user menu" }).click();
+    await page.getByRole("menuitem", { name: "Ask AI" }).click();
     await expect(page.getByRole("tab", { name: /History/ })).toHaveCount(0);
     await expect(page.getByText("openai.gpt-oss-120b")).toHaveCount(0);
     await expect(page.getByText("11111111-1111-4111-8111-111111111111")).toHaveCount(0);
@@ -112,8 +114,8 @@ test("ask ai opens in unavailable and mobile drawer states", async ({ page }) =>
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page, "/dashboard");
 
-    await page.getByRole("button", { name: "Main sidebar" }).click();
-    await page.getByRole("button", { name: "Ask AI about this site" }).click();
+    await page.getByRole("button", { name: "Open user menu" }).click();
+    await page.getByRole("menuitem", { name: "Ask AI" }).click();
     await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
     const drawer = page.locator(".ask-ai-drawer");
     await expect(drawer.getByText("Ask AI not configured")).toBeVisible();
@@ -143,7 +145,8 @@ test("ask ai shows the shared daily limit and can refresh availability", async (
         });
     });
     await login(page, "/dashboard");
-    await page.getByRole("button", { name: "Ask AI about this site" }).click();
+    await page.getByRole("button", { name: "Open user menu" }).click();
+    await page.getByRole("menuitem", { name: "Ask AI" }).click();
     await expect(page.getByText("0 of 1 team questions left today")).toBeVisible();
     await expect(page.getByRole("link", { name: /Set up MCP/ })).toHaveAttribute("href", /\/guides\/integrations\/mcp\//);
     await expect(page.getByRole("textbox", { name: "Ask AI prompt" })).toBeDisabled();

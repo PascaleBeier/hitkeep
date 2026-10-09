@@ -18,6 +18,14 @@
     min-width: 0;
 }
 
+.page-frame__heading {
+    margin: 0;
+    color: var(--p-text-color);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
 .page-frame__subtitle {
     margin: 0.25rem 0 0;
     color: var(--p-text-muted-color);

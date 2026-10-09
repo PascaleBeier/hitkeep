@@ -4,6 +4,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     selector: 'app-page-frame',
     template: `
         <div class="page-frame">
+            @if (heading()) {
+                <h1 class="page-frame__heading">{{ heading() }}</h1>
+            }
             @if (subtitle()) {
                 <p class="page-frame__subtitle page-frame__subtitle--intro">{{ subtitle() }}</p>
             }
@@ -17,4 +20,5 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 })
 export class PageFrame {
     subtitle = input('');
+    heading = input('');
 }
