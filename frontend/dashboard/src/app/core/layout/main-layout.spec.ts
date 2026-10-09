@@ -1158,6 +1158,8 @@ describe('MainLayout', () => {
 
         expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
         expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Account"]')).toBeTruthy();
+
+        localStorage.removeItem('hk_sidebar_sections');
     });
 
     it('should fold a route-active sidebar section when its toggle is clicked', () => {
@@ -1193,6 +1195,27 @@ describe('MainLayout', () => {
         expect(localFixture.nativeElement.querySelector('app-site-selector')).toBeNull();
         expect(localFixture.nativeElement.querySelector('app-layout-page-bar button[title]')).toBeNull();
         localFixture.destroy();
+    });
+
+    it('should fold a route-active section when another section is opened', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]')).toBeTruthy();
+
+            const accountToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Account"]') as HTMLButtonElement | null;
+            accountToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+            const integrationWrap = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section:has(button[aria-label="Expand Integration"]) .layout-sidebar-menu__collapse') as HTMLElement | null;
+            expect(integrationWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
     });
 
     it('should hide create team actions in hosted cloud for non-owners', () => {

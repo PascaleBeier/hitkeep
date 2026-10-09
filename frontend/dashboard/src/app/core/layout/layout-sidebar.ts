@@ -13,6 +13,7 @@ import { SidebarMenuService, type SidebarMenuSectionItem } from '@layout/sidebar
 interface ExpansionState {
     overrides: Record<string, boolean>;
     activeSectionId: string | null;
+    hasSectionOverrides: boolean;
 }
 
 const SECTION_ID_PREFIX = 's:';
@@ -38,10 +39,14 @@ export class LayoutSidebar {
     protected readonly isCreateTeamVisible = this.context.isCreateTeamVisible;
     protected readonly beforeTeamSwitch = this.context.beforeTeamSwitch;
     private readonly expansionOverrides = signal<Record<string, boolean>>(this.readStoredOverrides());
-    private readonly expansionState = computed<ExpansionState>(() => ({
-        overrides: this.expansionOverrides(),
-        activeSectionId: this.sidebarMenu.activeSectionId()
-    }));
+    private readonly expansionState = computed<ExpansionState>(() => {
+        const overrides = this.expansionOverrides();
+        return {
+            overrides,
+            activeSectionId: this.sidebarMenu.activeSectionId(),
+            hasSectionOverrides: Object.keys(overrides).some((key) => key.startsWith(SECTION_ID_PREFIX))
+        };
+    });
     protected readonly desktopMenuItems = computed(() => this.sidebarMenu.desktopItems());
     private readonly closeMobileMenuCommand = () => this.closeMobileDrawer();
     protected readonly mobileMenuItems = computed(() => this.sidebarMenu.mobileItems(this.closeMobileMenuCommand));
@@ -64,7 +69,11 @@ export class LayoutSidebar {
         if (override !== undefined) {
             return override;
         }
-        return expansion.activeSectionId === section.sectionId;
+        // Auto-expand the section of the active route, but only until the user
+        // picks a section manually: from then on the exclusive accordion owns
+        // the open state, otherwise the active route would keep its section
+        // stuck open next to the manually selected one.
+        return !expansion.hasSectionOverrides && expansion.activeSectionId === section.sectionId;
     }
 
     protected toggleSection(section: SidebarMenuSectionItem, event: Event) {
