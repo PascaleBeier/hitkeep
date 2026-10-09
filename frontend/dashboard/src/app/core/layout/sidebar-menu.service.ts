@@ -23,7 +23,7 @@ interface SidebarItem {
 
 interface SidebarSection {
     id: string;
-    labelKey: string;
+    labelKey?: string;
     collapsible?: boolean;
     visible?: () => boolean;
     items: SidebarItem[];
@@ -98,7 +98,7 @@ export class SidebarMenuService {
         return {
             sectionId: section.id,
             collapsible: section.collapsible ?? false,
-            label: this.transloco.translate(section.labelKey),
+            label: section.labelKey ? this.transloco.translate(section.labelKey) : '',
             expanded: true,
             items
         };
@@ -168,10 +168,14 @@ export class SidebarMenuService {
 
         return [
             {
+                id: 'overview',
+                visible: notShare,
+                items: [{ labelKey: 'nav.overview', icon: 'pi pi-globe', routerLink: '/overview', exact: true }]
+            },
+            {
                 id: 'analytics',
                 labelKey: 'nav.analytics',
                 items: [
-                    { labelKey: 'nav.overview', icon: 'pi pi-globe', routerLink: '/overview', visible: notShare, exact: true },
                     { labelKey: 'nav.dashboard', icon: 'pi pi-chart-bar', routerLink: '/dashboard', shareRouterLink: '/dashboard' },
                     { labelKey: 'nav.opportunities', icon: 'pi pi-compass', routerLink: '/opportunities', shareRouterLink: '/opportunities' },
                     { labelKey: 'nav.goals', icon: 'pi pi-flag', routerLink: '/goals', shareRouterLink: '/goals' },
@@ -194,9 +198,7 @@ export class SidebarMenuService {
                     {
                         labelKey: 'nav.apiClients',
                         icon: 'pi pi-key',
-                        routerLink: '/integration/api-clients',
-                        exact: true,
-                        items: [{ labelKey: 'nav.apiReference', icon: 'pi pi-book', routerLink: '/integration/api-reference' }]
+                        routerLink: '/integration/api-clients'
                     },
                     { labelKey: 'nav.webhooks', icon: 'pi pi-send', routerLink: '/integration/webhooks', visible: canManageWebhooks },
                     { labelKey: 'nav.googleSearchConsole', icon: 'pi pi-search', routerLink: '/integration/google-search-console', visible: canManageIntegrations }

@@ -25,7 +25,7 @@
     "goals": "Objetivos",
     "funnels": "Embudos",
     "utm": "UTM",
-    "apiClients": "Clientes API",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "Referencia API",
     "expandItem": "Expandir {{item}}",
@@ -3492,6 +3492,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clientes",
+        "reference": "Referencia"
+      },
       "subtitle": "Crea y administra clientes API para integraciones.",
       "manageTeamClients": "Administrar clientes API del equipo"
     },

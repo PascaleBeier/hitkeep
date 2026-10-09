@@ -70,9 +70,7 @@
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="siteActionStatusMessage()" />
                         </div>
                         }
-                        <div class="flex items-center justify-end gap-2 border-b border-[var(--p-content-border-color)] px-4 py-3">
-                            <p-button [label]="'admin.sites.addSite' | transloco" icon="pi pi-plus" styleClass="p-button-sm" (onClick)="openAddSiteDialog()" data-testid="admin-add-site-button" />
-                        </div>
+                        <p-button admin-panel-header [label]="'admin.sites.addSite' | transloco" icon="pi pi-plus" styleClass="p-button-sm" (onClick)="openAddSiteDialog()" data-testid="admin-add-site-button" />
                         <app-table
                             [value]="siteRows()"
                             [columns]="siteColumns"

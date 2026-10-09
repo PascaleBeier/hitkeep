@@ -1,0 +1,24 @@
+<app-page-frame>
+    <section class="api-clients-shell" [attr.aria-label]="'nav.apiClients' | transloco">
+        <p-tabs class="hk-page-tabs api-clients-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
+            <p-tablist>
+                <p-tab value="clients">
+                    <span class="api-clients-tab-label">
+                        <i class="pi pi-key" aria-hidden="true"></i>
+                        <span>{{ "integration.apiClients.tabs.clients" | transloco }}</span>
+                    </span>
+                </p-tab>
+                <p-tab value="reference">
+                    <span class="api-clients-tab-label">
+                        <i class="pi pi-book" aria-hidden="true"></i>
+                        <span>{{ "integration.apiClients.tabs.reference" | transloco }}</span>
+                    </span>
+                </p-tab>
+            </p-tablist>
+        </p-tabs>
+
+        <div class="api-clients-content">
+            <router-outlet />
+        </div>
+    </section>
+</app-page-frame>

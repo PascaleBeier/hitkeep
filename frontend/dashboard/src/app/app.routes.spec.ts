@@ -32,6 +32,21 @@ describe('routes', () => {
         expect(children.some((route) => route.path === 'imports')).toBe(false);
     });
 
+    it('exposes UTM as one routed hub with addressable tabs in both subtrees', () => {
+        const mainChildren = routes.find((route) => route.path === '')?.children ?? [];
+        const shareChildren = mainChildren.find((route) => route.path === 'share/:token')?.children ?? [];
+        const mainUtm = mainChildren.find((route) => route.path === 'utm');
+        const shareUtm = shareChildren.find((route) => route.path === 'utm');
+
+        expect(mainUtm?.children?.some((route) => route.path === '' && route.pathMatch === 'full' && route.redirectTo === 'builder')).toBe(true);
+        expect(mainUtm?.children?.some((route) => route.path === 'builder')).toBe(true);
+        expect(mainUtm?.children?.some((route) => route.path === 'qr-codes')).toBe(true);
+
+        expect(shareUtm?.children?.some((route) => route.path === '' && route.pathMatch === 'full' && route.redirectTo === 'qr-codes')).toBe(true);
+        expect(shareUtm?.children?.some((route) => route.path === 'builder')).toBe(false);
+        expect(shareUtm?.children?.some((route) => route.path === 'qr-codes')).toBe(true);
+    });
+
     it('exposes AI Agents as one single-page leaf route in both subtrees', () => {
         const mainChildren = routes.find((route) => route.path === '')?.children ?? [];
         const shareChildren = mainChildren.find((route) => route.path === 'share/:token')?.children ?? [];

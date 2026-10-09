@@ -38,7 +38,7 @@
     <div class="layout-sidebar-menu">
         @for (section of items; track section.sectionId) {
         <section class="layout-sidebar-menu__section">
-            @if (section.collapsible) {
+            @if (section.collapsible) { @if (section.label) {
             <h2 class="layout-sidebar-menu__section-label layout-sidebar-menu__section-label--collapsible">
                 <button
                     type="button"
@@ -52,6 +52,7 @@
                     <i class="pi layout-sidebar-menu__section-chevron" [class.pi-chevron-down]="isSectionOpen(section)" [class.pi-chevron-right]="!isSectionOpen(section)" aria-hidden="true"></i>
                 </button>
             </h2>
+            }
             <div [id]="'sidebar-section-' + section.sectionId" class="layout-sidebar-menu__collapse" [class.layout-sidebar-menu__collapse--closed]="!isSectionOpen(section)" [attr.inert]="!isSectionOpen(section) ? '' : null">
                 <ul class="layout-sidebar-menu__list" role="group">
                     @for (item of section.items ?? []; track item.label) {
@@ -59,8 +60,9 @@
                     }
                 </ul>
             </div>
-            } @else {
+            } @else { @if (section.label) {
             <h2 class="layout-sidebar-menu__section-label">{{ section.label }}</h2>
+            }
             <ul class="layout-sidebar-menu__list" role="tree">
                 @for (item of section.items ?? []; track item.label) {
                 <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: item, level: 1 }" />

@@ -84,7 +84,17 @@ describe('SidebarMenuService', () => {
         expect(findByLabel(items, 'Support')?.url).toBe('https://support.example.test');
     });
 
-    it('nests related utility pages under collapsed parent menu items', () => {
+    it('lists the team overview as an unlabeled section above Analytics', () => {
+        const items = service.desktopItems();
+
+        expect(items[0]?.sectionId).toBe('overview');
+        expect(items[0]?.label).toBe('');
+        expect(items[0]?.items?.[0]?.routerLink).toBe('/overview');
+        expect(items[1]?.sectionId).toBe('analytics');
+        expect(items[1]?.items?.some((item) => item.routerLink === '/overview')).toBe(false);
+    });
+
+    it('keeps utility hubs as flat menu entries without nested children', () => {
         permissions.applyPermissions({
             instance_role: 'user',
             permissions: {},
@@ -97,7 +107,6 @@ describe('SidebarMenuService', () => {
         const integration = findByLabel(items, 'Integration');
         const utm = findByLabel(items, 'UTM');
         const apiClients = findByLabel(items, 'API Clients');
-        const apiReference = findByLabel(apiClients?.items ?? [], 'API Reference');
 
         expect(analytics?.expanded).toBe(true);
         expect(integration?.expanded).toBe(true);
@@ -106,8 +115,7 @@ describe('SidebarMenuService', () => {
         expect(utm?.routerLink).toBe('/utm');
         expect(utm?.items).toBeUndefined();
         expect(apiClients?.routerLink).toBe('/integration/api-clients');
-        expect(apiClients?.expanded).toBe(false);
-        expect(apiReference?.routerLink).toBe('/integration/api-reference');
+        expect(apiClients?.items).toBeUndefined();
     });
 
     it('does not expose system settings to users who can only view system status', () => {

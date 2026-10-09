@@ -25,7 +25,7 @@
     "goals": "Doelen",
     "funnels": "Funnels",
     "utm": "UTM",
-    "apiClients": "API-clients",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "API-referentie",
     "expandItem": "{{item}} uitklappen",
@@ -3238,6 +3238,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clients",
+        "reference": "Referentie"
+      },
       "subtitle": "Creëer en beheer API-clients voor integraties.",
       "manageTeamClients": "Team-API-clients beheren"
     },

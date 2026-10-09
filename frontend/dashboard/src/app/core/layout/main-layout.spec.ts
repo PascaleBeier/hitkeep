@@ -78,12 +78,14 @@ describe('MainLayout', () => {
                     langs: {
                         en: {
                             nav: {
+                                overview: 'Overview',
                                 utm: 'UTM',
                                 utmBuilder: 'UTM Builder',
                                 qrCodes: 'QR codes',
                                 integration: 'Integration',
                                 apiClients: 'API Clients',
                                 apiReference: 'API Reference',
+                                account: 'Account',
                                 importExport: 'Import & Export',
                                 importExportAria: 'Go to import and export',
                                 expandItem: 'Expand {{item}}',
@@ -1141,67 +1143,56 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should keep collapsible sidebar parents navigable while the chevron expands children', () => {
+    it('should fold other sections when one collapsible section opens', () => {
         const integrationToggle = fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]') as HTMLButtonElement | null;
         integrationToggle?.click();
         fixture.detectChanges();
 
-        let apiClientsLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
-        let apiReferenceLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]') as HTMLAnchorElement | null;
-        let treeItem = apiClientsLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        let toggle = treeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
-        let nestedWrap = treeItem?.querySelector('.layout-sidebar-menu__collapse') as HTMLElement | null;
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]')).toBeNull();
 
-        expect(apiClientsLink).toBeTruthy();
-        expect(apiReferenceLink).toBeTruthy();
-        expect(nestedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
-        expect(nestedWrap?.hasAttribute('inert')).toBe(true);
-        expect(treeItem?.getAttribute('aria-expanded')).toBe('false');
-        expect(toggle?.getAttribute('aria-label')).toBe('Expand API Clients');
-
-        toggle?.click();
+        const accountToggle = fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Account"]') as HTMLButtonElement | null;
+        accountToggle?.click();
         fixture.detectChanges();
 
-        apiClientsLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
-        apiReferenceLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]') as HTMLAnchorElement | null;
-        treeItem = apiClientsLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        toggle = treeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
-        nestedWrap = treeItem?.querySelector('.layout-sidebar-menu__collapse') as HTMLElement | null;
-
-        expect(apiClientsLink).toBeTruthy();
-        expect(apiReferenceLink).toBeTruthy();
-        expect(nestedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(false);
-        expect(nestedWrap?.hasAttribute('inert')).toBe(false);
-        expect(treeItem?.getAttribute('aria-expanded')).toBe('true');
-        expect(toggle?.getAttribute('aria-label')).toBe('Collapse API Clients');
-        expect(treeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Account"]')).toBeTruthy();
     });
 
-    it('should fold a route-active sidebar branch when its toggle is clicked', () => {
+    it('should fold a route-active sidebar section when its toggle is clicked', () => {
         vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
         const localFixture = TestBed.createComponent(MainLayout);
         localFixture.detectChanges();
 
         try {
             const sectionToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]') as HTMLButtonElement | null;
-            const itemToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__toggle[aria-label="Collapse API Clients"]') as HTMLButtonElement | null;
+            const apiClientsLink = localFixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
 
             expect(sectionToggle).toBeTruthy();
-            expect(itemToggle).toBeTruthy();
-
-            itemToggle?.click();
-            localFixture.detectChanges();
-
-            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__toggle[aria-label="Expand API Clients"]')).toBeTruthy();
+            expect(apiClientsLink).toBeTruthy();
 
             sectionToggle?.click();
             localFixture.detectChanges();
 
             expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+            const closedWrap = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section:has(button[aria-label="Expand Integration"]) .layout-sidebar-menu__collapse') as HTMLElement | null;
+            expect(closedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
+            expect(closedWrap?.hasAttribute('inert')).toBe(true);
         } finally {
             localStorage.removeItem('hk_sidebar_sections');
             localFixture.destroy();
         }
+    });
+
+    it('should hide the site selector and settings shortcut on the overview page', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/overview');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        expect(localFixture.nativeElement.querySelector('app-site-selector')).toBeNull();
+        expect(localFixture.nativeElement.querySelector('app-layout-page-bar button[title]')).toBeNull();
+        localFixture.destroy();
     });
 
     it('should hide create team actions in hosted cloud for non-owners', () => {

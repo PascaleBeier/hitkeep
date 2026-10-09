@@ -8,7 +8,7 @@
             </button>
         </div>
     </div>
-    @if (!shareService.isShareMode()) {
+    @if (!shareService.isShareMode() && !context.isOverviewPage()) {
     <div class="flex items-center gap-2">
         <app-site-selector class="min-w-0 flex-1" [sites]="siteService.sites()" [current]="siteService.activeSite()" [loading]="siteService.isLoading()" (siteSelected)="context.onSiteSelected($event)" />
         <button

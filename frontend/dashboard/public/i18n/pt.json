@@ -25,7 +25,7 @@
     "goals": "Metas",
     "funnels": "Funis",
     "utm": "UTM",
-    "apiClients": "Clientes de API",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "API Doc.",
     "expandItem": "Expandir {{item}}",
@@ -3228,6 +3228,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clientes",
+        "reference": "Referência"
+      },
       "subtitle": "Crie e gerencie clientes de API para integrações.",
       "manageTeamClients": "Gerenciar clientes de API da equipe"
     },

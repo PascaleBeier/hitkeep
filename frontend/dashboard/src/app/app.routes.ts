@@ -136,12 +136,7 @@ export const routes: Routes = [
                         loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
                         data: titleData('nav.utm', 'site'),
                         children: [
-                            { path: '', pathMatch: 'full', redirectTo: 'builder' },
-                            {
-                                path: 'builder',
-                                loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
-                                data: titleData('nav.utmBuilder', 'site')
-                            },
+                            { path: '', pathMatch: 'full', redirectTo: 'qr-codes' },
                             {
                                 path: 'qr-codes',
                                 loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
@@ -215,7 +210,12 @@ export const routes: Routes = [
                 loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
                 data: titleData('nav.utm', 'site'),
                 children: [
-                    { path: '', pathMatch: 'full', redirectTo: 'qr-codes' },
+                    { path: '', pathMatch: 'full', redirectTo: 'builder' },
+                    {
+                        path: 'builder',
+                        loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
+                        data: titleData('nav.utmBuilder', 'site')
+                    },
                     {
                         path: 'qr-codes',
                         loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
@@ -297,13 +297,26 @@ export const routes: Routes = [
             },
             {
                 path: 'integration/api-clients',
-                loadComponent: () => import('@pages/integration/api-clients/api-clients').then((m) => m.APIClientsPage),
-                data: titleData('nav.apiClients', 'team')
+                loadComponent: () => import('@pages/integration/api-clients/api-clients-hub').then((m) => m.ApiClientsHub),
+                data: titleData('nav.apiClients', 'team'),
+                children: [
+                    { path: '', pathMatch: 'full', redirectTo: 'clients' },
+                    {
+                        path: 'clients',
+                        loadComponent: () => import('@pages/integration/api-clients/api-clients').then((m) => m.APIClientsPage),
+                        data: titleData('nav.apiClients', 'team')
+                    },
+                    {
+                        path: 'reference',
+                        loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage),
+                        data: titleData('nav.apiReference')
+                    }
+                ]
             },
             {
                 path: 'integration/api-reference',
-                loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage),
-                data: titleData('nav.apiReference')
+                pathMatch: 'full',
+                redirectTo: '/integration/api-clients/reference'
             },
             {
                 path: 'integration/webhooks',

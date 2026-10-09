@@ -1,5 +1,5 @@
 <div class="mb-4 hidden items-center gap-2 md:mb-6 md:flex">
-    @if (!shareService.isShareMode()) {
+    @if (!shareService.isShareMode() && !context.isOverviewPage()) {
     <app-site-selector class="w-52 min-w-0 shrink-0 lg:w-60" [sites]="siteService.sites()" [current]="siteService.activeSite()" [loading]="siteService.isLoading()" (siteSelected)="context.onSiteSelected($event)" />
     <button
         type="button"
