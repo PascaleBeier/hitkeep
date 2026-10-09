@@ -133,18 +133,26 @@ export const routes: Routes = [
                     },
                     {
                         path: 'utm',
-                        loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmDashboard),
-                        data: titleData('nav.utm', 'site')
-                    },
-                    {
-                        path: 'utm/qr-codes',
-                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                        data: titleData('nav.qrCodes', 'site')
-                    },
-                    {
-                        path: 'utm/qr-codes/:qrID',
-                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                        data: titleData('nav.qrCodes', 'site')
+                        loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
+                        data: titleData('nav.utm', 'site'),
+                        children: [
+                            { path: '', pathMatch: 'full', redirectTo: 'builder' },
+                            {
+                                path: 'builder',
+                                loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
+                                data: titleData('nav.utmBuilder', 'site')
+                            },
+                            {
+                                path: 'qr-codes',
+                                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                                data: titleData('nav.qrCodes', 'site')
+                            },
+                            {
+                                path: 'qr-codes/:qrID',
+                                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                                data: titleData('nav.qrCodes', 'site')
+                            }
+                        ]
                     },
                     { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
                 ]
@@ -204,23 +212,21 @@ export const routes: Routes = [
             },
             {
                 path: 'utm',
-                loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmDashboard),
-                data: titleData('nav.utm', 'site')
-            },
-            {
-                path: 'utm/builder',
-                loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
-                data: titleData('nav.utmBuilder', 'site')
-            },
-            {
-                path: 'utm/qr-codes',
-                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                data: titleData('nav.qrCodes', 'site')
-            },
-            {
-                path: 'utm/qr-codes/:qrID',
-                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                data: titleData('nav.qrCodes', 'site')
+                loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
+                data: titleData('nav.utm', 'site'),
+                children: [
+                    { path: '', pathMatch: 'full', redirectTo: 'qr-codes' },
+                    {
+                        path: 'qr-codes',
+                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                        data: titleData('nav.qrCodes', 'site')
+                    },
+                    {
+                        path: 'qr-codes/:qrID',
+                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                        data: titleData('nav.qrCodes', 'site')
+                    }
+                ]
             },
             {
                 path: 'sites/:siteId/settings',

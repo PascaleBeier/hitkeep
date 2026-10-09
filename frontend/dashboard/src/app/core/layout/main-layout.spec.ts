@@ -81,6 +81,9 @@ describe('MainLayout', () => {
                                 utm: 'UTM',
                                 utmBuilder: 'UTM Builder',
                                 qrCodes: 'QR codes',
+                                integration: 'Integration',
+                                apiClients: 'API Clients',
+                                apiReference: 'API Reference',
                                 importExport: 'Import & Export',
                                 importExportAria: 'Go to import and export',
                                 expandItem: 'Expand {{item}}',
@@ -335,7 +338,7 @@ describe('MainLayout', () => {
         const visibleHrefs = navLinks.map((link) => link.getAttribute('href'));
 
         expect(visibleHrefs).toContain('/share/share-token/utm');
-        expect(visibleHrefs).toContain('/share/share-token/utm/qr-codes');
+        expect(visibleHrefs).not.toContain('/share/share-token/utm/qr-codes');
     });
 
     it('should hide Ask AI by default', () => {
@@ -1139,29 +1142,39 @@ describe('MainLayout', () => {
     });
 
     it('should keep collapsible sidebar parents navigable while the chevron expands children', () => {
-        let utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        let utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        let utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        let toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        const integrationToggle = fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]') as HTMLButtonElement | null;
+        integrationToggle?.click();
+        fixture.detectChanges();
 
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeNull();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('false');
-        expect(toggle?.getAttribute('aria-label')).toBe('Expand UTM');
+        let apiClientsLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
+        let apiReferenceLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]') as HTMLAnchorElement | null;
+        let treeItem = apiClientsLink?.closest('[role="treeitem"]') as HTMLElement | null;
+        let toggle = treeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        let nestedWrap = treeItem?.querySelector('.layout-sidebar-menu__collapse') as HTMLElement | null;
+
+        expect(apiClientsLink).toBeTruthy();
+        expect(apiReferenceLink).toBeTruthy();
+        expect(nestedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
+        expect(nestedWrap?.hasAttribute('inert')).toBe(true);
+        expect(treeItem?.getAttribute('aria-expanded')).toBe('false');
+        expect(toggle?.getAttribute('aria-label')).toBe('Expand API Clients');
 
         toggle?.click();
         fixture.detectChanges();
 
-        utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        apiClientsLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
+        apiReferenceLink = fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]') as HTMLAnchorElement | null;
+        treeItem = apiClientsLink?.closest('[role="treeitem"]') as HTMLElement | null;
+        toggle = treeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        nestedWrap = treeItem?.querySelector('.layout-sidebar-menu__collapse') as HTMLElement | null;
 
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeTruthy();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('true');
-        expect(toggle?.getAttribute('aria-label')).toBe('Collapse UTM');
-        expect(utmTreeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
+        expect(apiClientsLink).toBeTruthy();
+        expect(apiReferenceLink).toBeTruthy();
+        expect(nestedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(false);
+        expect(nestedWrap?.hasAttribute('inert')).toBe(false);
+        expect(treeItem?.getAttribute('aria-expanded')).toBe('true');
+        expect(toggle?.getAttribute('aria-label')).toBe('Collapse API Clients');
+        expect(treeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
     });
 
     it('should hide create team actions in hosted cloud for non-owners', () => {

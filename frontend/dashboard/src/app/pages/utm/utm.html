@@ -1,60 +1,26 @@
-<div class="flex flex-col h-full w-full bg-[var(--p-surface-ground)] transition-colors duration-200">
-    <app-report-range-toolbar [loading]="isRefreshing()" (refresh)="refreshStats()">
-        <p-button toolbar-right routerLink="/utm/builder" icon="pi pi-link" [label]="'utmBuilder.breadcrumb' | transloco" severity="secondary" size="small" />
-    </app-report-range-toolbar>
+<app-page-frame>
+    <section class="utm-shell" [attr.aria-label]="'nav.utm' | transloco">
+        <p-tabs class="hk-page-tabs utm-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
+            <p-tablist>
+                @if (!isShareMode()) {
+                <p-tab value="builder">
+                    <span class="utm-tab-label">
+                        <i class="pi pi-link" aria-hidden="true"></i>
+                        <span>{{ "nav.utmBuilder" | transloco }}</span>
+                    </span>
+                </p-tab>
+                }
+                <p-tab value="qr-codes">
+                    <span class="utm-tab-label">
+                        <i class="pi pi-qrcode" aria-hidden="true"></i>
+                        <span>{{ "nav.qrCodes" | transloco }}</span>
+                    </span>
+                </p-tab>
+            </p-tablist>
+        </p-tabs>
 
-    @if (siteService.isLoading()) {
-    <div class="flex items-center gap-2 text-sm text-[var(--p-text-muted-color)]">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-        <span>{{ "common.loadingSiteData" | transloco }}</span>
-    </div>
-    } @else if (siteService.activeSite()) {
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
-        @for (card of utmKpis(); track card.label) {
-        <app-kpi-card [label]="card.label" [value]="card.value" [loading]="card.loading" [updateKey]="card.updateKey" [valueClass]="card.valueClass" [delta]="card.delta ?? null" />
-        }
-    </div>
-
-    <div class="mb-6">
-        <p-card class="shadow-sm border border-surface-200 dark:border-surface-700 surface-card">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-                <div>
-                    <h3 class="text-lg font-semibold">{{ "utm.series.title" | transloco }}</h3>
-                    <p class="text-sm text-[var(--p-text-muted-color)]">{{ "utm.series.description" | transloco }}</p>
-                </div>
-            </div>
-            <app-series-chart
-                [data]="utmSeriesData()"
-                [series]="utmSeriesConfig()"
-                [comparisonData]="utmComparisonSeriesData()"
-                [isLoading]="isStatsLoading()"
-                [isShortRange]="isShortRange()"
-                [emptyTitle]="'utm.series.emptyTitle' | transloco"
-                [emptyDescription]="'utm.series.emptyDescription' | transloco"
-                [comparisonLabel]="comparisonLabel()"
-            />
-        </p-card>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div class="flex flex-wrap items-center gap-2">
-            @if (hasFilters()) { @for (filter of filterChips(); track filter.type) {
-            <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--p-primary-color)] text-sm">
-                <span class="font-medium text-[var(--p-text-color)]">{{ filter.label }}</span>
-                <button type="button" class="text-muted-color hover:text-[var(--p-text-color)]" (click)="removeFilter(filter.type, filter.value)" [attr.aria-label]="'common.removeFilterAria' | transloco">
-                    <i class="pi pi-times" aria-hidden="true"></i>
-                </button>
-            </span>
-            }
-            <button type="button" class="text-xs text-muted-color hover:text-[var(--p-text-color)] underline" (click)="clearFilter()">{{ "common.actions.clearAll" | transloco }}</button>
-            } @else {
-            <span class="text-sm text-[var(--p-text-muted-color)]">{{ "common.noActiveFilter" | transloco }}</span>
-            }
+        <div class="utm-content">
+            <router-outlet />
         </div>
-    </div>
-
-    <app-metric-card-group class="mb-6" [tabs]="metricCardTabs()" (rowClicked)="onMetricCardClick($event)" />
-    } @else {
-    <app-page-state titleKey="common.noSiteSelected" messageKey="utm.noSiteDescription" icon="pi pi-globe" />
-    }
-</div>
+    </section>
+</app-page-frame>

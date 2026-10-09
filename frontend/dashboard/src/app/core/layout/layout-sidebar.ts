@@ -10,10 +10,13 @@ import { FreePlanChip } from '@layout/free-plan-chip';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { SidebarMenuService, type SidebarMenuSectionItem } from '@layout/sidebar-menu.service';
 
-interface SectionExpansionState {
+interface ExpansionState {
     overrides: Record<string, boolean>;
-    activeId: string | null;
+    activeSectionId: string | null;
 }
+
+const SECTION_ID_PREFIX = 's:';
+const ITEM_KEY_PREFIX = 'i:';
 
 @Component({
     selector: 'app-layout-sidebar',
@@ -34,15 +37,14 @@ export class LayoutSidebar {
     protected readonly isMobileDrawerOpen = this.context.isMobileDrawerOpen;
     protected readonly isCreateTeamVisible = this.context.isCreateTeamVisible;
     protected readonly beforeTeamSwitch = this.context.beforeTeamSwitch;
-    private readonly expandedMenuLabels = signal<ReadonlySet<string>>(new Set());
-    private readonly sectionOverrides = signal<Record<string, boolean>>(this.readStoredSectionOverrides());
-    private readonly sectionExpansion = computed<SectionExpansionState>(() => ({
-        overrides: this.sectionOverrides(),
-        activeId: this.sidebarMenu.activeSectionId()
+    private readonly expansionOverrides = signal<Record<string, boolean>>(this.readStoredOverrides());
+    private readonly expansionState = computed<ExpansionState>(() => ({
+        overrides: this.expansionOverrides(),
+        activeSectionId: this.sidebarMenu.activeSectionId()
     }));
-    protected readonly desktopMenuItems = computed(() => this.applyExpandedState(this.sidebarMenu.desktopItems()));
+    protected readonly desktopMenuItems = computed(() => this.sidebarMenu.desktopItems());
     private readonly closeMobileMenuCommand = () => this.closeMobileDrawer();
-    protected readonly mobileMenuItems = computed(() => this.applyExpandedState(this.sidebarMenu.mobileItems(this.closeMobileMenuCommand)));
+    protected readonly mobileMenuItems = computed(() => this.sidebarMenu.mobileItems(this.closeMobileMenuCommand));
 
     protected closeMobileDrawer() {
         this.isMobileDrawerOpen.set(false);
@@ -57,12 +59,12 @@ export class LayoutSidebar {
         if (!section.collapsible || !section.sectionId) {
             return true;
         }
-        const expansion = this.sectionExpansion();
-        const override = expansion.overrides[section.sectionId];
+        const expansion = this.expansionState();
+        const override = expansion.overrides[SECTION_ID_PREFIX + section.sectionId];
         if (override !== undefined) {
             return override;
         }
-        return expansion.activeId === section.sectionId;
+        return expansion.activeSectionId === section.sectionId;
     }
 
     protected toggleSection(section: SidebarMenuSectionItem, event: Event) {
@@ -73,40 +75,35 @@ export class LayoutSidebar {
             return;
         }
         const next = !this.isSectionOpen(section);
-        this.sectionOverrides.update((overrides) => {
-            const updated = { ...overrides, [sectionId]: next };
-            this.storeSectionOverrides(updated);
+        this.expansionOverrides.update((overrides) => {
+            // Exclusive accordion: opening one section folds the others. Item-level
+            // expansion (nested menus) lives in its own namespace and survives.
+            const kept = Object.fromEntries(Object.entries(overrides).filter(([key]) => key.startsWith(ITEM_KEY_PREFIX)));
+            const updated = next ? { ...kept, [SECTION_ID_PREFIX + sectionId]: true } : kept;
+            this.storeOverrides(updated);
             return updated;
         });
     }
 
-    protected toggleMenuItem(item: MenuItem, isExpanded: boolean | undefined, event: Event) {
+    protected isItemOpen(item: MenuItem): boolean {
+        if (!item.items?.length) {
+            return true;
+        }
+        const override = this.expansionOverrides()[ITEM_KEY_PREFIX + this.getMenuItemKey(item)];
+        return override ?? item.expanded === true;
+    }
+
+    protected toggleMenuItem(item: MenuItem, event: Event) {
         event.preventDefault();
         event.stopPropagation();
-        this.expandedMenuLabels.update((labels) => {
-            const next = new Set(labels);
-            const key = this.getMenuItemKey(item);
-            if (isExpanded) {
-                next.delete(key);
-            } else {
-                next.add(key);
-            }
-            return next;
+        const key = this.getMenuItemKey(item);
+        const next = !this.isItemOpen(item);
+        this.expansionOverrides.update((overrides) => {
+            const kept = Object.fromEntries(Object.entries(overrides).filter(([stored]) => stored.startsWith(SECTION_ID_PREFIX)));
+            const updated = next ? { ...kept, [ITEM_KEY_PREFIX + key]: true } : kept;
+            this.storeOverrides(updated);
+            return updated;
         });
-    }
-
-    private applyExpandedState(items: MenuItem[]): MenuItem[] {
-        const expandedLabels = this.expandedMenuLabels();
-        return items.map((item) => this.withExpandedState(item, expandedLabels));
-    }
-
-    private withExpandedState(item: MenuItem, expandedLabels: ReadonlySet<string>): MenuItem {
-        const children = item.items?.map((child) => this.withExpandedState(child, expandedLabels));
-        return {
-            ...item,
-            expanded: item.expanded || expandedLabels.has(this.getMenuItemKey(item)),
-            items: children
-        };
     }
 
     private getMenuItemKey(item: MenuItem): string {
@@ -116,7 +113,7 @@ export class LayoutSidebar {
         return item.url ?? item.label ?? '';
     }
 
-    private readStoredSectionOverrides(): Record<string, boolean> {
+    private readStoredOverrides(): Record<string, boolean> {
         try {
             const raw = localStorage.getItem(LayoutSidebar.SECTION_STATE_STORAGE_KEY);
             if (!raw) {
@@ -132,7 +129,7 @@ export class LayoutSidebar {
         }
     }
 
-    private storeSectionOverrides(overrides: Record<string, boolean>) {
+    private storeOverrides(overrides: Record<string, boolean>) {
         try {
             localStorage.setItem(LayoutSidebar.SECTION_STATE_STORAGE_KEY, JSON.stringify(overrides));
         } catch {

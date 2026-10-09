@@ -165,24 +165,6 @@ export class SidebarMenuService {
         const canManageIntegrations = () => this.access.canActiveTeam(TEAM_CAPABILITIES.manageIntegrations);
         const canManageWebhooks = () => this.access.hasInstance(INSTANCE_CAPABILITIES.manageWebhooks) || this.access.canActiveSite(SITE_CAPABILITIES.manageWebhooks);
         const supportURL = this.supportUrl();
-        const utmItems: SidebarItem[] = shareMode
-            ? [
-                  { labelKey: 'nav.utm', icon: 'pi pi-tags', routerLink: '/utm', shareRouterLink: '/utm', exact: true },
-                  { labelKey: 'nav.qrCodes', icon: 'pi pi-qrcode', routerLink: '/utm/qr-codes', shareRouterLink: '/utm/qr-codes' }
-              ]
-            : [
-                  {
-                      labelKey: 'nav.utm',
-                      icon: 'pi pi-tags',
-                      routerLink: '/utm',
-                      shareRouterLink: '/utm',
-                      exact: true,
-                      items: [
-                          { labelKey: 'nav.utmBuilder', icon: 'pi pi-link', routerLink: '/utm/builder', visible: notShare },
-                          { labelKey: 'nav.qrCodes', icon: 'pi pi-qrcode', routerLink: '/utm/qr-codes', shareRouterLink: '/utm/qr-codes' }
-                      ]
-                  }
-              ];
 
         return [
             {
@@ -199,7 +181,7 @@ export class SidebarMenuService {
                     { labelKey: 'nav.aiAgents', icon: 'pi pi-sparkles', routerLink: '/ai-agents', shareRouterLink: '/ai-agents' },
                     { labelKey: 'nav.aiChatbots', icon: 'pi pi-comments', routerLink: '/ai-chatbots', shareRouterLink: '/ai-chatbots' },
                     { labelKey: 'nav.ecommerce', icon: 'pi pi-shopping-bag', routerLink: '/ecommerce', shareRouterLink: '/ecommerce' },
-                    ...utmItems
+                    { labelKey: 'nav.utm', icon: 'pi pi-tags', routerLink: '/utm', shareRouterLink: '/utm', exact: true }
                 ]
             },
             {

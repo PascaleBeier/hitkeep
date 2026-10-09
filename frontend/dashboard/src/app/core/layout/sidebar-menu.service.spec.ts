@@ -96,8 +96,6 @@ describe('SidebarMenuService', () => {
         const analytics = findByLabel(items, 'Analytics');
         const integration = findByLabel(items, 'Integration');
         const utm = findByLabel(items, 'UTM');
-        const utmBuilder = findByLabel(utm?.items ?? [], 'UTM Builder');
-        const qrCodes = findByLabel(utm?.items ?? [], 'QR codes');
         const apiClients = findByLabel(items, 'API Clients');
         const apiReference = findByLabel(apiClients?.items ?? [], 'API Reference');
 
@@ -106,9 +104,7 @@ describe('SidebarMenuService', () => {
         expect(findByLabel(items, 'Overview')?.routerLink).toBe('/overview');
         expect(findByLabel(items, 'AI Agents')?.routerLink).toBe('/ai-agents');
         expect(utm?.routerLink).toBe('/utm');
-        expect(utm?.expanded).toBe(false);
-        expect(utmBuilder?.routerLink).toBe('/utm/builder');
-        expect(qrCodes?.routerLink).toBe('/utm/qr-codes');
+        expect(utm?.items).toBeUndefined();
         expect(apiClients?.routerLink).toBe('/integration/api-clients');
         expect(apiClients?.expanded).toBe(false);
         expect(apiReference?.routerLink).toBe('/integration/api-reference');
@@ -170,7 +166,7 @@ describe('SidebarMenuService', () => {
         const utm = analyticsItems.find((item) => item.label === 'UTM');
         const webVitals = findByLabel(items, 'Web Vitals');
         const utmBuilder = findByLabel(items, 'UTM Builder');
-        const qrCodes = analyticsItems.find((item) => item.label === 'QR codes');
+        const qrCodes = findByLabel(items, 'QR codes');
 
         expect(dashboard?.routerLink).toBe('/share/share-token/dashboard');
         expect(webVitals?.routerLink).toBe('/share/share-token/web-vitals');
@@ -178,7 +174,7 @@ describe('SidebarMenuService', () => {
         expect(utm?.routerLink).toBe('/share/share-token/utm');
         expect(utm?.items).toBeUndefined();
         expect(utmBuilder).toBeUndefined();
-        expect(qrCodes?.routerLink).toBe('/share/share-token/utm/qr-codes');
+        expect(qrCodes).toBeUndefined();
 
         dashboard?.command?.({ originalEvent: new Event('click'), item: dashboard });
         expect(closed).toBe(true);
