@@ -15,8 +15,6 @@ import { calcDelta } from '@core/analytics/delta-utils';
 import { HITKEEP_CHART_PALETTE } from '@core/charts/hitkeep-chart-options';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
@@ -40,26 +38,7 @@ import { ShareService } from '@services/share.service';
 @Component({
     selector: 'app-funnels',
     standalone: true,
-    imports: [
-        ButtonModule,
-        CardModule,
-        ConfirmDialogModule,
-        ConversionSubjectCard,
-        FunnelManager,
-        KpiCard,
-        PageBreadcrumb,
-        PageHeader,
-        PageHeaderLeft,
-        PageState,
-        ReportRangeToolbar,
-        SeriesChart,
-        AppTable,
-        AppTableCell,
-        TagModule,
-        TrafficRecordsCard,
-        TranslocoDecimalPipe,
-        TranslocoPipe
-    ],
+    imports: [ButtonModule, CardModule, ConfirmDialogModule, ConversionSubjectCard, FunnelManager, KpiCard, PageState, ReportRangeToolbar, SeriesChart, AppTable, AppTableCell, TagModule, TrafficRecordsCard, TranslocoDecimalPipe, TranslocoPipe],
     providers: [ConfirmationService],
     templateUrl: './funnels.html',
     styleUrl: './funnels.css',
@@ -220,16 +199,6 @@ export class Funnels {
     });
     protected pathSuggestions = computed(() => (this.stats()?.top_pages ?? []).map((item) => item.name).filter(Boolean));
     protected eventSuggestions = computed(() => [...new Set(this.funnels().flatMap((funnel) => funnel.steps.filter((step) => step.type === 'event').map((step) => step.value)))]);
-    protected breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        return site
-            ? [
-                  { label: site.domain, favicon: site, routerLink: '/dashboard' },
-                  { label: this.transloco.translate('nav.funnels'), isCurrent: true }
-              ]
-            : [{ label: this.transloco.translate('nav.funnels'), isCurrent: true }];
-    });
 
     constructor() {
         this.destroyRef.onDestroy(() => {

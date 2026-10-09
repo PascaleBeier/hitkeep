@@ -8,8 +8,6 @@ import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
 import { SelectModule } from '@openng/optimus-ui/select';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { localeFlagUrl } from '@core/i18n/flag-utils';
 import { UserPreferences, UserPreferencesService } from '@services/user-preferences.service';
 import { getBaseLanguage, getLocaleDirection, normalizeLocaleTag, TextDirection } from '@core/i18n/locale-utils';
@@ -25,7 +23,7 @@ type AvailableLang = string | { id: string; label: string };
 
 @Component({
     selector: 'app-preferences',
-    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, PageHeader, PageHeaderLeft, PageBreadcrumb, TranslocoPipe, NgOptimizedImage],
+    imports: [ReactiveFormsModule, ButtonModule, CardModule, SelectModule, TranslocoPipe, NgOptimizedImage],
     templateUrl: './preferences.html',
     styleUrl: './preferences.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -87,11 +85,6 @@ export class Preferences {
         const current = this.currentPreferences();
         if (!current.default_locale) return false;
         return !this.preferencesEqual(initial, current);
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('preferences.breadcrumb'), isCurrent: true }];
     });
 
     constructor() {

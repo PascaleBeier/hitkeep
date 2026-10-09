@@ -4,7 +4,6 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from 
 import { TranslocoService } from '@jsverse/transloco';
 import { filter, map } from 'rxjs';
 import { TabsModule } from '@openng/optimus-ui/tabs';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
@@ -79,11 +78,6 @@ export class TeamAdminPage {
             { label: this.transloco.translate('admin.team.tabs.activity'), route: 'activity', link: '/admin/team/activity', visible: this.canViewAudit() },
             { label: this.transloco.translate('admin.team.tabs.dangerZone'), route: 'danger-zone', link: '/admin/team/danger-zone', visible: this.canManageSettings(), icon: 'pi pi-exclamation-triangle', danger: true }
         ].filter((tab) => tab.visible);
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('nav.administration') }, { label: this.transloco.translate('nav.team'), isCurrent: true }];
     });
 
     private activeChildSegment(): string {

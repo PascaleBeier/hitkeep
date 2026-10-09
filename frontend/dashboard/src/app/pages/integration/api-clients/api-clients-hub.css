@@ -1,16 +1,16 @@
-.utm-shell {
+.api-clients-shell {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
-.utm-tab-label {
+.api-clients-tab-label {
     align-items: center;
     display: inline-flex;
     gap: 0.5rem;
     white-space: nowrap;
 }
 
-.utm-content {
+.api-clients-content {
     min-height: 18rem;
 }

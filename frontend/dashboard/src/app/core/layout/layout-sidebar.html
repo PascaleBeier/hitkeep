@@ -3,20 +3,6 @@
         <app-brand size="small" />
     </div>
 
-    <div class="flex min-w-0 flex-col gap-3">
-        <app-site-selector
-            class="min-w-0 flex-1"
-            [sites]="siteService.sites()"
-            [current]="siteService.activeSite()"
-            [loading]="siteService.isLoading()"
-            (siteSelected)="context.onSiteSelected($event)"
-            (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('general')"
-            (trackingClicked)="openSiteSettings('tracking')"
-        />
-        <app-ask-ai-control (opened)="closeMobileDrawer()" />
-    </div>
-
     <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
         <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: desktopMenuItems() }" />
     </nav>
@@ -40,17 +26,6 @@
         />
         }
 
-        <app-site-selector
-            [sites]="siteService.sites()"
-            [current]="siteService.activeSite()"
-            [loading]="siteService.isLoading()"
-            (siteSelected)="context.onSiteSelected($event); closeMobileDrawer()"
-            (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('general'); closeMobileDrawer()"
-            (trackingClicked)="openSiteSettings('tracking'); closeMobileDrawer()"
-        />
-        <app-ask-ai-control (opened)="closeMobileDrawer()" />
-
         <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
             <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: mobileMenuItems() }" />
         </nav>
@@ -61,21 +36,46 @@
 
 <ng-template #sidebarMenu let-items="items">
     <div class="layout-sidebar-menu">
-        @for (section of items; track section.label) {
+        @for (section of items; track section.sectionId) {
         <section class="layout-sidebar-menu__section">
+            @if (section.collapsible) { @if (section.label) {
+            <h2 class="layout-sidebar-menu__section-label layout-sidebar-menu__section-label--collapsible">
+                <button
+                    type="button"
+                    class="layout-sidebar-menu__section-toggle"
+                    [attr.aria-expanded]="isSectionOpen(section) ? 'true' : 'false'"
+                    [attr.aria-controls]="'sidebar-section-' + section.sectionId"
+                    [attr.aria-label]="(isSectionOpen(section) ? 'nav.collapseItem' : 'nav.expandItem') | transloco: { item: section.label }"
+                    (click)="toggleSection(section, $event)"
+                >
+                    <span class="layout-sidebar-menu__section-toggle-label">{{ section.label }}</span>
+                    <i class="pi layout-sidebar-menu__section-chevron" [class.pi-chevron-down]="isSectionOpen(section)" [class.pi-chevron-right]="!isSectionOpen(section)" aria-hidden="true"></i>
+                </button>
+            </h2>
+            }
+            <div [id]="'sidebar-section-' + section.sectionId" class="layout-sidebar-menu__collapse" [class.layout-sidebar-menu__collapse--closed]="!isSectionOpen(section)" [attr.inert]="!isSectionOpen(section) ? '' : null">
+                <ul class="layout-sidebar-menu__list" role="group">
+                    @for (item of section.items ?? []; track item.label) {
+                    <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: item, level: 1 }" />
+                    }
+                </ul>
+            </div>
+            } @else { @if (section.label) {
             <h2 class="layout-sidebar-menu__section-label">{{ section.label }}</h2>
+            }
             <ul class="layout-sidebar-menu__list" role="tree">
                 @for (item of section.items ?? []; track item.label) {
                 <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: item, level: 1 }" />
                 }
             </ul>
+            }
         </section>
         }
     </div>
 </ng-template>
 
 <ng-template #sidebarMenuItem let-item let-level="level">
-    <li class="layout-sidebar-menu__node" role="treeitem" [attr.aria-label]="item.label" [attr.aria-expanded]="item.items?.length ? (item.expanded ? 'true' : 'false') : null" [attr.aria-level]="level" aria-selected="false">
+    <li class="layout-sidebar-menu__node" role="treeitem" [attr.aria-label]="item.label" [attr.aria-expanded]="item.items?.length ? (isItemOpen(item) ? 'true' : 'false') : null" [attr.aria-level]="level" aria-selected="false">
         <span class="layout-sidebar-menu__item-row">
             @if (item.routerLink) {
             <a
@@ -104,20 +104,22 @@
             <button
                 type="button"
                 class="layout-sidebar-menu__toggle"
-                [attr.aria-label]="(item.expanded ? 'nav.collapseItem' : 'nav.expandItem') | transloco: { item: item.label }"
-                [attr.aria-expanded]="item.expanded ? 'true' : 'false'"
-                (click)="toggleMenuItem(item, item.expanded, $event)"
+                [attr.aria-label]="(isItemOpen(item) ? 'nav.collapseItem' : 'nav.expandItem') | transloco: { item: item.label }"
+                [attr.aria-expanded]="isItemOpen(item) ? 'true' : 'false'"
+                (click)="toggleMenuItem(item, $event)"
             >
-                <i [class]="item.expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" aria-hidden="true"></i>
+                <i class="pi" [class.pi-chevron-down]="isItemOpen(item)" [class.pi-chevron-right]="!isItemOpen(item)" aria-hidden="true"></i>
             </button>
             }
         </span>
-        @if (item.items?.length && item.expanded) {
-        <ul class="layout-sidebar-menu__list layout-sidebar-menu__list--nested" role="group">
-            @for (child of item.items ?? []; track child.label) {
-            <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: child, level: level + 1 }" />
-            }
-        </ul>
+        @if (item.items?.length) {
+        <div class="layout-sidebar-menu__collapse" [class.layout-sidebar-menu__collapse--closed]="!isItemOpen(item)" [attr.inert]="!isItemOpen(item) ? '' : null">
+            <ul class="layout-sidebar-menu__list layout-sidebar-menu__list--nested" role="group">
+                @for (child of item.items ?? []; track child.label) {
+                <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: child, level: level + 1 }" />
+                }
+            </ul>
+        </div>
         }
     </li>
 </ng-template>

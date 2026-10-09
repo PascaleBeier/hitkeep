@@ -1,12 +1,6 @@
 <div class="qr-codes-page">
     <p-confirmdialog />
 
-    <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <app-page-breadcrumb [items]="breadcrumbItems()" />
-        </ng-template>
-    </app-page-header>
-
     @if (isDetailRoute()) {
     <app-report-range-toolbar [loading]="isStatsLoading()" (refresh)="refresh()">
         @if (!isShareMode()) {

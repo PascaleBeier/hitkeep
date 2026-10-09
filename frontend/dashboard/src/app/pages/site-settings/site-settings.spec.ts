@@ -45,13 +45,13 @@ describe('SiteSettingsPage', () => {
                         en: {
                             sites: {
                                 settings: {
-                                    breadcrumb: { sites: 'Sites', settings: 'Settings' },
                                     tabs: {
                                         general: 'General',
                                         tracking: 'Tracking',
                                         filtering: 'Filtering',
                                         retention: 'Retention',
                                         access: 'Access',
+                                        share: 'Share',
                                         dangerZone: 'Danger zone'
                                     }
                                 }

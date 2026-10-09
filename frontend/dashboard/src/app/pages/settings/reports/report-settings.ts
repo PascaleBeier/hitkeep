@@ -16,7 +16,6 @@ import { TagModule } from '@openng/optimus-ui/tag';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { PageState } from '@components/page-state/page-state';
 import { SiteScopeSummary, SiteScopeSummaryItem } from '@components/site-scope-summary/site-scope-summary';
@@ -152,10 +151,6 @@ export class ReportSettings {
     protected readonly isFocusedReport = (row: ReportTableRow) => row.report.id === this.focusedReportID();
     protected readonly reportActionLoading = (row: ReportTableRow) => this.reportActionID() === row.report.id;
 
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('settings.reports.breadcrumb'), isCurrent: true }];
-    });
     protected readonly reportTableRows = computed<ReportTableRow[]>(() => {
         this.activeLanguage();
         return this.reports().map((report) => ({

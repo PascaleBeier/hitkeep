@@ -16,8 +16,6 @@ import { SkeletonModule } from '@openng/optimus-ui/skeleton';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { DateRange } from '@components/range-toolbar/range-toolbar';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { SiteFavicon } from '@features/sites/components/site-favicon';
 import { SiteService } from '@features/sites/services/site.service';
 import { StatsService } from '@features/analytics/services/stats.service';
@@ -63,7 +61,7 @@ const OVERVIEW_SORT_KEYS: readonly OverviewSortKey[] = ['domain', 'pageviews', '
 
 @Component({
     selector: 'app-overview-page',
-    imports: [FormsModule, ButtonModule, CardModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, PageBreadcrumb, PageHeader, PageHeaderLeft, ReportRangeToolbar, SelectModule, SiteFavicon, SkeletonModule, TranslocoPipe],
+    imports: [FormsModule, ButtonModule, CardModule, IconFieldModule, InputIconModule, InputTextModule, MessageModule, ReportRangeToolbar, SelectModule, SiteFavicon, SkeletonModule, TranslocoPipe],
     templateUrl: './overview.html',
     styleUrl: './overview.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -86,11 +84,6 @@ export class OverviewPage {
     protected readonly sortValue = signal<OverviewSortKey>(this.initialSort());
     protected readonly siteStates = signal<Record<string, SiteStatsState>>({});
     protected readonly isStatsLoading = signal(false);
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('overview.title'), isCurrent: true }];
-    });
 
     protected readonly sortOptions = computed<OverviewSortOption[]>(() => {
         this.activeLanguage();

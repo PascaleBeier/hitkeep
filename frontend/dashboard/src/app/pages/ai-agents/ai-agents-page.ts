@@ -9,8 +9,6 @@ import { finalize, Subscription } from 'rxjs';
 import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
 import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
 import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { StatGroup, StatGroups } from '@components/stat-groups/stat-groups';
@@ -61,24 +59,7 @@ interface AIPageFilter {
  */
 @Component({
     selector: 'app-ai-agents-page',
-    imports: [
-        TranslocoPipe,
-        ButtonModule,
-        CardModule,
-        StatGroups,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        ReportRangeToolbar,
-        NoSiteSelected,
-        SetupCallout,
-        FilterChipRow,
-        KpiCard,
-        SeriesChart,
-        MetricCardGroup,
-        ExportSplitButton,
-        ExportStatusBanner
-    ],
+    imports: [TranslocoPipe, ButtonModule, CardModule, StatGroups, ReportRangeToolbar, NoSiteSelected, SetupCallout, FilterChipRow, KpiCard, SeriesChart, MetricCardGroup, ExportSplitButton, ExportStatusBanner],
     templateUrl: './ai-agents-page.html',
     styleUrl: './ai-agents-page.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -327,14 +308,6 @@ export class AIAgentsPage {
             label: this.filterLabel(filter),
             remove: () => this.removeFilter(filter.type, filter.value)
         }));
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.site();
-        const current: PageBreadcrumbItem = { label: this.transloco.translate('aiAgents.title'), isCurrent: true };
-        if (!site) return [current];
-        return [{ label: site.domain, favicon: site, routerLink: '/dashboard' }, current];
     });
 
     protected readonly exportUrl = computed(() => {

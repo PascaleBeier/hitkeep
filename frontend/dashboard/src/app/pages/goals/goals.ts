@@ -14,8 +14,6 @@ import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { calcDelta } from '@core/analytics/delta-utils';
 import { HITKEEP_CHART_PALETTE } from '@core/charts/hitkeep-chart-options';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
@@ -41,26 +39,7 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 @Component({
     selector: 'app-goals',
     standalone: true,
-    imports: [
-        ButtonModule,
-        CardModule,
-        ConfirmDialogModule,
-        ConversionSubjectCard,
-        GoalManager,
-        KpiCard,
-        MessageModule,
-        PageBreadcrumb,
-        PageHeader,
-        PageHeaderLeft,
-        PageState,
-        ReportRangeToolbar,
-        SeriesChart,
-        AppTable,
-        AppTableCell,
-        TrafficRecordsCard,
-        TranslocoDecimalPipe,
-        TranslocoPipe
-    ],
+    imports: [ButtonModule, CardModule, ConfirmDialogModule, ConversionSubjectCard, GoalManager, KpiCard, MessageModule, PageState, ReportRangeToolbar, SeriesChart, AppTable, AppTableCell, TrafficRecordsCard, TranslocoDecimalPipe, TranslocoPipe],
     providers: [ConfirmationService],
     templateUrl: './goals.html',
     styleUrl: './goals.css',
@@ -230,16 +209,6 @@ export class Goals {
             .filter((goal) => goal.type === 'event')
             .map((goal) => goal.value)
     );
-    protected breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        return site
-            ? [
-                  { label: site.domain, favicon: site, routerLink: '/dashboard' },
-                  { label: this.transloco.translate('nav.goals'), isCurrent: true }
-              ]
-            : [{ label: this.transloco.translate('nav.goals'), isCurrent: true }];
-    });
 
     constructor() {
         this.destroyRef.onDestroy(() => this.reportingRequest?.unsubscribe());

@@ -1,26 +1,22 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { filter, map, startWith } from 'rxjs';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { TabsModule } from '@openng/optimus-ui/tabs';
 import { PageFrame } from '@components/page-frame/page-frame';
 
-type ImportExportTab = 'import' | 'export';
+type ApiClientsTab = 'clients' | 'reference';
 
 @Component({
-    selector: 'app-import-export-page',
+    selector: 'app-api-clients-hub',
     imports: [PageFrame, RouterOutlet, TabsModule, TranslocoPipe],
-    templateUrl: './import-export.html',
-    styleUrl: './import-export.css',
+    templateUrl: './api-clients-hub.html',
+    styleUrl: './api-clients-hub.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ImportExportPage {
+export class ApiClientsHub {
     private readonly router = inject(Router);
-    private readonly transloco = inject(TranslocoService);
-    private readonly pageTitle = toSignal(this.transloco.selectTranslate('importExport.title'), {
-        initialValue: this.transloco.translate('importExport.title')
-    });
 
     protected readonly activeTab = toSignal(
         this.router.events.pipe(
@@ -32,11 +28,11 @@ export class ImportExportPage {
     );
 
     protected onTabChange(value: string | number | undefined): void {
-        const tab = value === 'import' || value === 'export' ? value : this.activeTab();
-        void this.router.navigate(['/import-export', tab]);
+        const tab = value === 'clients' || value === 'reference' ? value : this.activeTab();
+        void this.router.navigate(['/integration/api-clients', tab]);
     }
 
-    private tabFromUrl(url: string): ImportExportTab {
-        return url.includes('/import-export/export') ? 'export' : 'import';
+    private tabFromUrl(url: string): ApiClientsTab {
+        return url.includes('/integration/api-clients/reference') ? 'reference' : 'clients';
     }
 }

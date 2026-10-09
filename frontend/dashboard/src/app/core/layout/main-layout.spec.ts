@@ -14,8 +14,10 @@ import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
+import { UserMenuService } from '@services/user-menu.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { AskAIControl } from '@features/ask-ai/ask-ai-control';
+import { AskAIControlService } from '@features/ask-ai/ask-ai-control.service';
 import { LayoutPageBar } from './layout-page-bar';
 import { LayoutSidebar } from './layout-sidebar';
 import { MainLayoutContextService } from './main-layout-context.service';
@@ -23,7 +25,6 @@ import { MenuItem } from '@openng/optimus-ui/api';
 import { vi } from 'vitest';
 
 interface LayoutSidebarTestAccess {
-    openSiteSettings(section?: string): void;
     closeMobileDrawer(): void;
     mobileMenuItems(): MenuItem[];
     canCreateTeams(): boolean;
@@ -77,9 +78,14 @@ describe('MainLayout', () => {
                     langs: {
                         en: {
                             nav: {
+                                overview: 'Overview',
                                 utm: 'UTM',
                                 utmBuilder: 'UTM Builder',
                                 qrCodes: 'QR codes',
+                                integration: 'Integration',
+                                apiClients: 'API Clients',
+                                apiReference: 'API Reference',
+                                account: 'Account',
                                 importExport: 'Import & Export',
                                 importExportAria: 'Go to import and export',
                                 expandItem: 'Expand {{item}}',
@@ -334,7 +340,7 @@ describe('MainLayout', () => {
         const visibleHrefs = navLinks.map((link) => link.getAttribute('href'));
 
         expect(visibleHrefs).toContain('/share/share-token/utm');
-        expect(visibleHrefs).toContain('/share/share-token/utm/qr-codes');
+        expect(visibleHrefs).not.toContain('/share/share-token/utm/qr-codes');
     });
 
     it('should hide Ask AI by default', () => {
@@ -344,7 +350,7 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should show Ask AI below the site selector when available', () => {
+    it('should offer Ask AI from the user menu when available', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -361,13 +367,14 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
-        expect(trigger?.textContent).toContain('Ask AI');
-        expect(trigger?.disabled).toBe(false);
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        const askAIItem = menuItems.find((item) => item.icon === 'pi pi-sparkles');
+        expect(askAIItem).toBeTruthy();
+        expect(askAIItem?.label).toContain('Ask AI');
+        expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should show Ask AI as unavailable when the product flag is on but no model is configured', () => {
+    it('should keep Ask AI in the user menu when the product flag is on but no model is configured', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -382,10 +389,13 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
-        expect(trigger?.textContent).toContain('Ask AI not configured');
-        expect(trigger?.classList.contains('ask-ai-trigger--unavailable')).toBe(true);
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        expect(menuItems.some((item) => item.icon === 'pi pi-sparkles')).toBe(true);
+
+        openAskAIDrawer();
+        fixture.detectChanges();
+
+        expect(document.body.textContent).toContain('Ask AI not configured');
     });
 
     it('should show unavailable Ask AI as a chat-only drawer without history or model details', () => {
@@ -733,7 +743,7 @@ describe('MainLayout', () => {
         expect(request.request.to).toBe('2026-06-20');
     });
 
-    it('should focus the Ask AI drawer composer when opened from the sidebar', async () => {
+    it('should focus the Ask AI drawer composer when opened from the user menu', async () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -1133,30 +1143,79 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should keep collapsible sidebar parents navigable while the chevron expands children', () => {
-        let utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        let utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        let utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        let toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
-
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeNull();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('false');
-        expect(toggle?.getAttribute('aria-label')).toBe('Expand UTM');
-
-        toggle?.click();
+    it('should fold other sections when one collapsible section opens', () => {
+        const integrationToggle = fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]') as HTMLButtonElement | null;
+        integrationToggle?.click();
         fixture.detectChanges();
 
-        utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]')).toBeNull();
 
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeTruthy();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('true');
-        expect(toggle?.getAttribute('aria-label')).toBe('Collapse UTM');
-        expect(utmTreeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
+        const accountToggle = fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Account"]') as HTMLButtonElement | null;
+        accountToggle?.click();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Account"]')).toBeTruthy();
+
+        localStorage.removeItem('hk_sidebar_sections');
+    });
+
+    it('should fold a route-active sidebar section when its toggle is clicked', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            const sectionToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]') as HTMLButtonElement | null;
+            const apiClientsLink = localFixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
+
+            expect(sectionToggle).toBeTruthy();
+            expect(apiClientsLink).toBeTruthy();
+
+            sectionToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+            const closedWrap = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section:has(button[aria-label="Expand Integration"]) .layout-sidebar-menu__collapse') as HTMLElement | null;
+            expect(closedWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
+            expect(closedWrap?.hasAttribute('inert')).toBe(true);
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
+    });
+
+    it('should hide the site selector and settings shortcut on the overview page', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/overview');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        expect(localFixture.nativeElement.querySelector('app-site-selector')).toBeNull();
+        expect(localFixture.nativeElement.querySelector('app-layout-page-bar button[title]')).toBeNull();
+        localFixture.destroy();
+    });
+
+    it('should fold a route-active section when another section is opened', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]')).toBeTruthy();
+
+            const accountToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Account"]') as HTMLButtonElement | null;
+            accountToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+            const integrationWrap = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section:has(button[aria-label="Expand Integration"]) .layout-sidebar-menu__collapse') as HTMLElement | null;
+            expect(integrationWrap?.classList.contains('layout-sidebar-menu__collapse--closed')).toBe(true);
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
     });
 
     it('should hide create team actions in hosted cloud for non-owners', () => {
@@ -1277,7 +1336,7 @@ describe('MainLayout', () => {
         const sidebar = fixture.debugElement.query(By.directive(LayoutSidebar)).componentInstance as LayoutSidebarTestAccess;
         layoutContext.isMobileDrawerOpen.set(true);
 
-        sidebar.openSiteSettings();
+        layoutContext.openSiteSettings('general');
         sidebar.closeMobileDrawer();
         const menuItems = sidebar.mobileMenuItems();
         const firstItem = menuItems[0]?.items?.[0];
@@ -1438,9 +1497,7 @@ describe('MainLayout', () => {
     }
 
     function openAskAIDrawer() {
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLElement | null;
-        expect(trigger).toBeTruthy();
-        trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        TestBed.inject(AskAIControlService).requestOpen();
         fixture.detectChanges();
     }
 

@@ -1,5 +1,7 @@
 import { TemplateRef, computed, inject, signal, Service } from '@angular/core';
-import { Router } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, map, startWith } from 'rxjs';
 import { Site, Team } from '@models/analytics.types';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
@@ -33,9 +35,23 @@ export class MainLayoutContextService {
     readonly pageHeaderLeft = signal<TemplateRef<unknown> | null>(null);
     readonly pageHeaderRight = signal<TemplateRef<unknown> | null>(null);
     readonly hasPageHeader = computed(() => this.pageHeaderLeft() !== null);
+    // The overview page is team-scoped, so the site selector and its settings
+    // shortcut do not apply there and the shell hides them.
+    readonly isOverviewPage = computed(() => {
+        const url = this.activeUrl().split(/[?#]/, 1)[0] || '/';
+        return url === '/overview' || url.startsWith('/overview/');
+    });
 
     readonly beforeTeamSwitch = () => true;
     private pageHeaderOwner: symbol | null = null;
+    private readonly activeUrl = toSignal(
+        this.router.events.pipe(
+            filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+            map((event) => event.urlAfterRedirects),
+            startWith(this.router.url)
+        ),
+        { initialValue: this.router.url }
+    );
 
     openSiteSettings(section: SiteSettingsSection = 'general') {
         const site = this.siteService.activeSite();
@@ -102,7 +118,7 @@ export class MainLayoutContextService {
     }
 
     private currentSiteSettingsSection(): SiteSettingsSection | null {
-        const match = this.router.url.match(/^\/sites\/[^/]+\/settings\/(general|tracking|filtering|retention|access|danger-zone)(?:[/?#]|$)/);
+        const match = this.router.url.match(/^\/sites\/[^/]+\/settings\/(general|tracking|filtering|retention|access|share|danger-zone)(?:[/?#]|$)/);
         return (match?.[1] as SiteSettingsSection | undefined) ?? null;
     }
 }

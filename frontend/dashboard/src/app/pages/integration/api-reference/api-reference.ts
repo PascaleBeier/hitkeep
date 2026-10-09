@@ -4,8 +4,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PreferencesService } from '@services/preferences.service';
 import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 
@@ -18,7 +16,7 @@ const SCALAR_FRAME_EVENT_SOURCE = 'hitkeep-scalar-frame';
 
 @Component({
     selector: 'app-api-reference-page',
-    imports: [PageHeader, PageHeaderLeft, PageBreadcrumb, TranslocoPipe],
+    imports: [TranslocoPipe],
     templateUrl: './api-reference.html',
     styleUrl: './api-reference.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -68,14 +66,6 @@ export class APIReferencePage implements OnInit, OnDestroy {
 
         const frameUrl = browserAppUrl(this.document, `/scalar/index.html?${query.toString()}`);
         return this.sanitizer.bypassSecurityTrustResourceUrl(frameUrl);
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [
-            { label: this.transloco.translate('nav.integration'), routerLink: '/integration/api-clients' },
-            { label: this.transloco.translate('nav.apiReference'), isCurrent: true }
-        ];
     });
 
     constructor() {

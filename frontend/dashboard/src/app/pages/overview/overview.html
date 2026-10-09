@@ -1,10 +1,4 @@
 <div class="hk-overview-page">
-    <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <app-page-breadcrumb [items]="breadcrumbItems()" />
-        </ng-template>
-    </app-page-header>
-
     <app-report-range-toolbar [loading]="isStatsLoading()" (refresh)="refreshOverview()" />
 
     <section class="hk-overview-toolbar" [attr.aria-label]="'overview.toolbarAria' | transloco">

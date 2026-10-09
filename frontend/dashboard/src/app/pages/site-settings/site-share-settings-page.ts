@@ -8,7 +8,6 @@ import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { ConfirmDialogModule } from '@openng/optimus-ui/confirmdialog';
 import { ConfirmationService } from '@openng/optimus-ui/api';
-import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { SITE_CAPABILITIES } from '@core/access/capabilities';
 import { AccessService } from '@services/access.service';
@@ -23,16 +22,16 @@ interface ShareNotice {
 }
 
 @Component({
-    selector: 'app-share-dashboard-link',
-    imports: [ButtonModule, DialogShell, InputTextModule, ConfirmDialogModule, AppTable, AppTableCell, TranslocoPipe],
+    selector: 'app-site-share-settings-page',
+    imports: [ButtonModule, InputTextModule, ConfirmDialogModule, AppTable, AppTableCell, TranslocoPipe],
     providers: [ConfirmationService],
-    templateUrl: './share-dashboard-link.html',
-    styleUrl: './share-dashboard-link.css',
+    templateUrl: './site-share-settings-page.html',
+    styleUrl: './site-share-settings-page.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ShareDashboardLink {
+export class SiteShareSettingsPage {
     private shareService = inject(ShareService);
-    protected siteService = inject(SiteService);
+    private siteService = inject(SiteService);
     private access = inject(AccessService);
     private confirmation = inject(ConfirmationService);
     private transloco = inject(TranslocoService);
@@ -40,7 +39,6 @@ export class ShareDashboardLink {
     private clipboard = inject(Clipboard);
 
     protected isShareMode = computed(() => this.shareService.isShareMode());
-    protected showShareDialog = signal(false);
     protected shareLinks = signal<ShareLink[]>([]);
     protected linksLoading = signal(false);
     protected createLoading = signal(false);
@@ -68,29 +66,10 @@ export class ShareDashboardLink {
             this.shareSiteId.set(siteId);
             this.resetShareState();
 
-            if (this.showShareDialog() && siteId && this.canManageShares()) {
+            if (siteId && this.canManageShares()) {
                 this.loadShareLinks(siteId);
             }
         });
-    }
-
-    protected openShareDialog() {
-        if (!this.canManageShares()) {
-            return;
-        }
-
-        this.notice.set(null);
-        this.showShareDialog.set(true);
-
-        const siteId = this.siteService.activeSite()?.id;
-        if (siteId) {
-            this.loadShareLinks(siteId);
-        }
-    }
-
-    open() {
-        if (this.isShareMode() || !this.canManageShares()) return;
-        this.openShareDialog();
     }
 
     protected generateShareLink() {
@@ -150,19 +129,6 @@ export class ShareDashboardLink {
             }
         ];
     };
-
-    protected resetShareDialog() {
-        this.showShareDialog.set(false);
-        this.notice.set(null);
-        this.deletingShareId.set(null);
-    }
-
-    protected onShareDialogVisibleChange(visible: boolean) {
-        this.showShareDialog.set(visible);
-        if (!visible) {
-            this.resetShareDialog();
-        }
-    }
 
     private loadShareLinks(siteId: string) {
         if (!this.canManageShares()) {

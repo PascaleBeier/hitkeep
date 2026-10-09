@@ -1,4 +1,4 @@
-<app-page-frame [breadcrumbItems]="breadcrumbItems()">
+<app-page-frame [heading]="'importExport.title' | transloco">
     <section class="import-export-shell" [attr.aria-label]="'importExport.title' | transloco">
         <p-tabs class="hk-page-tabs import-export-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
             <p-tablist>

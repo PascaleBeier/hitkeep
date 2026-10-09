@@ -25,7 +25,7 @@
     "goals": "Ziele",
     "funnels": "Funnels",
     "utm": "UTM",
-    "apiClients": "API-Clients",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "API-Referenz",
     "expandItem": "{{item}} aufklappen",
@@ -1269,7 +1269,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Einstellungen",
       "title": "Einstellungen",
       "subtitle": "Verwalte die Sicherheit und Einstellungen deines Kontos.",
       "profile": {
@@ -1314,7 +1313,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Berichte",
       "subtitle": "Erstelle zuverlässige, geplante Analyseberichte für dich oder dein Team.",
       "newReport": "Neuer Bericht",
       "mailUnavailable": "SMTP ist nicht verfügbar. Entwürfe können bearbeitet werden, Berichte aber nicht aktiviert, getestet oder erneut gesendet werden.",
@@ -1688,19 +1686,11 @@
     },
     "selector": {
       "regionAria": "Seitenauswahl",
-      "sitesLabel": "Seiten",
-      "addSiteAria": "Neue Seite hinzufügen",
       "selectPlaceholder": "Seite auswählen",
       "selectSiteAria": "Wähle eine Seite, um Statistiken zu sehen",
-      "siteSettingsAria": "Seiteneinstellungen",
-      "trackingCodeAria": "Tracking-Code",
-      "shareDashboardAria": "Dashboard teilen"
+      "siteSettingsAria": "Seiteneinstellungen"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Seiten",
-        "settings": "Einstellungen"
-      },
       "title": "Seiteneinstellungen",
       "tabs": {
         "general": "Allgemein",
@@ -1708,6 +1698,7 @@
         "filtering": "Filterung",
         "retention": "Aufbewahrung",
         "access": "Zugriff",
+        "share": "Teilen",
         "dangerZone": "Gefahrenzone"
       },
       "notices": {
@@ -1851,7 +1842,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Instanzverwaltung",
     "tabs": {
       "users": "Benutzer",
       "sites": "Seiten",
@@ -1874,6 +1864,7 @@
     },
     "sites": {
       "title": "Seiten",
+      "addSite": "Seite hinzufügen",
       "ownerUnknown": "Unbekannter Eigentümer"
     },
     "exclusions": {
@@ -2013,7 +2004,6 @@
         "status": { "createSuccess": "Team-Filter {{value}} wurde erstellt.", "deleteSuccess": "Team-Filter {{value}} wurde gelöscht." }
       },
       "overview": {
-        "breadcrumb": "Team-Übersicht",
         "title": "Team",
         "teamIdLabel": "Team-ID",
         "memberCount": "Mitglieder",
@@ -2080,7 +2070,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Teammitglieder",
         "title": "Teammitglieder"
       },
       "sso": {
@@ -2146,7 +2135,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Team-Einstellungen",
         "title": "Team-Einstellungen",
         "nameSectionTitle": "Teamname",
         "nameSectionDescription": "Der Anzeigename für dieses Team. Eigentümer und Admins können ihn ändern.",
@@ -2985,7 +2973,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Einstellungen",
     "subtitle": "Verwalte deine Anwendungseinstellungen.",
     "actions": {
       "saveChanges": "Änderungen speichern"
@@ -3307,6 +3294,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clients",
+        "reference": "Referenz"
+      },
       "subtitle": "Erstelle und verwalte API-Clients für Integrationen.",
       "manageTeamClients": "Team-API-Clients verwalten"
     },
@@ -3818,7 +3809,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "QR-Codes",
     "actions": {
       "create": "QR-Code erstellen",
       "exportSvg": "SVG exportieren",

@@ -25,7 +25,7 @@
     "goals": "Objectifs",
     "funnels": "Entonnoirs",
     "utm": "UTM",
-    "apiClients": "Clients API",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "Référence API",
     "expandItem": "Développer {{item}}",
@@ -1238,7 +1238,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Paramètres",
       "title": "Paramètres",
       "subtitle": "Gérez la sécurité et les préférences de votre compte.",
       "profile": {
@@ -1283,7 +1282,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Rapports",
       "subtitle": "Créez des rapports d’analyse fiables et planifiés pour vous ou votre équipe.",
       "newReport": "Nouveau rapport",
       "mailUnavailable": "SMTP est indisponible. Vous pouvez modifier les brouillons, mais pas activer, tester ou relancer les rapports.",
@@ -1649,19 +1647,11 @@
     },
     "selector": {
       "regionAria": "Sélection du site",
-      "sitesLabel": "Sites",
-      "addSiteAria": "Ajouter un nouveau site",
       "selectPlaceholder": "Sélectionner un site",
       "selectSiteAria": "Sélectionnez un site pour voir les stats",
-      "siteSettingsAria": "Paramètres du site",
-      "trackingCodeAria": "Code de suivi",
-      "shareDashboardAria": "Partager le tableau de bord"
+      "siteSettingsAria": "Paramètres du site"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Paramètres"
-      },
       "title": "Paramètres du site",
       "tabs": {
         "general": "Général",
@@ -1669,6 +1659,7 @@
         "filtering": "Filtrage",
         "retention": "Rétention",
         "access": "Accès",
+        "share": "Partager",
         "dangerZone": "Zone de danger"
       },
       "notices": {
@@ -1812,7 +1803,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Administration de l'instance",
     "tabs": {
       "users": "Utilisateurs",
       "sites": "Sites",
@@ -1835,6 +1825,7 @@
     },
     "sites": {
       "title": "Sites",
+      "addSite": "Ajouter un site",
       "ownerUnknown": "Propriétaire inconnu"
     },
     "exclusions": {
@@ -1974,7 +1965,6 @@
         "status": { "createSuccess": "Filtre d'équipe {{value}} créé.", "deleteSuccess": "Filtre d'équipe {{value}} supprimé." }
       },
       "overview": {
-        "breadcrumb": "Aperçu de l'équipe",
         "title": "Équipe",
         "teamIdLabel": "ID d’équipe",
         "memberCount": "Membres",
@@ -2041,7 +2031,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Membres de l'équipe",
         "title": "Membres de l'équipe"
       },
       "sso": {
@@ -2107,7 +2096,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Paramètres de l'équipe",
         "title": "Paramètres de l'équipe",
         "nameSectionTitle": "Nom de l'équipe",
         "nameSectionDescription": "Le nom d'affichage de cette équipe. Les propriétaires et admins peuvent le modifier.",
@@ -2946,7 +2934,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Préférences",
     "subtitle": "Gérez les préférences de votre application.",
     "actions": {
       "saveChanges": "Enregistrer les modifications"
@@ -3268,6 +3255,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clients",
+        "reference": "Référence"
+      },
       "subtitle": "Créez et gérez des clients API pour vos intégrations.",
       "manageTeamClients": "Gérer les clients API d'équipe"
     },
@@ -3779,7 +3770,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "Codes QR",
     "actions": {
       "create": "Créer un code QR",
       "exportSvg": "Exporter en SVG",

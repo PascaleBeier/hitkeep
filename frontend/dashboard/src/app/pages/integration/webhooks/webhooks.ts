@@ -16,8 +16,6 @@ import { OneTimeCredential } from '@components/one-time-credential/one-time-cred
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { dialogCancelButton, dialogDangerButton, dialogPrimaryButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { AppTable, AppTableCell, AppTableColumn, AppTableSlot } from '@components/table/table';
 import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
@@ -43,9 +41,6 @@ interface WebhookEndpointDisplay {
         PopoverModule,
         TagModule,
         TextareaModule,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
         PageState,
         OneTimeCredential,
         CrudDialog,
@@ -130,14 +125,6 @@ export class WebhooksPage implements OnInit {
         description: ['', Validators.maxLength(500)],
         url: ['', [Validators.required]],
         enabled: [true]
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.language();
-        return [
-            { label: this.transloco.translate('nav.integration'), routerLink: '/integration/webhooks' },
-            { label: this.transloco.translate('nav.webhooks'), isCurrent: true }
-        ];
     });
 
     ngOnInit(): void {

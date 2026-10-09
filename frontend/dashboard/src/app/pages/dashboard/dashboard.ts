@@ -23,8 +23,6 @@ import { MetricCardGroup, MetricCardGroupAction, MetricCardGroupRowClick, Metric
 import { SearchConsoleDrilldown } from '@features/analytics/components/search-console-drilldown';
 import type { Funnel, GoalStats, MetricStat } from '@models/analytics.types';
 import type { ConversionSubject } from '@features/analytics/models/conversion-subject';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { WorkflowProgress, type WorkflowProgressStep } from '@components/workflow-progress/workflow-progress';
 import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
 import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
@@ -80,9 +78,6 @@ interface KpiCardData {
         CardModule,
         ButtonModule,
         TooltipModule,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
         WorkflowProgress,
         ReportRangeToolbar,
         ExportSplitButton,
@@ -534,19 +529,6 @@ export class Dashboard {
         if (!site) return;
         void this.router.navigate(['/sites', site.id, 'settings', 'tracking']);
     }
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) {
-            return [
-                {
-                    label: this.transloco.translate('dashboard.breadcrumbOverview'),
-                    isCurrent: true
-                }
-            ];
-        }
-        return [{ label: site.domain, favicon: site, isCurrent: true }];
-    });
 
     protected readonly isShortRange = this.reportRange.isShortRange;
     protected chartTitle = computed(() => {
@@ -623,9 +605,13 @@ export class Dashboard {
                     this.clearConversionSubject();
                     // If there is no conversion chip to clear, no signal would
                     // cause this effect to run again for the new site. Start
-                    // the activity request here so a site switch cannot leave
-                    // the old report visible or skip the new site's cards.
-                    if (!hadConversion) this.loadAIActivityForCurrentRange();
+                    // the activity and report requests here so a site switch
+                    // cannot leave the previous site's report visible or skip
+                    // the new site's cards.
+                    if (!hadConversion) {
+                        this.loadAIActivityForCurrentRange();
+                        this.loadStatsForCurrentRange();
+                    }
                 });
                 this.conversionSiteId = siteId;
                 return;

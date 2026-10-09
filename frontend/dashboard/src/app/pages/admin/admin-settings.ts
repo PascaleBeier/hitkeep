@@ -19,7 +19,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { dialogCancelButton, dialogDangerButton, dialogWarnButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
@@ -32,6 +31,7 @@ import { PermissionService } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { AdminPageFrame } from './components/admin-page-frame';
+import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { AdminGlobalExclusionSettings } from './components/admin-global-exclusion-settings';
 import { AdminItemList, type AdminItemListEntry } from './components/admin-item-list';
 import { AdminPanel } from './components/admin-panel';
@@ -158,6 +158,7 @@ export class AdminSettings implements OnInit {
     private access = inject(AccessService);
     private userTeamService = inject(TeamService);
     private system = inject(AdminSystemService);
+    private layoutContext = inject(MainLayoutContextService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     protected activeAdminTab = signal<AdminStatusTab>('runtime');
@@ -493,10 +494,6 @@ export class AdminSettings implements OnInit {
     protected readonly userActionStatusMessage = computed(() => this.actionStatusMessage(this.userActionStatus()));
     protected readonly siteActionStatusMessage = computed(() => this.actionStatusMessage(this.siteActionStatus()));
     protected readonly teamActionStatusMessage = computed(() => this.actionStatusMessage(this.teamActionStatus()));
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('nav.administration') }, { label: this.transloco.translate(this.pageTitleKey()), isCurrent: true }];
-    });
     protected readonly canManageUsers = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.manageUsers));
     protected readonly canRunMaintenance = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.runMaintenance));
     protected readonly canViewActivation = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.viewActivation));
@@ -1028,6 +1025,12 @@ export class AdminSettings implements OnInit {
         this.activeLanguage();
         return [
             {
+                label: this.transloco.translate('sites.selector.siteSettingsAria'),
+                icon: 'pi pi-cog',
+                command: () => this.router.navigate(['/sites', site.id, 'settings', 'general'])
+            },
+            { separator: true },
+            {
                 label: this.transloco.translate('share.dialog.deleteAction'),
                 icon: 'pi pi-trash',
                 danger: true,
@@ -1036,6 +1039,10 @@ export class AdminSettings implements OnInit {
             }
         ];
     };
+
+    protected openAddSiteDialog() {
+        this.layoutContext.isAddSiteVisible.set(true);
+    }
 
     protected readonly teamActions = (team: AdminTeam): TableRowActionItem[] => {
         if (team.is_default) {
