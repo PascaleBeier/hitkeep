@@ -1238,7 +1238,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Paramètres",
       "title": "Paramètres",
       "subtitle": "Gérez la sécurité et les préférences de votre compte.",
       "profile": {
@@ -1283,7 +1282,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Rapports",
       "subtitle": "Créez des rapports d’analyse fiables et planifiés pour vous ou votre équipe.",
       "newReport": "Nouveau rapport",
       "mailUnavailable": "SMTP est indisponible. Vous pouvez modifier les brouillons, mais pas activer, tester ou relancer les rapports.",
@@ -1805,7 +1803,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Administration de l'instance",
     "tabs": {
       "users": "Utilisateurs",
       "sites": "Sites",
@@ -1968,7 +1965,6 @@
         "status": { "createSuccess": "Filtre d'équipe {{value}} créé.", "deleteSuccess": "Filtre d'équipe {{value}} supprimé." }
       },
       "overview": {
-        "breadcrumb": "Aperçu de l'équipe",
         "title": "Équipe",
         "teamIdLabel": "ID d’équipe",
         "memberCount": "Membres",
@@ -2035,7 +2031,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Membres de l'équipe",
         "title": "Membres de l'équipe"
       },
       "sso": {
@@ -2101,7 +2096,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Paramètres de l'équipe",
         "title": "Paramètres de l'équipe",
         "nameSectionTitle": "Nom de l'équipe",
         "nameSectionDescription": "Le nom d'affichage de cette équipe. Les propriétaires et admins peuvent le modifier.",
@@ -2940,7 +2934,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Préférences",
     "subtitle": "Gérez les préférences de votre application.",
     "actions": {
       "saveChanges": "Enregistrer les modifications"
@@ -3773,7 +3766,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "Codes QR",
     "actions": {
       "create": "Créer un code QR",
       "exportSvg": "Exporter en SVG",

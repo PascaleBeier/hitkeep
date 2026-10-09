@@ -1,15 +1,20 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 
 @Component({
     selector: 'app-page-frame',
-    imports: [PageHeader, PageHeaderLeft, PageBreadcrumb],
-    templateUrl: './page-frame.html',
+    template: `
+        <div class="page-frame">
+            @if (subtitle()) {
+                <p class="page-frame__subtitle page-frame__subtitle--intro">{{ subtitle() }}</p>
+            }
+            <div class="page-frame__body">
+                <ng-content />
+            </div>
+        </div>
+    `,
     styleUrl: './page-frame.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PageFrame {
-    breadcrumbItems = input<PageBreadcrumbItem[]>([]);
     subtitle = input('');
 }

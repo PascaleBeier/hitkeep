@@ -7,7 +7,6 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { compatForm } from '@angular/forms/signals/compat';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { localeFlagUrl } from '@core/i18n/flag-utils';
@@ -80,11 +79,6 @@ export class UserSettings {
     protected readonly saveState = signal<'idle' | 'saved' | 'error'>('idle');
     protected readonly initialPreferences = signal<UserPreferences | null>(null);
     protected readonly activeTab = signal<UserSettingsTab>('account');
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('settings.user.breadcrumb'), isCurrent: true }];
-    });
 
     protected readonly languageOptions = computed(() => {
         this.activeLanguage();

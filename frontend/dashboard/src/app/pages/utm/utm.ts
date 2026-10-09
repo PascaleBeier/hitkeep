@@ -10,8 +10,6 @@ import { ButtonModule } from '@openng/optimus-ui/button';
 import { CardModule } from '@openng/optimus-ui/card';
 import { SiteService } from '@features/sites/services/site.service';
 import { injectStatsQuery, type StatsQueryMode } from '@features/analytics/services/stats-query';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageState } from '@components/page-state/page-state';
 import { KpiCard } from '@features/analytics/components/kpi-card';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
@@ -30,7 +28,7 @@ interface MetricFilter {
 @Component({
     selector: 'app-utm-dashboard',
     standalone: true,
-    imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, ButtonModule, CardModule, PageHeader, PageHeaderLeft, PageBreadcrumb, PageState, ReportRangeToolbar, KpiCard, MetricCardGroup, SeriesChart],
+    imports: [ReactiveFormsModule, RouterLink, TranslocoPipe, ButtonModule, CardModule, PageState, ReportRangeToolbar, KpiCard, MetricCardGroup, SeriesChart],
     templateUrl: './utm.html',
     styleUrl: './utm.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -59,17 +57,6 @@ export class UtmDashboard {
             label: this.filterLabel(filter)
         }))
     );
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.utm'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.utm'), isCurrent: true }
-        ];
-    });
 
     protected comparisonLabel = computed(() => {
         this.activeLanguage();

@@ -1291,7 +1291,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Settings",
       "title": "Settings",
       "subtitle": "Manage your account security and preferences.",
       "profile": {
@@ -1336,7 +1335,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Reporting",
       "subtitle": "Create reliable, scheduled analytics reports for yourself or your team.",
       "newReport": "New report",
       "mailUnavailable": "SMTP is unavailable. You can create and edit drafts, but reports cannot be activated, tested, or retried.",
@@ -1879,7 +1877,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Instance administration",
     "tabs": {
       "users": "Users",
       "sites": "Sites",
@@ -2059,7 +2056,6 @@
         }
       },
       "overview": {
-        "breadcrumb": "Team Overview",
         "title": "Team",
         "teamIdLabel": "Team ID",
         "memberCount": "Members",
@@ -2126,7 +2122,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Team Members",
         "title": "Team Members"
       },
       "sso": {
@@ -2195,7 +2190,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Team Settings",
         "title": "Team Settings",
         "nameSectionTitle": "Team name",
         "nameSectionDescription": "The display name for this team. Owners and admins can update it.",
@@ -3042,7 +3036,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Preferences",
     "subtitle": "Manage your application preferences.",
     "actions": {
       "saveChanges": "Save changes"
@@ -3875,7 +3868,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "QR codes",
     "actions": {
       "create": "Create QR code",
       "exportSvg": "Export SVG",

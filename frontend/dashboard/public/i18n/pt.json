@@ -1228,7 +1228,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Configurações",
       "title": "Configurações",
       "subtitle": "Gerencie a segurança e as preferências da sua conta.",
       "profile": {
@@ -1273,7 +1272,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Relatórios",
       "subtitle": "Crie relatórios de análises confiáveis e agendados para você ou sua equipe.",
       "newReport": "Novo relatório",
       "mailUnavailable": "O SMTP não está disponível. Você pode editar rascunhos, mas não ativar, testar ou tentar novamente os relatórios.",
@@ -1795,7 +1793,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Administração da instância",
     "tabs": {
       "users": "Usuários",
       "sites": "Sites",
@@ -1958,7 +1955,6 @@
         "status": { "createSuccess": "Filtro da equipe {{value}} criado.", "deleteSuccess": "Filtro da equipe {{value}} excluído." }
       },
       "overview": {
-        "breadcrumb": "Visão geral da equipe",
         "title": "Equipe",
         "teamIdLabel": "ID da equipe",
         "memberCount": "Membros",
@@ -2025,7 +2021,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Membros da equipe",
         "title": "Membros da equipe"
       },
       "sso": {
@@ -2091,7 +2086,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Configurações da equipe",
         "title": "Configurações da equipe",
         "nameSectionTitle": "Nome da equipe",
         "nameSectionDescription": "O nome de exibição desta equipe. Proprietários e administradores podem atualizá-lo.",
@@ -2913,7 +2907,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Preferências",
     "subtitle": "Gerencie as preferências da sua aplicação.",
     "actions": {
       "saveChanges": "Salvar alterações"
@@ -3746,7 +3739,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "Códigos QR",
     "actions": {
       "create": "Criar código QR",
       "exportSvg": "Exportar SVG",

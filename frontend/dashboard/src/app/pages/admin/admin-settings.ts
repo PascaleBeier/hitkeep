@@ -19,7 +19,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { dialogCancelButton, dialogDangerButton, dialogWarnButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
@@ -495,10 +494,6 @@ export class AdminSettings implements OnInit {
     protected readonly userActionStatusMessage = computed(() => this.actionStatusMessage(this.userActionStatus()));
     protected readonly siteActionStatusMessage = computed(() => this.actionStatusMessage(this.siteActionStatus()));
     protected readonly teamActionStatusMessage = computed(() => this.actionStatusMessage(this.teamActionStatus()));
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [{ label: this.transloco.translate('nav.administration') }, { label: this.transloco.translate(this.pageTitleKey()), isCurrent: true }];
-    });
     protected readonly canManageUsers = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.manageUsers));
     protected readonly canRunMaintenance = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.runMaintenance));
     protected readonly canViewActivation = computed(() => this.access.hasInstance(INSTANCE_CAPABILITIES.viewActivation));

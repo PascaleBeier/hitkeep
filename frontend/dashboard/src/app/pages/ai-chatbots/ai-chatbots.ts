@@ -11,8 +11,6 @@ import { SiteService } from '@features/sites/services/site.service';
 import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { ExportSplitButton, ExportStatusBanner } from '@components/export-split-button/export-split-button';
 import { FilterChipItem, FilterChipRow } from '@components/filter-chip-row/filter-chip-row';
 import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
@@ -51,25 +49,7 @@ const CHATBOT_EVENTS: Record<ChatbotMetricKey, string> = {
 
 @Component({
     selector: 'app-ai-chatbots',
-    imports: [
-        FormsModule,
-        TranslocoPipe,
-        SelectModule,
-        ButtonModule,
-        CardModule,
-        ReportRangeToolbar,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        ExportSplitButton,
-        ExportStatusBanner,
-        FilterChipRow,
-        NoSiteSelected,
-        SetupCallout,
-        SeriesChart,
-        KpiCard,
-        MetricCardGroup
-    ],
+    imports: [FormsModule, TranslocoPipe, SelectModule, ButtonModule, CardModule, ReportRangeToolbar, ExportSplitButton, ExportStatusBanner, FilterChipRow, NoSiteSelected, SetupCallout, SeriesChart, KpiCard, MetricCardGroup],
     templateUrl: './ai-chatbots.html',
     styleUrl: './ai-chatbots.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -150,22 +130,6 @@ export class AIChatbots {
         ] satisfies { label: string; value: ScopeKey }[];
     });
     protected readonly scopeValueOptions = computed(() => this.scopeValues().map((item) => ({ label: item.name, value: item.name })));
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.activeSite();
-        if (!site)
-            return [
-                {
-                    label: this.transloco.translate('aiChatbots.title'),
-                    isCurrent: true
-                }
-            ];
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('aiChatbots.title'), isCurrent: true }
-        ];
-    });
 
     protected readonly isShortRange = this.reportRange.isShortRange;
 

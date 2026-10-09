@@ -1269,7 +1269,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Einstellungen",
       "title": "Einstellungen",
       "subtitle": "Verwalte die Sicherheit und Einstellungen deines Kontos.",
       "profile": {
@@ -1314,7 +1313,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Berichte",
       "subtitle": "Erstelle zuverlässige, geplante Analyseberichte für dich oder dein Team.",
       "newReport": "Neuer Bericht",
       "mailUnavailable": "SMTP ist nicht verfügbar. Entwürfe können bearbeitet werden, Berichte aber nicht aktiviert, getestet oder erneut gesendet werden.",
@@ -1844,7 +1842,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Instanzverwaltung",
     "tabs": {
       "users": "Benutzer",
       "sites": "Seiten",
@@ -2007,7 +2004,6 @@
         "status": { "createSuccess": "Team-Filter {{value}} wurde erstellt.", "deleteSuccess": "Team-Filter {{value}} wurde gelöscht." }
       },
       "overview": {
-        "breadcrumb": "Team-Übersicht",
         "title": "Team",
         "teamIdLabel": "Team-ID",
         "memberCount": "Mitglieder",
@@ -2074,7 +2070,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Teammitglieder",
         "title": "Teammitglieder"
       },
       "sso": {
@@ -2140,7 +2135,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Team-Einstellungen",
         "title": "Team-Einstellungen",
         "nameSectionTitle": "Teamname",
         "nameSectionDescription": "Der Anzeigename für dieses Team. Eigentümer und Admins können ihn ändern.",
@@ -2979,7 +2973,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Einstellungen",
     "subtitle": "Verwalte deine Anwendungseinstellungen.",
     "actions": {
       "saveChanges": "Änderungen speichern"
@@ -3812,7 +3805,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "QR-Codes",
     "actions": {
       "create": "QR-Code erstellen",
       "exportSvg": "SVG exportieren",
