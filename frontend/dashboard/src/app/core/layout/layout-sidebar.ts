@@ -78,8 +78,11 @@ export class LayoutSidebar {
         this.expansionOverrides.update((overrides) => {
             // Exclusive accordion: opening one section folds the others. Item-level
             // expansion (nested menus) lives in its own namespace and survives.
+            // Closes are stored explicitly so folding a section whose route is
+            // active actually sticks instead of being re-expanded by the
+            // active-route fallback.
             const kept = Object.fromEntries(Object.entries(overrides).filter(([key]) => key.startsWith(ITEM_KEY_PREFIX)));
-            const updated = next ? { ...kept, [SECTION_ID_PREFIX + sectionId]: true } : kept;
+            const updated = { ...kept, [SECTION_ID_PREFIX + sectionId]: next };
             this.storeOverrides(updated);
             return updated;
         });
@@ -99,8 +102,10 @@ export class LayoutSidebar {
         const key = this.getMenuItemKey(item);
         const next = !this.isItemOpen(item);
         this.expansionOverrides.update((overrides) => {
+            // Same exclusive behavior as sections, within the item namespace, and
+            // with explicit closes so an active-route branch can be folded.
             const kept = Object.fromEntries(Object.entries(overrides).filter(([stored]) => stored.startsWith(SECTION_ID_PREFIX)));
-            const updated = next ? { ...kept, [ITEM_KEY_PREFIX + key]: true } : kept;
+            const updated = { ...kept, [ITEM_KEY_PREFIX + key]: next };
             this.storeOverrides(updated);
             return updated;
         });

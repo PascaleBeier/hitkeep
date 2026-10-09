@@ -1177,6 +1177,33 @@ describe('MainLayout', () => {
         expect(treeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
     });
 
+    it('should fold a route-active sidebar branch when its toggle is clicked', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            const sectionToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Collapse Integration"]') as HTMLButtonElement | null;
+            const itemToggle = localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__toggle[aria-label="Collapse API Clients"]') as HTMLButtonElement | null;
+
+            expect(sectionToggle).toBeTruthy();
+            expect(itemToggle).toBeTruthy();
+
+            itemToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__toggle[aria-label="Expand API Clients"]')).toBeTruthy();
+
+            sectionToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside button.layout-sidebar-menu__section-toggle[aria-label="Expand Integration"]')).toBeTruthy();
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
+    });
+
     it('should hide create team actions in hosted cloud for non-owners', () => {
         TestBed.inject(PermissionService).applyPermissions({
             instance_role: 'user',
