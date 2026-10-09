@@ -14,8 +14,10 @@ import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
+import { UserMenuService } from '@services/user-menu.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { AskAIControl } from '@features/ask-ai/ask-ai-control';
+import { AskAIControlService } from '@features/ask-ai/ask-ai-control.service';
 import { LayoutPageBar } from './layout-page-bar';
 import { LayoutSidebar } from './layout-sidebar';
 import { MainLayoutContextService } from './main-layout-context.service';
@@ -23,7 +25,6 @@ import { MenuItem } from '@openng/optimus-ui/api';
 import { vi } from 'vitest';
 
 interface LayoutSidebarTestAccess {
-    openSiteSettings(section?: string): void;
     closeMobileDrawer(): void;
     mobileMenuItems(): MenuItem[];
     canCreateTeams(): boolean;
@@ -344,7 +345,7 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should show Ask AI below the site selector when available', () => {
+    it('should offer Ask AI from the user menu when available', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -361,13 +362,14 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
-        expect(trigger?.textContent).toContain('Ask AI');
-        expect(trigger?.disabled).toBe(false);
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        const askAIItem = menuItems.find((item) => item.icon === 'pi pi-sparkles');
+        expect(askAIItem).toBeTruthy();
+        expect(askAIItem?.label).toContain('Ask AI');
+        expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should show Ask AI as unavailable when the product flag is on but no model is configured', () => {
+    it('should keep Ask AI in the user menu when the product flag is on but no model is configured', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -382,10 +384,13 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
-        expect(trigger?.textContent).toContain('Ask AI not configured');
-        expect(trigger?.classList.contains('ask-ai-trigger--unavailable')).toBe(true);
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        expect(menuItems.some((item) => item.icon === 'pi pi-sparkles')).toBe(true);
+
+        openAskAIDrawer();
+        fixture.detectChanges();
+
+        expect(document.body.textContent).toContain('Ask AI not configured');
     });
 
     it('should show unavailable Ask AI as a chat-only drawer without history or model details', () => {
@@ -733,7 +738,7 @@ describe('MainLayout', () => {
         expect(request.request.to).toBe('2026-06-20');
     });
 
-    it('should focus the Ask AI drawer composer when opened from the sidebar', async () => {
+    it('should focus the Ask AI drawer composer when opened from the user menu', async () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -1277,7 +1282,7 @@ describe('MainLayout', () => {
         const sidebar = fixture.debugElement.query(By.directive(LayoutSidebar)).componentInstance as LayoutSidebarTestAccess;
         layoutContext.isMobileDrawerOpen.set(true);
 
-        sidebar.openSiteSettings();
+        layoutContext.openSiteSettings('general');
         sidebar.closeMobileDrawer();
         const menuItems = sidebar.mobileMenuItems();
         const firstItem = menuItems[0]?.items?.[0];
@@ -1438,9 +1443,7 @@ describe('MainLayout', () => {
     }
 
     function openAskAIDrawer() {
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLElement | null;
-        expect(trigger).toBeTruthy();
-        trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        TestBed.inject(AskAIControlService).requestOpen();
         fixture.detectChanges();
     }
 

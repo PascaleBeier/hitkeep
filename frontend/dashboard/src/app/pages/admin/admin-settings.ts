@@ -32,6 +32,7 @@ import { PermissionService } from '@services/permission.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { AdminPageFrame } from './components/admin-page-frame';
+import { MainLayoutContextService } from '@layout/main-layout-context.service';
 import { AdminGlobalExclusionSettings } from './components/admin-global-exclusion-settings';
 import { AdminItemList, type AdminItemListEntry } from './components/admin-item-list';
 import { AdminPanel } from './components/admin-panel';
@@ -158,6 +159,7 @@ export class AdminSettings implements OnInit {
     private access = inject(AccessService);
     private userTeamService = inject(TeamService);
     private system = inject(AdminSystemService);
+    private layoutContext = inject(MainLayoutContextService);
     private activeLanguage = toSignal(this.transloco.langChanges$, { initialValue: this.transloco.getActiveLang() });
 
     protected activeAdminTab = signal<AdminStatusTab>('runtime');
@@ -1028,6 +1030,12 @@ export class AdminSettings implements OnInit {
         this.activeLanguage();
         return [
             {
+                label: this.transloco.translate('sites.selector.siteSettingsAria'),
+                icon: 'pi pi-cog',
+                command: () => this.router.navigate(['/sites', site.id, 'settings', 'general'])
+            },
+            { separator: true },
+            {
                 label: this.transloco.translate('share.dialog.deleteAction'),
                 icon: 'pi pi-trash',
                 danger: true,
@@ -1036,6 +1044,10 @@ export class AdminSettings implements OnInit {
             }
         ];
     };
+
+    protected openAddSiteDialog() {
+        this.layoutContext.isAddSiteVisible.set(true);
+    }
 
     protected readonly teamActions = (team: AdminTeam): TableRowActionItem[] => {
         if (team.is_default) {

@@ -43,6 +43,7 @@ export const siteSettingsSectionGuard: CanActivateFn = (route) => {
             case 'retention':
                 return access.canSite(site.id, SITE_CAPABILITIES.manageData);
             case 'access':
+            case 'share':
                 return access.canSite(site.id, SITE_CAPABILITIES.manageTeam);
             case 'danger-zone':
                 return access.canSite(site.id, SITE_CAPABILITIES.delete);

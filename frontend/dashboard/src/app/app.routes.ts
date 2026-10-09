@@ -266,6 +266,15 @@ export const routes: Routes = [
                         }
                     },
                     {
+                        path: 'share',
+                        loadComponent: () => import('@pages/site-settings/site-share-settings-page').then((m) => m.SiteShareSettingsPage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: {
+                            ...titleData('sites.settings.tabs.share', 'site'),
+                            siteSettingsSection: 'share'
+                        }
+                    },
+                    {
                         path: 'danger-zone',
                         loadComponent: () => import('@pages/site-settings/site-danger-zone-page').then((m) => m.SiteDangerZonePage),
                         canActivate: [siteSettingsSectionGuard],

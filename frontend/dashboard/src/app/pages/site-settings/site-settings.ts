@@ -58,6 +58,7 @@ export class SiteSettingsPage {
             },
             { label: this.transloco.translate('sites.settings.tabs.retention'), route: 'retention', icon: 'pi pi-history', visible: this.access.canSite(site.id, SITE_CAPABILITIES.manageData) },
             { label: this.transloco.translate('sites.settings.tabs.access'), route: 'access', icon: 'pi pi-users', visible: this.access.canSite(site.id, SITE_CAPABILITIES.manageTeam) },
+            { label: this.transloco.translate('sites.settings.tabs.share'), route: 'share', icon: 'pi pi-share-alt', visible: this.access.canSite(site.id, SITE_CAPABILITIES.manageTeam) },
             {
                 label: this.transloco.translate('sites.settings.tabs.dangerZone'),
                 route: 'danger-zone',

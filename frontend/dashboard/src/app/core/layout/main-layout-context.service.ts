@@ -102,7 +102,7 @@ export class MainLayoutContextService {
     }
 
     private currentSiteSettingsSection(): SiteSettingsSection | null {
-        const match = this.router.url.match(/^\/sites\/[^/]+\/settings\/(general|tracking|filtering|retention|access|danger-zone)(?:[/?#]|$)/);
+        const match = this.router.url.match(/^\/sites\/[^/]+\/settings\/(general|tracking|filtering|retention|access|share|danger-zone)(?:[/?#]|$)/);
         return (match?.[1] as SiteSettingsSection | undefined) ?? null;
     }
 }

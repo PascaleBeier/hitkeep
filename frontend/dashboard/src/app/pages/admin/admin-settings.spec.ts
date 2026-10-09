@@ -13,6 +13,7 @@ import { AccessService } from '@services/access.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { PermissionService } from '@services/permission.service';
 import { AdminSettings } from './admin-settings';
+import { MainLayoutContextService } from '@layout/main-layout-context.service';
 
 interface AdminSettingsTestAccess {
     handleDeleteUserError(err: unknown, user: { email: string }): boolean;
@@ -187,6 +188,14 @@ describe('AdminSettings', () => {
                 provideRouter([]),
                 provideHttpClient(),
                 provideHttpClientTesting(),
+                {
+                    provide: MainLayoutContextService,
+                    useValue: {
+                        isAddSiteVisible: signal(false),
+                        registerPageHeader: () => undefined,
+                        clearPageHeader: () => undefined
+                    }
+                },
                 {
                     provide: ConfirmationService,
                     useValue: confirmationServiceMock
@@ -650,6 +659,14 @@ describe('AdminSettings rendered system status', () => {
                 provideRouter([]),
                 provideHttpClient(),
                 provideHttpClientTesting(),
+                {
+                    provide: MainLayoutContextService,
+                    useValue: {
+                        isAddSiteVisible: signal(false),
+                        registerPageHeader: () => undefined,
+                        clearPageHeader: () => undefined
+                    }
+                },
                 {
                     provide: UserProfileService,
                     useValue: {

@@ -1637,13 +1637,9 @@
     },
     "selector": {
       "regionAria": "Locatieselectie",
-      "sitesLabel": "Sites",
-      "addSiteAria": "Voeg een nieuwe site toe",
       "selectPlaceholder": "Selecteer locatie",
       "selectSiteAria": "Selecteer een site om statistieken te bekijken",
-      "siteSettingsAria": "Site-instellingen",
-      "trackingCodeAria": "Trackingcode",
-      "shareDashboardAria": "Dashboard delen"
+      "siteSettingsAria": "Site-instellingen"
     },
     "settings": {
       "breadcrumb": {
@@ -1657,6 +1653,7 @@
         "filtering": "Filteren",
         "retention": "Behoud",
         "access": "Toegang",
+        "share": "Delen",
         "dangerZone": "Gevarenzone"
       },
       "notices": {
@@ -1823,6 +1820,7 @@
     },
     "sites": {
       "title": "Sites",
+      "addSite": "Site toevoegen",
       "ownerUnknown": "Onbekende eigenaar"
     },
     "exclusions": {

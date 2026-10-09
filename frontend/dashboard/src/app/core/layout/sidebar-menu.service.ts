@@ -22,10 +22,14 @@ interface SidebarItem {
 }
 
 interface SidebarSection {
+    id: string;
     labelKey: string;
+    collapsible?: boolean;
     visible?: () => boolean;
     items: SidebarItem[];
 }
+
+export type SidebarMenuSectionItem = MenuItem & { sectionId?: string; collapsible?: boolean };
 
 @Service({ autoProvided: false })
 export class SidebarMenuService {
@@ -49,22 +53,51 @@ export class SidebarMenuService {
 
     readonly desktopItems = computed(() => this.buildItems());
 
+    readonly activeSectionId = computed(() => {
+        this.activeLanguage();
+        this.activeUrl();
+        for (const section of this.sections()) {
+            if (section.collapsible && this.sectionVisible(section) && this.sectionHasActiveItem(section)) {
+                return section.id;
+            }
+        }
+        return null;
+    });
+
     mobileItems(close: () => void): MenuItem[] {
         return this.buildItems(close);
     }
 
-    private buildItems(close?: () => void): MenuItem[] {
+    private buildItems(close?: () => void): SidebarMenuSectionItem[] {
         this.activeLanguage();
         const activeUrl = this.activeUrl();
         return this.sections()
-            .filter((section) => section.visible?.() ?? true)
+            .filter((section) => this.sectionVisible(section))
             .map((section) => this.sectionItem(section, close, activeUrl))
             .filter((section) => section.items?.length);
     }
 
-    private sectionItem(section: SidebarSection, close: (() => void) | undefined, activeUrl: string): MenuItem {
+    private sectionVisible(section: SidebarSection): boolean {
+        return section.visible?.() ?? true;
+    }
+
+    private sectionHasActiveItem(section: SidebarSection): boolean {
+        return section.items.some((item) => this.itemOrDescendantActive(item));
+    }
+
+    private itemOrDescendantActive(item: SidebarItem): boolean {
+        const routerLink = this.routerLinkFor(item);
+        if (routerLink && this.urlMatches(this.activeUrl(), routerLink, item.exact)) {
+            return true;
+        }
+        return item.items?.some((child) => this.itemOrDescendantActive(child)) ?? false;
+    }
+
+    private sectionItem(section: SidebarSection, close: (() => void) | undefined, activeUrl: string): SidebarMenuSectionItem {
         const items = section.items.map((item) => this.menuItem(item, close, activeUrl)).filter((item): item is MenuItem => !!item);
         return {
+            sectionId: section.id,
+            collapsible: section.collapsible ?? false,
             label: this.transloco.translate(section.labelKey),
             expanded: true,
             items
@@ -153,6 +186,7 @@ export class SidebarMenuService {
 
         return [
             {
+                id: 'analytics',
                 labelKey: 'nav.analytics',
                 items: [
                     { labelKey: 'nav.overview', icon: 'pi pi-globe', routerLink: '/overview', visible: notShare, exact: true },
@@ -169,7 +203,9 @@ export class SidebarMenuService {
                 ]
             },
             {
+                id: 'integration',
                 labelKey: 'nav.integration',
+                collapsible: true,
                 visible: notShare,
                 items: [
                     { labelKey: 'nav.importExport', icon: 'pi pi-sync', routerLink: '/import-export' },
@@ -185,12 +221,16 @@ export class SidebarMenuService {
                 ]
             },
             {
+                id: 'account',
                 labelKey: 'nav.account',
+                collapsible: true,
                 visible: notShare,
                 items: [{ labelKey: 'nav.emailReports', icon: 'pi pi-envelope', routerLink: '/settings/reports' }]
             },
             {
+                id: 'resources',
                 labelKey: 'nav.resources',
+                collapsible: true,
                 visible: notShare,
                 items: [
                     { labelKey: 'nav.docs', icon: 'pi pi-bookmark pi-external-link', url: SidebarMenuService.docsURL, target: '_blank' },
@@ -198,7 +238,9 @@ export class SidebarMenuService {
                 ]
             },
             {
+                id: 'administration',
                 labelKey: 'nav.administration',
+                collapsible: true,
                 visible: () => notShare() && (canViewSystem() || canManageTeamSettings()),
                 items: [
                     { labelKey: 'nav.systemStatus', icon: 'pi pi-server', routerLink: '/admin/status', visible: canViewSystem },

@@ -1646,13 +1646,9 @@
     },
     "selector": {
       "regionAria": "Selezione sito",
-      "sitesLabel": "Siti",
-      "addSiteAria": "Aggiungi un nuovo sito",
       "selectPlaceholder": "Seleziona sito",
       "selectSiteAria": "Seleziona un sito per vedere le statistiche",
-      "siteSettingsAria": "Impostazioni sito",
-      "trackingCodeAria": "Codice di tracciamento",
-      "shareDashboardAria": "Condividi dashboard"
+      "siteSettingsAria": "Impostazioni sito"
     },
     "settings": {
       "breadcrumb": {
@@ -1666,6 +1662,7 @@
         "filtering": "Filtraggio",
         "retention": "Retention",
         "access": "Accesso",
+        "share": "Condividi",
         "dangerZone": "Zona pericolo"
       },
       "notices": {
@@ -1832,6 +1829,7 @@
     },
     "sites": {
       "title": "Siti",
+      "addSite": "Aggiungi sito",
       "ownerUnknown": "Proprietario sconosciuto"
     },
     "exclusions": {
