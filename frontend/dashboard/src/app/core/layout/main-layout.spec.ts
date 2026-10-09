@@ -350,7 +350,7 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('keeps Ask AI out of the navigation chrome', () => {
+    it('should offer Ask AI from the user menu when available', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -368,8 +368,34 @@ describe('MainLayout', () => {
         fixture.detectChanges();
 
         const menuItems = TestBed.inject(UserMenuService).menuItems();
-        expect(menuItems.some((item) => item.icon === 'pi pi-sparkles')).toBe(false);
+        const askAIItem = menuItems.find((item) => item.icon === 'pi pi-sparkles');
+        expect(askAIItem).toBeTruthy();
+        expect(askAIItem?.label).toContain('Ask AI');
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
+    });
+
+    it('should keep Ask AI in the user menu when the product flag is on but no model is configured', () => {
+        seedActiveSite();
+        bootstrap.status.set({
+            needs_setup: false,
+            version: 'v2.0.0',
+            cloud: { hosted: false, signup_enabled: false },
+            ask_ai: {
+                enabled: true,
+                available: false,
+                status: 'not_configured',
+                budget_exhausted: false
+            }
+        });
+        fixture.detectChanges();
+
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        expect(menuItems.some((item) => item.icon === 'pi pi-sparkles')).toBe(true);
+
+        openAskAIDrawer();
+        fixture.detectChanges();
+
+        expect(document.body.textContent).toContain('Ask AI not configured');
     });
 
     it('should show unavailable Ask AI as a chat-only drawer without history or model details', () => {
