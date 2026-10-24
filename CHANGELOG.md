@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.15.0](https://github.com/HitKeep/hitkeep/compare/v2.14.2...v2.15.0) (2026-10-24)
+
+
+### Features
+
+* connect assistants to scoped analytics and public discovery ([#411](https://github.com/HitKeep/hitkeep/issues/411)) ([fafb021](https://github.com/HitKeep/hitkeep/commit/fafb0211de2365bde570f54875a0bc8b797cd798))
+* **oauth:** add resource-scoped integrations and client administration ([#408](https://github.com/HitKeep/hitkeep/issues/408)) ([faed560](https://github.com/HitKeep/hitkeep/commit/faed560d135422db9d385a8d5d2ef831aa57a094))
+
+
+### Bug Fixes
+
+* align OAuth management details with shared dialogs ([#419](https://github.com/HitKeep/hitkeep/issues/419)) ([0849743](https://github.com/HitKeep/hitkeep/commit/0849743e9b2170eb99cf1c053fb11334c1997c93))
+* migrate GitHub organization release identities ([#418](https://github.com/HitKeep/hitkeep/issues/418)) ([5587bc9](https://github.com/HitKeep/hitkeep/commit/5587bc960a61ca6fb81975a2b7e63aa88a6aa9f6))
+* **oauth:** harden MCP agent connections ([#410](https://github.com/HitKeep/hitkeep/issues/410)) ([f6cc129](https://github.com/HitKeep/hitkeep/commit/f6cc1295c77efbaa598bab50da59a0ae9f7f558f))
+
 ## [2.14.2](https://github.com/PascaleBeier/hitkeep/compare/v2.14.1...v2.14.2) (2026-10-18)
 
 

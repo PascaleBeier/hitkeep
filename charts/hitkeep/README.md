@@ -168,7 +168,7 @@ persistence:
 
 ### Optional MCP and AI configuration
 
-HitKeep 2.14.2 can expose the read-only MCP endpoint, optional AI-backed Opportunity features, and the optional Ask AI dashboard assistant when you configure them explicitly. <!-- x-release-please-version -->
+HitKeep 2.15.0 can expose the read-only MCP endpoint, optional AI-backed Opportunity features, and the optional Ask AI dashboard assistant when you configure them explicitly. <!-- x-release-please-version -->
 
 ```
 env:
