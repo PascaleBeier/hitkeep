@@ -61,7 +61,7 @@
         "@eslint/js": "^10.0.1",
         "@jsverse/transloco": "^8.4.0",
         "@jsverse/transloco-optimize": "^8.4.0",
-        "@playwright/test": "^1.64.0",
+        "@playwright/test": "^1.64.1",
         "@types/markdown-it": "14.2.0",
         "@vitest/browser-playwright": "^5.0.5",
         "@vitest/coverage-v8": "^5.0.5",
