@@ -58,6 +58,14 @@ describe('Brand', () => {
         expect(image?.classList.contains('hk-brand-icon')).toBe(true);
     });
 
+    it('keeps an accessible home link while hiding its wordmark in a compact header', async () => {
+        fixture.componentRef.setInput('compact', true);
+        await fixture.whenStable();
+        expect(fixture.nativeElement.querySelector('a span')).toBeNull();
+        expect(fixture.nativeElement.querySelector('a img')?.getAttribute('alt')).toContain('HitKeep');
+        expect(fixture.nativeElement.querySelector('a')?.getAttribute('href')).toBe('/hitkeep/');
+    });
+
     it('routes the brand to the configured app root without a document navigation', () => {
         const link = fixture.nativeElement.querySelector('a');
 

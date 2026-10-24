@@ -6,8 +6,6 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
 import { InputTextModule } from '@openng/optimus-ui/inputtext';
 import { SelectModule } from '@openng/optimus-ui/select';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { SiteService } from '@features/sites/services/site.service';
 import { SiteSelectOption } from '@features/sites/components/site-select-option';
@@ -31,7 +29,7 @@ function urlValidator(): ValidatorFn {
     templateUrl: './utm-builder.html',
     styleUrl: './utm-builder.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, ButtonModule, InputTextModule, SelectModule, SiteSelectOption, PageHeader, PageHeaderLeft, PageBreadcrumb, CopyControl]
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, ButtonModule, InputTextModule, SelectModule, SiteSelectOption, CopyControl]
 })
 export class UtmBuilder {
     private transloco = inject(TranslocoService);
@@ -67,12 +65,6 @@ export class UtmBuilder {
         } catch {
             return '';
         }
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        return [...(site ? [{ label: site.domain, favicon: site, routerLink: '/dashboard' }] : []), { label: this.transloco.translate('nav.utm'), routerLink: '/utm' }, { label: this.transloco.translate('utmBuilder.breadcrumb'), isCurrent: true }];
     });
 
     protected readonly utmParamKeys = ['source', 'medium', 'campaign', 'term', 'content'] as const;

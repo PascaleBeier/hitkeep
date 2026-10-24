@@ -1,10 +1,11 @@
 const { test, expect } = require("playwright/test");
 const { login } = require("./support/auth");
+const { enableAskAIForBootstrap } = require("./support/ask-ai");
 
 test("ask ai stays hidden for disabled installs", async ({ page }) => {
     await login(page, "/dashboard");
 
-    await expect(page.locator("app-ask-ai-control .ask-ai-trigger")).toHaveCount(0);
+    await expect(page.locator("app-layout-page-bar .ask-ai-trigger")).toHaveCount(0);
 });
 
 test("ask ai answers with a chart, page link, and export action", async ({ page }) => {
@@ -112,7 +113,6 @@ test("ask ai opens in unavailable and mobile drawer states", async ({ page }) =>
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page, "/dashboard");
 
-    await page.getByRole("button", { name: "Main sidebar" }).click();
     await page.getByRole("button", { name: "Ask AI about this site" }).click();
     await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
     const drawer = page.locator(".ask-ai-drawer");
@@ -151,44 +151,3 @@ test("ask ai shows the shared daily limit and can refresh availability", async (
     await expect(page.getByText("1 of 1 team questions left today")).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Ask AI prompt" })).toBeEnabled();
 });
-
-async function enableAskAIForBootstrap(page, askAIStatus = {}, cloudHosted = false) {
-    await page.route("**/api/sites/*/ask-ai/status", async (route) => {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enabled: true, available: true, status: "available", budget_exhausted: false, ...askAIStatus }) });
-    });
-    await page.route("**/api/user/bootstrap", async (route) => {
-        const response = await route.fetch();
-        const bootstrap = await response.json();
-        const headers = response.headers();
-        delete headers["content-length"];
-
-        bootstrap.status = bootstrap.status || {};
-        if (cloudHosted) {
-            bootstrap.status.cloud = { ...(bootstrap.status.cloud || {}), hosted: true };
-        }
-        bootstrap.status.ai = {
-            ...(bootstrap.status.ai || {}),
-            enabled: true,
-            configured: true,
-            provider: "openai-compatible",
-            model: "openai.gpt-oss-120b",
-            ask_ai_enabled: true,
-            ask_ai_available: true
-        };
-        bootstrap.status.ask_ai = {
-            enabled: true,
-            available: true,
-            status: "available",
-            provider: "openai-compatible",
-            model: "openai.gpt-oss-120b",
-            budget_exhausted: false,
-            ...askAIStatus
-        };
-
-        await route.fulfill({
-            status: response.status(),
-            headers: { ...headers, "content-type": "application/json" },
-            body: JSON.stringify(bootstrap)
-        });
-    });
-}

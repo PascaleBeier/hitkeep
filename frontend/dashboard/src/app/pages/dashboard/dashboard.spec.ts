@@ -669,6 +669,20 @@ describe('Dashboard', () => {
         expect(dashboard.aiActivity()).toBeNull();
     });
 
+    it('reloads the report from the new site when the active site changes', () => {
+        const siteService = TestBed.inject(SiteService);
+        const fetchStats = TestBed.inject(StatsService).fetchStats as unknown as ReturnType<typeof vi.fn>;
+
+        siteService.activeSite.set({ id: 'site-1', user_id: 'user-1', domain: 'one.example', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+        expect(fetchStats.mock.calls.some((call) => call[0] === 'site-1')).toBe(true);
+
+        siteService.activeSite.set({ id: 'site-2', user_id: 'user-1', domain: 'two.example', created_at: '2026-01-01T00:00:00Z' });
+        fixture.detectChanges();
+
+        expect(fetchStats.mock.calls.some((call) => call[0] === 'site-2')).toBe(true);
+    });
+
     it('should render configured funnels from dashboard stats', () => {
         const siteService = TestBed.inject(SiteService);
         const statsService = TestBed.inject(StatsService);

@@ -1,4 +1,4 @@
-import { effect, inject, Service } from '@angular/core';
+import { computed, effect, inject, Service } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRouteSnapshot, NavigationEnd, Router } from '@angular/router';
@@ -35,15 +35,20 @@ export class DashboardTitleService {
         { initialValue: this.router.url }
     );
 
+    private readonly routeTitle = computed(() => {
+        this.activeUrl();
+        return this.currentRouteTitle();
+    });
+    readonly pageTitle = computed(() => {
+        this.activeLanguage();
+        const key = this.routeTitle().titleKey;
+        return key ? this.transloco.translate(key) : '';
+    });
+
     constructor() {
         effect(() => {
-            this.activeUrl();
-            this.activeLanguage();
-            const routeTitle = this.currentRouteTitle();
-            const pageTitle = routeTitle.titleKey ? this.transloco.translate(routeTitle.titleKey) : '';
-            const contextTitle = this.contextTitle(routeTitle.titleScope ?? 'none');
-
-            this.title.setTitle(this.composeTitle(contextTitle, pageTitle));
+            const contextTitle = this.contextTitle(this.routeTitle().titleScope ?? 'none');
+            this.title.setTitle(this.composeTitle(contextTitle, this.pageTitle()));
         });
     }
 

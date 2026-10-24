@@ -1,3 +1,35 @@
-:host {
+app-main-layout {
     display: block;
+}
+app-main-layout .focus-shell {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+app-main-layout .focus-shell .p-splitterpanel {
+    min-width: 0;
+}
+app-main-layout .focus-shell .p-splitterpanel:first-child {
+    flex-grow: 0;
+    overflow: visible;
+}
+app-main-layout .focus-shell.sidebar-hidden .p-splitterpanel:first-child {
+    flex: 0 0 0 !important;
+}
+app-main-layout .focus-shell.sidebar-hidden .p-splitter-gutter {
+    display: none;
+}
+app-main-layout .focus-shell .p-splitter-gutter {
+    background: var(--p-content-border-color);
+}
+app-main-layout .focus-shell .p-splitter-gutter-handle {
+    height: 100%;
+    background: transparent;
+}
+app-main-layout .focus-shell .p-splitter-gutter-handle:focus-visible {
+    outline: 2px solid var(--p-primary-color);
 }

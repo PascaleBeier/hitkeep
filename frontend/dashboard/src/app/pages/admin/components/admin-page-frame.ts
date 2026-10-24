@@ -1,5 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { PageFrame } from '@components/page-frame/page-frame';
 
 @Component({
@@ -9,6 +8,4 @@ import { PageFrame } from '@components/page-frame/page-frame';
     styleUrl: './admin-page-frame.css',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class AdminPageFrame {
-    breadcrumbItems = input.required<PageBreadcrumbItem[]>();
-}
+export class AdminPageFrame {}

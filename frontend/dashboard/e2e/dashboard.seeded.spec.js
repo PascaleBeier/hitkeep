@@ -54,7 +54,7 @@ async function selectComboboxOption(page, name, optionName) {
 }
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
-    const combobox = page.locator('[role="combobox"]:visible').first();
+    const combobox = page.locator('app-site-selector [role="combobox"]:visible').first();
     await expect(combobox).toBeVisible();
 
     const currentSite = ((await combobox.textContent()) || "").trim();
@@ -299,14 +299,14 @@ test("dashboard renders seeded data and product controls", async ({ page }) => {
     await expect(teamSwitcher).toBeVisible();
     await expect(teamSwitcher).toContainText("Acme Analytics");
 
-    await page.getByRole("button", { name: /share dashboard/i }).click();
-    await expect(page.getByRole("dialog").getByText("Share dashboard")).toBeVisible();
-    await expect(page.getByRole("button", { name: /generate/i })).toBeVisible();
-    await page.getByRole("button", { name: /close/i }).click();
-
     await page.getByRole("button", { name: /site settings/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/general$/);
     await expect(page.getByRole("tab", { name: /general/i })).toHaveAttribute("aria-selected", "true");
+
+    await page.getByRole("tab", { name: /share/i }).click();
+    await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/share$/);
+    await expect(page.getByRole("button", { name: /generate/i })).toBeVisible();
+
     await page.getByRole("tab", { name: /tracking/i }).click();
     await expect(page).toHaveURL(/\/sites\/[^/]+\/settings\/tracking$/);
     await expect(page.getByTestId("tracking-snippet")).toContainText("hk.js");
@@ -666,7 +666,7 @@ test("team admin page shows seeded members and administration tabs", async ({ pa
     await expect(page.getByRole("heading", { name: "Team API clients" })).toBeVisible();
 
     await page.getByRole("tab", { name: /^Custom Domains$/i }).click();
-    await expect(page.getByRole("heading", { name: "Custom domains" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Custom domains", level: 2, exact: true })).toBeVisible();
     const trackingDomain = `track-${Date.now()}.acme-analytics.io`;
     const customDomainsUrl = page.url();
     await page.locator("app-team-tracking-domains header").getByRole("button", { name: "Add domain" }).click();
@@ -713,4 +713,20 @@ test("public share links render seeded analytics without login", async ({ page }
     await expect(page.getByText("ASNs")).toBeVisible();
     await expectSeededGeoNetworkMetrics(page);
     await expect(page.getByRole("button", { name: /share dashboard/i })).toHaveCount(0);
+});
+
+test("UTM keeps Analytics as the default alongside Generator and QR codes", async ({ page }) => {
+    await login(page, "/utm");
+    await expect(page.getByRole("tab", { name: "Analytics", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("app-utm-analytics app-report-range-toolbar")).toBeVisible();
+    await page.getByRole("tab", { name: /Generator|Builder/ }).click();
+    await expect(page).toHaveURL(/\/utm\/builder$/);
+    await page.getByRole("tab", { name: "QR codes", exact: true }).click();
+    await expect(page).toHaveURL(/\/utm\/qr-codes$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/utm\/builder$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/utm$/);
+    await page.reload();
+    await expect(page.getByRole("tab", { name: "Analytics", exact: true })).toHaveAttribute("aria-selected", "true");
 });

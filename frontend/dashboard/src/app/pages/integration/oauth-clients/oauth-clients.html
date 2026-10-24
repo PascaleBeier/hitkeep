@@ -1,5 +1,5 @@
 <p-confirmdialog />
-<app-page-frame [breadcrumbItems]="breadcrumbItems()" [subtitle]="'oauthClients.description' | transloco">
+<app-page-frame [subtitle]="'oauthClients.description' | transloco">
     <section class="flex min-w-0 flex-col gap-5">
         @if (!canManage()) {
         <p-message severity="error" role="alert">{{ 'oauth.permissionDenied' | transloco }}</p-message>

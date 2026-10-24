@@ -38,7 +38,6 @@ describe('UserSettings', () => {
                             settings: {
                                 security: { title: 'Security' },
                                 user: {
-                                    breadcrumb: 'Settings',
                                     profile: {
                                         title: 'Profile',
                                         description: 'Update your personal details.',

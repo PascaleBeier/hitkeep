@@ -13,8 +13,13 @@ import { AccessService } from '@services/access.service';
 import { UserProfileService } from '@services/user-profile.service';
 import { PermissionService } from '@services/permission.service';
 import { AdminSettings } from './admin-settings';
+import { MainLayoutContextService } from '@layout/main-layout-context.service';
+import { SiteService } from '@features/sites/services/site.service';
+import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 
 interface AdminSettingsTestAccess {
+    siteActions(site: { id: string; domain: string; user_id: string; created_at: string }): TableRowActionItem[];
+    openAddSiteDialog(): void;
     handleDeleteUserError(err: unknown, user: { email: string }): boolean;
     resolveDeleteErrorKey(err: unknown, fallbackKey: string): string;
     confirmDeleteSite(site: { id: string; domain: string; user_id: string; created_at: string }): void;
@@ -188,6 +193,19 @@ describe('AdminSettings', () => {
                 provideHttpClient(),
                 provideHttpClientTesting(),
                 {
+                    provide: MainLayoutContextService,
+                    useFactory: () => ({
+                        isAddSiteVisible: signal(false),
+                        isContextPending: signal(false),
+                        siteService: TestBed.inject(SiteService),
+                        onSiteSelected: vi.fn(),
+                        openSiteSettings: vi.fn(),
+                        openAddSite: vi.fn(),
+                        registerPageHeader: () => undefined,
+                        clearPageHeader: () => undefined
+                    })
+                },
+                {
                     provide: ConfirmationService,
                     useValue: confirmationServiceMock
                 },
@@ -205,7 +223,8 @@ describe('AdminSettings', () => {
                 {
                     provide: AccessService,
                     useValue: {
-                        hasInstance: hasInstanceMock
+                        hasInstance: hasInstanceMock,
+                        canSite: () => true
                     }
                 }
             ]
@@ -220,6 +239,36 @@ describe('AdminSettings', () => {
 
     afterEach(() => {
         httpMock.verify();
+    });
+
+    it('offers Settings only for canonical sites and rejects a stale menu during switching', () => {
+        const current = { id: 'current', domain: 'current.example.test', user_id: 'owner', created_at: '' };
+        const foreign = { ...current, id: 'foreign' };
+        const sites = TestBed.inject(SiteService);
+        const context = TestBed.inject(MainLayoutContextService);
+        sites.applySites([current]);
+        expect(component.siteActions(foreign).some((item) => item['icon'] === 'pi pi-cog')).toBe(false);
+        expect(component.siteActions(foreign).some((item) => item['icon'] === 'pi pi-trash')).toBe(true);
+        const settings = component.siteActions(current).find((item) => item['icon'] === 'pi pi-cog')!;
+        settings['command']?.();
+        expect(context.onSiteSelected).toHaveBeenCalledWith(current);
+        expect(context.openSiteSettings).toHaveBeenCalled();
+        vi.mocked(context.onSiteSelected).mockClear();
+        vi.mocked(context.openSiteSettings).mockClear();
+        (context.isContextPending as unknown as { set(value: boolean): void }).set(true);
+        settings['command']?.();
+        expect(context.onSiteSelected).not.toHaveBeenCalled();
+        sites.applySites([]);
+        (context.isContextPending as unknown as { set(value: boolean): void }).set(false);
+        settings['command']?.();
+        expect(context.openSiteSettings).not.toHaveBeenCalled();
+    });
+
+    it('delegates contextual site creation to the guarded owner', () => {
+        const context = TestBed.inject(MainLayoutContextService);
+        component.openAddSiteDialog();
+        expect(context.openAddSite).toHaveBeenCalled();
+        expect(context.isAddSiteVisible()).toBe(false);
     });
 
     it('stores blocking team details for sole-owner delete errors', () => {
@@ -650,6 +699,14 @@ describe('AdminSettings rendered system status', () => {
                 provideRouter([]),
                 provideHttpClient(),
                 provideHttpClientTesting(),
+                {
+                    provide: MainLayoutContextService,
+                    useValue: {
+                        isAddSiteVisible: signal(false),
+                        registerPageHeader: () => undefined,
+                        clearPageHeader: () => undefined
+                    }
+                },
                 {
                     provide: UserProfileService,
                     useValue: {

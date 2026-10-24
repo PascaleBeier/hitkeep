@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { ButtonModule } from '@openng/optimus-ui/button';
@@ -10,7 +10,6 @@ import { OAuthService } from '@services/oauth.service';
 import { formatOAuthTime, oauthScopeLabelKey } from '@core/utils/oauth-display';
 import { injectActiveLang } from '@core/i18n/active-lang';
 import { PageFrame } from '@components/page-frame/page-frame';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
 import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
@@ -27,13 +26,6 @@ export class ConnectedApplicationsPage {
     private readonly destroyRef = inject(DestroyRef);
     private readonly transloco = inject(TranslocoService);
     private readonly language = injectActiveLang();
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.language();
-        return [
-            { label: this.transloco.translate('userMenu.userSettings'), routerLink: '/settings' },
-            { label: this.transloco.translate('oauth.applicationsTitle'), isCurrent: true }
-        ];
-    });
     protected readonly grants = signal<OAuthGrant[]>([]);
     protected readonly loading = signal(false);
     protected readonly loadError = signal<string | null>(null);

@@ -1,3 +1,16 @@
-:host {
-    display: block;
+.utm-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.utm-tab-label {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.utm-content {
+    min-height: 18rem;
 }

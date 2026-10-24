@@ -11,13 +11,11 @@ import { MessageModule } from '@openng/optimus-ui/message';
 import { finalize } from 'rxjs';
 
 import { PageFrame } from '@components/page-frame/page-frame';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { CrudDialog } from '@components/crud-dialog/crud-dialog';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
 import { TableRowActionItem } from '@components/table-row-actions/table-row-actions';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { injectActiveLang } from '@core/i18n/active-lang';
 import { TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { OAuthClientRegistration } from '@models/oauth.types';
 import { OAuthService } from '@services/oauth.service';
@@ -38,7 +36,6 @@ export class OAuthClientsPage {
     private readonly transloco = inject(TranslocoService);
     private readonly confirmations = inject(ConfirmationService);
     private readonly destroyRef = inject(DestroyRef);
-    private readonly language = injectActiveLang();
     private readonly refresh = signal(0);
     protected readonly canManage = computed(() => !!this.teams.activeTeam() && this.access.canActiveTeam(TEAM_CAPABILITIES.manageApiClients));
     protected readonly clients = signal<OAuthClientRegistration[]>([]);
@@ -50,13 +47,6 @@ export class OAuthClientsPage {
     protected readonly visible = signal(false);
     protected readonly editing = signal<string | null>(null);
     protected readonly selectedClient = signal<OAuthClientRegistration | null>(null);
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.language();
-        return [
-            { label: this.transloco.translate('nav.integration'), routerLink: '/integration/api-clients' },
-            { label: this.transloco.translate('oauthClients.title'), isCurrent: true }
-        ];
-    });
     protected readonly columns: AppTableColumn<OAuthClientRegistration>[] = [
         { field: 'client_name', headerKey: 'common.columns.name', frozen: true },
         { field: 'client_id', headerKey: 'oauth.applicationId' }

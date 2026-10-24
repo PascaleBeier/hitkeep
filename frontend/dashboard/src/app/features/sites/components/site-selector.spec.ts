@@ -1,24 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { WritableSignal, signal } from '@angular/core';
 import { SiteSelector } from '@features/sites/components/site-selector';
 import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
+import { userEvent } from 'vitest/browser';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { vi } from 'vitest';
-import { SITE_CAPABILITIES } from '@core/access/capabilities';
-import { AccessService } from '@services/access.service';
 
 describe('SiteSelector', () => {
     let component: SiteSelector;
     let fixture: ComponentFixture<SiteSelector>;
-    let canSiteMock: ReturnType<typeof vi.fn>;
-    let allowedSiteCapabilities: WritableSignal<string[] | null>;
 
     beforeEach(async () => {
-        allowedSiteCapabilities = signal<string[] | null>(null);
-        canSiteMock = vi.fn((_siteId: string, capability: string) => allowedSiteCapabilities()?.includes(capability) ?? true);
-
         await TestBed.configureTestingModule({
             imports: [
                 SiteSelector,
@@ -31,16 +23,7 @@ describe('SiteSelector', () => {
                     preloadLangs: true
                 })
             ],
-            providers: [
-                provideHttpClient(),
-                provideRouter([]),
-                {
-                    provide: AccessService,
-                    useValue: {
-                        canSite: canSiteMock
-                    }
-                }
-            ]
+            providers: [provideHttpClient(), provideRouter([])]
         }).compileComponents();
 
         fixture = TestBed.createComponent(SiteSelector);
@@ -54,18 +37,35 @@ describe('SiteSelector', () => {
         TestBed.resetTestingModule();
     });
 
+    it('keeps contextual Add site available when the team has no sites and closes the selector', async () => {
+        let opened = 0;
+        fixture.componentRef.setInput('sites', []);
+        fixture.componentRef.setInput('current', null);
+        fixture.componentRef.setInput('actions', [{ label: 'Add site', icon: 'pi pi-plus', command: () => opened++ }]);
+        await fixture.whenStable();
+        const select = fixture.nativeElement.querySelector('p-select') as HTMLElement;
+        expect(select).toBeTruthy();
+        select.click();
+        await fixture.whenStable();
+        const action = fixture.nativeElement.querySelector('button[aria-label="Add site"]') as HTMLButtonElement;
+        expect(action).toBeTruthy();
+        await userEvent.click(action);
+        await fixture.whenStable();
+        expect(opened).toBe(1);
+        await expect.poll(() => fixture.nativeElement.querySelector('.p-select-overlay')).toBeNull();
+    });
+
     it('should create', () => {
         expect(component).toBeTruthy();
     });
 
-    it('A11Y: should have a label associated with the dropdown', () => {
-        const label = fixture.debugElement.query(By.css('label'));
+    it('A11Y: should expose an accessible label on the dropdown', () => {
         const select = fixture.debugElement.query(By.css('p-select'));
-        expect(label.nativeElement.getAttribute('for')).toBe('site-dropdown');
         expect(select.attributes['inputId']).toBe('site-dropdown');
+        expect(select.attributes['aria-label']).toBeTruthy();
     });
 
-    it('keeps long selected domains and options constrained to the sidebar width', async () => {
+    it('keeps long selected domains and options constrained to the selector width', async () => {
         const longDomain = 'a-very-long-customer-subdomain-with-campaign-context-and-region.example-analytics.test';
         const host = fixture.nativeElement as HTMLElement;
         host.style.width = '16rem';
@@ -104,19 +104,5 @@ describe('SiteSelector', () => {
         expect(panel!.getBoundingClientRect().width).toBeLessThanOrEqual(selectBox!.getBoundingClientRect().width);
         expect(selectedDomain!.getBoundingClientRect().right).toBeLessThanOrEqual(selectBox!.getBoundingClientRect().right);
         expect(optionDomain!.getBoundingClientRect().right).toBeLessThanOrEqual(panel!.getBoundingClientRect().right);
-    });
-
-    it('A11Y: Add Site button should have aria-label', () => {
-        const btn = fixture.debugElement.query(By.css('button[aria-label]'));
-        expect(btn).toBeTruthy();
-    });
-
-    it('disables dashboard sharing when the active site cannot manage team access', () => {
-        allowedSiteCapabilities.set([SITE_CAPABILITIES.view]);
-        fixture.detectChanges();
-
-        const shareButton = fixture.debugElement.query(By.css('button[title="sites.selector.shareDashboardAria"]'));
-
-        expect(shareButton.nativeElement.disabled).toBe(true);
     });
 });

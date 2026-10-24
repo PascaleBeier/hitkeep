@@ -11,7 +11,7 @@ test("export format menus download all-sites and per-site takeouts", async ({ pa
     try {
         await page.goto("/import-export/export", { waitUntil: "domcontentloaded" });
 
-        await expect(page.getByRole("heading", { name: "Import & Export" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Export", level: 1, exact: true })).toBeVisible();
         await expect(page.locator("html")).toHaveAttribute("lang", /de/i);
         await expect(page.getByRole("heading", { name: /^Alle zugänglichen Sites$/ })).toBeVisible();
         await expect(page.getByRole("heading", { name: /^Site-Exporte$/ })).toBeVisible();

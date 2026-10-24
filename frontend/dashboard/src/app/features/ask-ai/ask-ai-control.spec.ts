@@ -218,7 +218,7 @@ describe('AskAIControl charts', () => {
         expect(document.body.textContent).toContain('Check availability');
         expect(document.body.querySelector<HTMLAnchorElement>('.ai-budget-help a')?.href).toContain('/guides/admin/ai-model-configuration/');
         expect(document.body.querySelector<HTMLTextAreaElement>('textarea[name="ask-ai-panel-query"]')?.disabled).toBe(true);
-        expect(document.body.querySelector('.ask-ai-trigger')?.textContent).toContain('Ask AI paused');
+        expect(document.body.querySelector('.ask-ai-drawer')).toBeTruthy();
     });
 
     it('opens System Status only for instance operators when the self-hosted budget is exhausted', async () => {

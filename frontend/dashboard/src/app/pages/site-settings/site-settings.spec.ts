@@ -45,13 +45,14 @@ describe('SiteSettingsPage', () => {
                         en: {
                             sites: {
                                 settings: {
-                                    breadcrumb: { sites: 'Sites', settings: 'Settings' },
+                                    title: 'Site settings',
                                     tabs: {
                                         general: 'General',
                                         tracking: 'Tracking',
                                         filtering: 'Filtering',
                                         retention: 'Retention',
                                         access: 'Access',
+                                        share: 'Share',
                                         dangerZone: 'Danger zone'
                                     }
                                 }
@@ -84,6 +85,10 @@ describe('SiteSettingsPage', () => {
         const selected = harness.routeNativeElement!.ownerDocument.querySelector('[role="tab"][aria-selected="true"]');
 
         expect(selected?.textContent).toContain('Access');
+        expect(harness.routeNativeElement?.querySelector('p-breadcrumb')?.textContent).toContain('Site settings');
+        expect(harness.routeNativeElement?.querySelector('[aria-current="page"]')?.textContent).toContain('Access');
+        await harness.navigateByUrl('/sites/site-1/settings/general');
+        expect(harness.routeNativeElement?.querySelector('[aria-current="page"]')?.textContent).toContain('General');
         expect(harness.routeNativeElement?.textContent).toContain('settings child');
     });
 

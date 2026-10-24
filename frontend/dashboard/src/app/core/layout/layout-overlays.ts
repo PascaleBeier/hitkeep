@@ -3,12 +3,13 @@ import { SessionExpiryIndicator } from '@components/session-expiry-indicator/ses
 import { CreateTeamDialog } from '@components/create-team-dialog/create-team-dialog';
 import { AddSiteDialog } from '@features/sites/components/add-site-dialog';
 import { AnnotationDialog } from '@features/annotations/annotation-dialog';
+import { AskAIControl } from '@features/ask-ai/ask-ai-control';
 import { SiteAnnotationsService } from '@features/annotations/site-annotations.service';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
 
 @Component({
     selector: 'app-layout-overlays',
-    imports: [SessionExpiryIndicator, AddSiteDialog, AnnotationDialog, CreateTeamDialog],
+    imports: [SessionExpiryIndicator, AddSiteDialog, AnnotationDialog, CreateTeamDialog, AskAIControl],
     templateUrl: './layout-overlays.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { TranslocoTestingModule } from '@jsverse/transloco';
@@ -14,6 +14,8 @@ import { StatsService } from '@features/analytics/services/stats.service';
 import { SiteOverviewStats, SitesOverviewStatsResponse } from '@models/analytics.types';
 import { DEFAULT_RANGE_OPTIONS, RangeOption, RangeToolbar } from '@components/range-toolbar/range-toolbar';
 import { ReportRangePreferencesService } from '@services/report-range-preferences.service';
+import { MainLayoutContextService } from '@layout/main-layout-context.service';
+import { TeamService } from '@services/team.service';
 
 describe('OverviewPage', () => {
     let fixture: ComponentFixture<OverviewPage>;
@@ -90,6 +92,7 @@ describe('OverviewPage', () => {
             providers: [
                 provideHttpClient(),
                 provideHttpClientTesting(),
+                MainLayoutContextService,
                 provideRouter([]),
                 provideTranslocoLocale({
                     defaultLocale: 'en-US',
@@ -103,6 +106,7 @@ describe('OverviewPage', () => {
 
         statsService = TestBed.inject(StatsService);
         siteService = TestBed.inject(SiteService);
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/overview');
         localStorage.clear();
     });
 
@@ -213,6 +217,49 @@ describe('OverviewPage', () => {
         expect(chart.getAttribute('aria-label')).toBe('Traffic trend for alpha.example.com');
     });
 
+    it('blocks Overview actions through delayed team-switch failure and success, including site refresh', async () => {
+        vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse()));
+        const context = TestBed.inject(MainLayoutContextService);
+        const teams = TestBed.inject(TeamService);
+        const http = TestBed.inject(HttpTestingController);
+        const a = { id: 'a', domain: 'a.example.test', user_id: 'owner', created_at: '' };
+        const b = { ...a, id: 'b' };
+        const first = { id: 'team-a', name: 'A', role: 'owner' as const, logo_url: '', created_at: '' };
+        const second = { ...first, id: 'team-b', name: 'B' };
+        teams.applyTeams({ teams: [first, second], active_team_id: first.id });
+        siteService.applySites([a]);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture = TestBed.createComponent(OverviewPage);
+        const page = fixture.componentInstance as unknown as { openDashboard(site: typeof a): void; openAddSite(): void };
+        fixture.detectChanges();
+        context.onTeamSelected(second);
+        page.openDashboard(a);
+        page.openAddSite();
+        expect(context.isAddSiteVisible()).toBe(false);
+        expect(navigate).not.toHaveBeenCalledWith(['/dashboard']);
+        http.expectOne('/api/user/teams/active').flush({}, { status: 500, statusText: 'Failed' });
+        page.openDashboard(a);
+        expect(navigate).toHaveBeenCalledWith(['/dashboard']);
+        navigate.mockClear();
+        context.onTeamSelected(second);
+        http.expectOne('/api/user/teams/active').flush({ active_team_id: second.id });
+        http.expectOne('/api/user/teams').flush({ teams: [first, second], active_team_id: second.id });
+        http.expectOne('/api/user/permissions').flush({ instance_role: 'user', permissions: {} });
+        expect(context.isContextPending()).toBe(true);
+        page.openDashboard(a);
+        page.openAddSite();
+        expect(context.isAddSiteVisible()).toBe(false);
+        expect(navigate).not.toHaveBeenCalledWith(['/dashboard']);
+        http.expectOne('/api/sites').flush([b]);
+        page.openDashboard(b);
+        page.openAddSite();
+        expect(siteService.activeSite()?.id).toBe('b');
+        expect(context.isAddSiteVisible()).toBe(true);
+        expect(navigate).toHaveBeenCalledWith(['/dashboard']);
+        http.verify();
+        await fixture.whenStable();
+    });
+
     it('selects a site before opening its dashboard', () => {
         vi.spyOn(statsService, 'fetchSitesOverviewStats').mockReturnValue(of(overviewResponse(statsWithTraffic('site-alpha', 120, 45), statsWithTraffic('site-beta', 30, 12))));
         siteService.applySites([
@@ -229,7 +276,7 @@ describe('OverviewPage', () => {
                 created_at: '2026-01-02T00:00:00Z'
             }
         ]);
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         fixture = TestBed.createComponent(OverviewPage);
         fixture.detectChanges();
 
@@ -241,7 +288,7 @@ describe('OverviewPage', () => {
         fixture.detectChanges();
 
         expect(siteService.activeSite()?.id).toBe('site-beta');
-        expect(navigate).toHaveBeenCalledWith('/dashboard');
+        expect(navigate).toHaveBeenCalledWith(['/dashboard']);
     });
 
     it('opens a site dashboard from keyboard activation on a site card', () => {
@@ -254,7 +301,7 @@ describe('OverviewPage', () => {
                 created_at: '2026-01-01T00:00:00Z'
             }
         ]);
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         fixture = TestBed.createComponent(OverviewPage);
         fixture.detectChanges();
 
@@ -263,7 +310,7 @@ describe('OverviewPage', () => {
         fixture.detectChanges();
 
         expect(siteService.activeSite()?.id).toBe('site-alpha');
-        expect(navigate).toHaveBeenCalledWith('/dashboard');
+        expect(navigate).toHaveBeenCalledWith(['/dashboard']);
     });
 
     it('can sort cards by pageviews', () => {

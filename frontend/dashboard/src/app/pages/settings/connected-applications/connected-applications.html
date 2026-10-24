@@ -1,4 +1,4 @@
-<app-page-frame [breadcrumbItems]="breadcrumbItems()" [subtitle]="'oauth.applicationsDescription' | transloco">
+<app-page-frame [subtitle]="'oauth.applicationsDescription' | transloco">
     <section class="flex min-w-0 flex-col gap-5">
         @if (revoked()) {
         <p-message severity="success" role="status">{{ 'oauth.revoked' | transloco }}</p-message>

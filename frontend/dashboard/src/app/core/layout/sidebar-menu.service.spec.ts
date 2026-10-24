@@ -65,6 +65,17 @@ describe('SidebarMenuService', () => {
         bootstrap = TestBed.inject(DashboardBootstrapService);
     });
 
+    it('derives searchable leaves from the permitted model and preserves public share routes', () => {
+        permissions.applyPermissions({ instance_role: 'user', permissions: {}, active_team_role: 'member', active_team_capabilities: [] });
+        expect(service.searchableItems().some((item) => item.routerLink === '/utm')).toBe(true);
+        expect(service.searchableItems().some((item) => item.routerLink === '/integration/api-clients')).toBe(true);
+        expect(service.searchableItems().some((item) => item.routerLink === '/admin/system')).toBe(false);
+        expect(service.searchableItems().every((item) => !item.items?.length)).toBe(true);
+        share.setToken('public-token');
+        expect(service.searchableItems().some((item) => item.routerLink === '/share/public-token/utm')).toBe(true);
+        expect(service.searchableItems().some((item) => item.routerLink === '/overview' || item.routerLink === '/integration/api-clients')).toBe(false);
+    });
+
     it('builds capability-filtered desktop menu sections', () => {
         permissions.applyPermissions({
             instance_role: 'admin',
@@ -85,7 +96,17 @@ describe('SidebarMenuService', () => {
         expect(findByLabel(items, 'Support')?.url).toBe('https://support.example.test');
     });
 
-    it('nests related utility pages under collapsed parent menu items', () => {
+    it('lists the team overview as an unlabeled section above Analytics', () => {
+        const items = service.desktopItems();
+
+        expect(items[0]?.sectionId).toBe('overview');
+        expect(items[0]?.label).toBe('');
+        expect(items[0]?.items?.[0]?.routerLink).toBe('/overview');
+        expect(items[1]?.sectionId).toBe('analytics');
+        expect(items[1]?.items?.some((item) => item.routerLink === '/overview')).toBe(false);
+    });
+
+    it('keeps utility hubs as flat menu entries without nested children', () => {
         permissions.applyPermissions({
             instance_role: 'user',
             permissions: {},
@@ -97,10 +118,7 @@ describe('SidebarMenuService', () => {
         const analytics = findByLabel(items, 'Analytics');
         const integration = findByLabel(items, 'Integration');
         const utm = findByLabel(items, 'UTM');
-        const utmBuilder = findByLabel(utm?.items ?? [], 'UTM Builder');
-        const qrCodes = findByLabel(utm?.items ?? [], 'QR codes');
         const apiClients = findByLabel(items, 'API Clients');
-        const apiReference = findByLabel(apiClients?.items ?? [], 'API Reference');
 
         expect(analytics?.expanded).toBe(true);
         expect(integration?.expanded).toBe(true);
@@ -109,12 +127,9 @@ describe('SidebarMenuService', () => {
         expect(findByLabel(items, 'Overview')?.routerLink).toBe('/overview');
         expect(findByLabel(items, 'AI Agents')?.routerLink).toBe('/ai-agents');
         expect(utm?.routerLink).toBe('/utm');
-        expect(utm?.expanded).toBe(false);
-        expect(utmBuilder?.routerLink).toBe('/utm/builder');
-        expect(qrCodes?.routerLink).toBe('/utm/qr-codes');
+        expect(utm?.items).toBeUndefined();
         expect(apiClients?.routerLink).toBe('/integration/api-clients');
-        expect(apiClients?.expanded).toBe(false);
-        expect(apiReference?.routerLink).toBe('/integration/api-reference');
+        expect(apiClients?.items).toBeUndefined();
     });
 
     it('does not expose system settings to users who can only view system status', () => {
@@ -173,7 +188,7 @@ describe('SidebarMenuService', () => {
         const utm = analyticsItems.find((item) => item.label === 'UTM');
         const webVitals = findByLabel(items, 'Web Vitals');
         const utmBuilder = findByLabel(items, 'UTM Builder');
-        const qrCodes = analyticsItems.find((item) => item.label === 'QR codes');
+        const qrCodes = findByLabel(items, 'QR codes');
 
         expect(findByLabel(items, 'Assistants')).toBeUndefined();
         expect(dashboard?.routerLink).toBe('/share/share-token/dashboard');
@@ -182,7 +197,7 @@ describe('SidebarMenuService', () => {
         expect(utm?.routerLink).toBe('/share/share-token/utm');
         expect(utm?.items).toBeUndefined();
         expect(utmBuilder).toBeUndefined();
-        expect(qrCodes?.routerLink).toBe('/share/share-token/utm/qr-codes');
+        expect(qrCodes).toBeUndefined();
 
         dashboard?.command?.({ originalEvent: new Event('click'), item: dashboard });
         expect(closed).toBe(true);

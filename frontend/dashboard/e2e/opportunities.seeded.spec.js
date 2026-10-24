@@ -4,7 +4,7 @@ const { login } = require("./support/auth");
 const PRIMARY_SEEDED_SITE_DOMAIN = "acme-analytics.io";
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
-    const combobox = page.locator('[role="combobox"]:visible').first();
+    const combobox = page.locator('app-site-selector [role="combobox"]:visible').first();
     await expect(combobox).toBeVisible();
 
     const currentSite = ((await combobox.textContent()) || "").trim();

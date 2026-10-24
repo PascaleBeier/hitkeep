@@ -8,7 +8,6 @@ import { Subject } from 'rxjs';
 import { vi } from 'vitest';
 
 import type { FilterChipItem } from '@components/filter-chip-row/filter-chip-row';
-import type { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import type { MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import type { SeriesChartPoint, SeriesDefinition } from '@features/analytics/components/series-chart';
 import { SiteService } from '@features/sites/services/site.service';
@@ -42,7 +41,6 @@ interface StatStripGroup {
 }
 
 interface PageInternals {
-    breadcrumbItems: () => PageBreadcrumbItem[];
     kpiCards: () => AgentKpiCard[];
     cardGroups: () => MetricCardGroupTab[];
     correlation: () => AIFetchCorrelationReport | null;
@@ -73,8 +71,6 @@ describe('AIAgentsPage', () => {
     let realtimeEvents: Subject<RealtimeEvent>;
 
     const instance = () => fixture.componentInstance as AIAgentsPage & PageInternals;
-
-    const site = () => TestBed.inject(SiteService).activeSite();
 
     const selectSite = (siteId: string | null = 'site-1'): void => {
         TestBed.inject(SiteService).activeSite.set(siteId ? { id: siteId, user_id: 'user-1', domain: 'example.com', created_at: '2026-01-01T00:00:00Z' } : null);
@@ -243,25 +239,6 @@ describe('AIAgentsPage', () => {
         expect(fixture.nativeElement.querySelector('[data-testid="ai-agents-nav-tabs"]')).toBeNull();
         expect(fixture.nativeElement.querySelector('router-outlet')).toBeNull();
         expect(fixture.nativeElement.querySelectorAll('app-report-range-toolbar').length).toBe(1);
-        expect(fixture.nativeElement.querySelector('app-page-header')).not.toBeNull();
-    });
-
-    it('breadcrumbs the active site domain followed by the page title', () => {
-        create();
-        flushActivity();
-
-        expect(instance().breadcrumbItems()).toEqual([
-            { label: 'example.com', favicon: site(), routerLink: '/dashboard' },
-            { label: 'AI Agents', isCurrent: true }
-        ]);
-    });
-
-    it('falls back to the page title alone when no site is selected', () => {
-        selectSite(null);
-
-        create();
-
-        expect(instance().breadcrumbItems()).toEqual([{ label: 'AI Agents', isCurrent: true }]);
     });
 
     it('loads the range with exactly one ai-activity request carrying the comparison window', () => {

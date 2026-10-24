@@ -1,12 +1,13 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MainLayout } from '@layout/main-layout';
-import { Router, provideRouter } from '@angular/router';
+import { NavigationEnd, Router, provideRouter } from '@angular/router';
 import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TranslocoTestingModule } from '@jsverse/transloco';
 import { Observable, Subject, of } from 'rxjs';
-import { AskAIRequest, AskAIResponse, AskAIStatus, AskAIStreamEvent } from '@models/analytics.types';
+import { AskAIRequest, AskAIResponse, AskAIStatus, AskAIStreamEvent, Team } from '@models/analytics.types';
 import { AskAIService, AskAIStreamStatusError } from '@services/ask-ai.service';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { NavigationNoticeService } from '@services/navigation-notice.service';
@@ -14,8 +15,10 @@ import { PermissionService } from '@services/permission.service';
 import { ShareService } from '@services/share.service';
 import { TeamService } from '@services/team.service';
 import { UserProfileService } from '@services/user-profile.service';
+import { UserMenuService } from '@services/user-menu.service';
 import { SiteService } from '@features/sites/services/site.service';
 import { AskAIControl } from '@features/ask-ai/ask-ai-control';
+import { AskAIControlService } from '@features/ask-ai/ask-ai-control.service';
 import { LayoutPageBar } from './layout-page-bar';
 import { LayoutSidebar } from './layout-sidebar';
 import { MainLayoutContextService } from './main-layout-context.service';
@@ -23,7 +26,6 @@ import { MenuItem } from '@openng/optimus-ui/api';
 import { vi } from 'vitest';
 
 interface LayoutSidebarTestAccess {
-    openSiteSettings(section?: string): void;
     closeMobileDrawer(): void;
     mobileMenuItems(): MenuItem[];
     canCreateTeams(): boolean;
@@ -61,6 +63,9 @@ class FakeAskAIService {
     }
 }
 
+@Component({ selector: 'app-layout-title-probe', template: '' })
+class LayoutTitleProbe {}
+
 describe('MainLayout', () => {
     let component: MainLayout;
     let fixture: ComponentFixture<MainLayout>;
@@ -68,8 +73,10 @@ describe('MainLayout', () => {
     let bootstrap: DashboardBootstrapService;
     let layoutContext: MainLayoutContextService;
     let askAI: FakeAskAIService;
+    let existingDrawerMasks: Set<Element>;
 
     beforeEach(async () => {
+        existingDrawerMasks = new Set(document.querySelectorAll('.p-drawer-mask'));
         await TestBed.configureTestingModule({
             imports: [
                 MainLayout,
@@ -77,9 +84,16 @@ describe('MainLayout', () => {
                     langs: {
                         en: {
                             nav: {
+                                resizeSidebar: 'Resize sidebar',
+                                dashboard: 'Dashboard',
+                                overview: 'Overview',
                                 utm: 'UTM',
                                 utmBuilder: 'UTM Builder',
                                 qrCodes: 'QR codes',
+                                integration: 'Integration',
+                                apiClients: 'API Clients',
+                                apiReference: 'API Reference',
+                                account: 'Account',
                                 importExport: 'Import & Export',
                                 importExportAria: 'Go to import and export',
                                 expandItem: 'Expand {{item}}',
@@ -187,8 +201,101 @@ describe('MainLayout', () => {
     });
 
     afterEach(() => {
+        fixture.destroy();
+        // Destroying a fixture aborts native exit motion before Drawer can remove its body mask.
+        document.querySelectorAll('.p-drawer-mask').forEach((mask) => {
+            if (!existingDrawerMasks.has(mask)) mask.remove();
+        });
         httpMock.verify();
         vi.restoreAllMocks();
+        localStorage.removeItem('hk_sidebar_layout');
+        localStorage.removeItem('hk_sidebar_sections');
+    });
+
+    it('bounds sidebar width and restores it after collapsing without replacing the outlet', async () => {
+        const outlet = fixture.nativeElement.querySelector('router-outlet');
+        expect(layoutContext.sidebarWidthPx()).toBe(240);
+        layoutContext.setSidebarWidthPx(900);
+        expect(layoutContext.sidebarWidthPx()).toBe(320);
+        layoutContext.setSidebarWidthPx(120);
+        expect(layoutContext.sidebarWidthPx()).toBe(220);
+        layoutContext.setSidebarWidthPx(280);
+        layoutContext.toggleSidebar();
+        await fixture.whenStable();
+        expect(layoutContext.isSidebarCollapsed()).toBe(true);
+        expect(fixture.nativeElement.querySelector('router-outlet')).toBe(outlet);
+        layoutContext.isMobileDrawerOpen.set(true);
+        layoutContext.isMobileDrawerOpen.set(false);
+        layoutContext.toggleSidebar();
+        await fixture.whenStable();
+        expect(layoutContext.sidebarWidthPx()).toBe(280);
+        expect(fixture.nativeElement.querySelector('router-outlet')).toBe(outlet);
+        expect(JSON.parse(localStorage.getItem('hk_sidebar_layout')!)).toEqual({ version: 1, collapsed: false, widthPx: 280 });
+    });
+
+    it('restores valid preferences and safely defaults malformed, obsolete and blocked storage', () => {
+        for (const [record, width, collapsed] of [
+            ['{"version":1,"widthPx":300,"collapsed":true}', 300, true],
+            ['{"version":1,"widthPx":900,"collapsed":false}', 320, false],
+            ['{"version":2,"widthPx":300,"collapsed":true}', 240, false],
+            ['{"version":1,"widthPx":"wide","collapsed":"yes"}', 240, false],
+            ['{broken', 240, false]
+        ] as const) {
+            localStorage.setItem('hk_sidebar_layout', record);
+            const other = TestBed.createComponent(MainLayout);
+            const context = other.debugElement.injector.get(MainLayoutContextService);
+            expect(context.sidebarWidthPx()).toBe(width);
+            expect(context.isSidebarCollapsed()).toBe(collapsed);
+            other.destroy();
+        }
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('blocked');
+        });
+        const other = TestBed.createComponent(MainLayout);
+        const context = other.debugElement.injector.get(MainLayoutContextService);
+        context.setSidebarWidthPx(Number.NaN);
+        expect(context.sidebarWidthPx()).toBe(240);
+        context.toggleSidebar();
+        expect(context.isSidebarCollapsed()).toBe(true);
+        other.destroy();
+    });
+
+    it('renders the active route title as one page heading in the content area', async () => {
+        const router = TestBed.inject(Router);
+        router.resetConfig([{ path: 'dashboard', component: LayoutTitleProbe, data: { titleKey: 'nav.dashboard', titleScope: 'site' } }]);
+        await router.navigateByUrl('/dashboard');
+        await fixture.whenStable();
+        const headings = fixture.nativeElement.querySelectorAll('main h1');
+        expect(headings).toHaveLength(1);
+        expect(headings[0].textContent).toContain('Dashboard');
+    });
+
+    it('offers contextual site actions under the existing permission and share boundaries', () => {
+        const site = seedActiveSite();
+        expect(layoutContext.siteActions().map((item) => item.icon)).toEqual(['pi pi-cog', 'pi pi-share-alt', 'pi pi-plus']);
+        layoutContext.onSiteSelected({ ...site, id: 'removed-site' });
+        expect(TestBed.inject(SiteService).activeSite()?.id).toBe(site.id);
+        TestBed.inject(PermissionService).applyPermissions({ instance_role: 'user', permissions: { [site.id]: 'viewer' } });
+        expect(layoutContext.siteActions().some((item) => item.icon === 'pi pi-share-alt')).toBe(false);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        layoutContext.openSiteSettings('share');
+        expect(navigate).not.toHaveBeenCalled();
+        TestBed.inject(ShareService).setToken('public-token');
+        expect(layoutContext.siteActions()).toEqual([]);
+        layoutContext.openAddSite();
+        expect(layoutContext.isAddSiteVisible()).toBe(false);
+    });
+
+    it('exposes the resize handle as a named keyboard separator with pixel bounds', async () => {
+        await fixture.whenStable();
+        const handle = fixture.nativeElement.querySelector('[role="separator"][aria-label="Resize sidebar"]');
+        expect(handle).toBeTruthy();
+        expect(handle?.getAttribute('aria-valuemin')).toBe('220');
+        expect(handle?.getAttribute('aria-valuemax')).toBe('320');
+        expect(handle?.getAttribute('aria-orientation')).toBe('vertical');
     });
 
     it('should create', () => {
@@ -334,7 +441,17 @@ describe('MainLayout', () => {
         const visibleHrefs = navLinks.map((link) => link.getAttribute('href'));
 
         expect(visibleHrefs).toContain('/share/share-token/utm');
-        expect(visibleHrefs).toContain('/share/share-token/utm/qr-codes');
+        expect(visibleHrefs).not.toContain('/share/share-token/utm/qr-codes');
+    });
+
+    it('keeps readable team and site labels in the narrow global context', async () => {
+        seedActiveSite();
+        fixture.nativeElement.style.width = '320px';
+        await fixture.whenStable();
+        const teamLabel = fixture.nativeElement.querySelector('app-team-switcher .p-select-label .truncate') as HTMLElement;
+        const siteLabel = fixture.nativeElement.querySelector('app-site-selector .site-select-option__domain') as HTMLElement;
+        await expect.poll(() => teamLabel.getBoundingClientRect().width).toBeGreaterThan(64);
+        expect(siteLabel.getBoundingClientRect().width).toBeGreaterThan(64);
     });
 
     it('should hide Ask AI by default', () => {
@@ -344,7 +461,7 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should show Ask AI below the site selector when available', () => {
+    it('opens Ask AI directly from the persistent header when available', async () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -361,13 +478,37 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        const askAIItem = menuItems.find((item) => item.icon === 'pi pi-sparkles');
+        expect(askAIItem).toBeUndefined();
+        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement;
         expect(trigger?.textContent).toContain('Ask AI');
-        expect(trigger?.disabled).toBe(false);
+        trigger.click();
+        await fixture.whenStable();
+        expect(document.body.querySelector('#ask-ai-drawer')).toBeTruthy();
     });
 
-    it('should show Ask AI as unavailable when the product flag is on but no model is configured', () => {
+    it('closes Ask AI on entering a shared scope and requires a new explicit request afterward', async () => {
+        seedActiveSite();
+        bootstrap.status.set({ needs_setup: false, version: 'test', ask_ai: { enabled: true, available: true, status: 'available', budget_exhausted: false } });
+        fixture.detectChanges();
+        openAskAIDrawer();
+        await fixture.whenStable();
+        expect(document.body.querySelector('#ask-ai-drawer')?.getAttribute('data-p-open')).toBe('true');
+
+        const share = TestBed.inject(ShareService);
+        share.setToken('shared-site');
+        await fixture.whenStable();
+        expect(document.body.querySelector('#ask-ai-drawer')?.getAttribute('data-p-open')).not.toBe('true');
+        share.clear();
+        await fixture.whenStable();
+        expect(document.body.querySelector('#ask-ai-drawer')?.getAttribute('data-p-open')).not.toBe('true');
+        openAskAIDrawer();
+        await fixture.whenStable();
+        expect(document.body.querySelector('#ask-ai-drawer')?.getAttribute('data-p-open')).toBe('true');
+    });
+
+    it('keeps direct Ask AI access when enabled without a configured model', () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -382,10 +523,14 @@ describe('MainLayout', () => {
         });
         fixture.detectChanges();
 
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLButtonElement | null;
-        expect(trigger).toBeTruthy();
-        expect(trigger?.textContent).toContain('Ask AI not configured');
-        expect(trigger?.classList.contains('ask-ai-trigger--unavailable')).toBe(true);
+        const menuItems = TestBed.inject(UserMenuService).menuItems();
+        expect(menuItems.some((item) => item.icon === 'pi pi-sparkles')).toBe(false);
+        expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeTruthy();
+
+        openAskAIDrawer();
+        fixture.detectChanges();
+
+        expect(document.body.textContent).toContain('Ask AI not configured');
     });
 
     it('should show unavailable Ask AI as a chat-only drawer without history or model details', () => {
@@ -733,7 +878,7 @@ describe('MainLayout', () => {
         expect(request.request.to).toBe('2026-06-20');
     });
 
-    it('should focus the Ask AI drawer composer when opened from the sidebar', async () => {
+    it('should focus the Ask AI drawer composer when opened from the user menu', async () => {
         seedActiveSite();
         bootstrap.status.set({
             needs_setup: false,
@@ -1133,30 +1278,110 @@ describe('MainLayout', () => {
         expect(fixture.nativeElement.querySelector('.ask-ai-trigger')).toBeNull();
     });
 
-    it('should keep collapsible sidebar parents navigable while the chevron expands children', () => {
-        let utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        let utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        let utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        let toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
-
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeNull();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('false');
-        expect(toggle?.getAttribute('aria-label')).toBe('Expand UTM');
-
-        toggle?.click();
+    it('keeps multiple sections open and persists each independent choice', () => {
+        const integrationToggle = fixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="false"]') as HTMLButtonElement | null;
+        integrationToggle?.click();
         fixture.detectChanges();
 
-        utmLink = fixture.nativeElement.querySelector('aside a[href="/utm"]') as HTMLAnchorElement | null;
-        utmBuilderLink = fixture.nativeElement.querySelector('aside a[href="/utm/builder"]') as HTMLAnchorElement | null;
-        utmTreeItem = utmLink?.closest('[role="treeitem"]') as HTMLElement | null;
-        toggle = utmTreeItem?.querySelector('button.layout-sidebar-menu__toggle') as HTMLButtonElement | null;
+        expect(fixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="true"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside a[href="/integration/api-reference"]')).toBeNull();
 
-        expect(utmLink).toBeTruthy();
-        expect(utmBuilderLink).toBeTruthy();
-        expect(utmTreeItem?.getAttribute('aria-expanded')).toBe('true');
-        expect(toggle?.getAttribute('aria-label')).toBe('Collapse UTM');
-        expect(utmTreeItem?.querySelector('ul.layout-sidebar-menu__list--nested')?.getAttribute('role')).toBe('group');
+        const accountToggle = fixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Account"][aria-expanded="false"]') as HTMLButtonElement | null;
+        accountToggle?.click();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="true"]')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Account"][aria-expanded="true"]')).toBeTruthy();
+
+        expect(JSON.parse(localStorage.getItem('hk_sidebar_sections')!)).toMatchObject({ 's:integration': true, 's:account': true });
+
+        localStorage.removeItem('hk_sidebar_sections');
+    });
+
+    it('should fold a route-active sidebar section when its toggle is clicked', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            const sectionToggle = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="true"]') as HTMLButtonElement | null;
+            const apiClientsLink = localFixture.nativeElement.querySelector('aside a[href="/integration/api-clients"]') as HTMLAnchorElement | null;
+
+            expect(sectionToggle).toBeTruthy();
+            expect(apiClientsLink).toBeTruthy();
+
+            sectionToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="false"]')).toBeTruthy();
+            expect(sectionToggle?.getAttribute('aria-expanded')).toBe('false');
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
+    });
+
+    it('restores independent groups and reveals a closed group only on a new route path', async () => {
+        localStorage.setItem('hk_sidebar_sections', JSON.stringify({ 's:integration': false, 's:resources': true, unknown: true }));
+        const router = TestBed.inject(Router);
+        const events = new Subject<NavigationEnd>();
+        vi.spyOn(router, 'events', 'get').mockReturnValue(events);
+        vi.spyOn(router, 'url', 'get').mockReturnValue('/integration/api-clients');
+        const other = TestBed.createComponent(MainLayout);
+        await other.whenStable();
+        const header = (label: string) => other.nativeElement.querySelector(`aside [role="button"][aria-label="${label}"]`) as HTMLElement;
+        expect(header('Integration').getAttribute('aria-expanded')).toBe('true');
+        const integration = header('Integration');
+        integration.click();
+        await other.whenStable();
+        expect(header('Integration')).toBe(integration);
+        expect(integration.getAttribute('aria-expanded')).toBe('false');
+        events.next(new NavigationEnd(1, '/integration/api-clients?tab=reference', '/integration/api-clients?tab=reference'));
+        await other.whenStable();
+        expect(header('Integration').getAttribute('aria-expanded')).toBe('false');
+        events.next(new NavigationEnd(2, '/settings/reports', '/settings/reports'));
+        await other.whenStable();
+        expect(header('Account').getAttribute('aria-expanded')).toBe('true');
+        events.next(new NavigationEnd(3, '/integration/api-clients', '/integration/api-clients'));
+        await other.whenStable();
+        expect(header('Integration').getAttribute('aria-expanded')).toBe('true');
+        expect(JSON.parse(localStorage.getItem('hk_sidebar_sections')!)).toMatchObject({ 's:resources': true, 's:account': true, 's:integration': true });
+        expect(JSON.parse(localStorage.getItem('hk_sidebar_sections')!)).not.toHaveProperty('unknown');
+        other.destroy();
+    });
+
+    it('keeps global site and team context on Overview with collapsed navigation', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/overview');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        const context = localFixture.debugElement.injector.get(MainLayoutContextService);
+        context.toggleSidebar();
+        localFixture.detectChanges();
+        expect(localFixture.nativeElement.querySelector('app-layout-page-bar app-site-selector')).toBeTruthy();
+        expect(localFixture.nativeElement.querySelectorAll('app-team-switcher')).toHaveLength(1);
+        expect(localFixture.nativeElement.querySelector('app-layout-mobile-header')).toBeNull();
+        localFixture.destroy();
+    });
+
+    it('keeps the route-active section open when another section is opened', () => {
+        vi.spyOn(TestBed.inject(Router), 'url', 'get').mockReturnValue('/integration/api-clients');
+        const localFixture = TestBed.createComponent(MainLayout);
+        localFixture.detectChanges();
+
+        try {
+            expect(localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="true"]')).toBeTruthy();
+
+            const accountToggle = localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Account"][aria-expanded="false"]') as HTMLButtonElement | null;
+            accountToggle?.click();
+            localFixture.detectChanges();
+
+            expect(localFixture.nativeElement.querySelector('aside .layout-sidebar-menu__section-toggle[aria-label="Integration"][aria-expanded="true"]')).toBeTruthy();
+        } finally {
+            localStorage.removeItem('hk_sidebar_sections');
+            localFixture.destroy();
+        }
     });
 
     it('should hide create team actions in hosted cloud for non-owners', () => {
@@ -1236,48 +1461,13 @@ describe('MainLayout', () => {
         expect(confirmSpy).not.toHaveBeenCalled();
     });
 
-    it('should open site settings from keyboard shortcut when an active site exists', () => {
-        const site = seedActiveSite();
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-        const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
-        const preventDefault = vi.spyOn(event, 'preventDefault');
-
-        component.handleKeyboard(event);
-
-        expect(preventDefault).toHaveBeenCalled();
-        expect(navigate).toHaveBeenCalledWith(['/sites', site.id, 'settings', 'general']);
-    });
-
-    it('should handle the document keyboard shortcut binding and ctrl-key variant', () => {
-        const site = seedActiveSite();
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-        const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
-        const preventDefault = vi.spyOn(event, 'preventDefault');
-
-        document.dispatchEvent(event);
-
-        expect(preventDefault).toHaveBeenCalled();
-        expect(navigate).toHaveBeenCalledWith(['/sites', site.id, 'settings', 'general']);
-    });
-
-    it('should ignore unrelated keyboard shortcuts', () => {
-        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-        const event = new KeyboardEvent('keydown', { key: 'x', metaKey: true });
-        const preventDefault = vi.spyOn(event, 'preventDefault');
-
-        component.handleKeyboard(event);
-
-        expect(preventDefault).not.toHaveBeenCalled();
-        expect(navigate).not.toHaveBeenCalled();
-    });
-
     it('should keep sidebar drawer actions inside the sidebar component', () => {
         const site = seedActiveSite();
         const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         const sidebar = fixture.debugElement.query(By.directive(LayoutSidebar)).componentInstance as LayoutSidebarTestAccess;
         layoutContext.isMobileDrawerOpen.set(true);
 
-        sidebar.openSiteSettings();
+        layoutContext.openSiteSettings('general');
         sidebar.closeMobileDrawer();
         const menuItems = sidebar.mobileMenuItems();
         const firstItem = menuItems[0]?.items?.[0];
@@ -1290,6 +1480,54 @@ describe('MainLayout', () => {
         expect(layoutContext.isMobileDrawerOpen()).toBe(false);
         expect(menuItems.length).toBeGreaterThan(0);
         expect(sidebar.canCreateTeams()).toBe(true);
+    });
+
+    it('selects a site from Overview and opens its dashboard', () => {
+        const site = seedActiveSite();
+        const router = TestBed.inject(Router);
+        vi.spyOn(router, 'url', 'get').mockReturnValue('/overview');
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+        layoutContext.onSiteSelected(site);
+        expect(TestBed.inject(SiteService).activeSite()).toEqual(site);
+        expect(navigate).toHaveBeenCalledWith(['/dashboard']);
+    });
+
+    it('rejects duplicate team switches and stale site actions, then recovers after failure', () => {
+        const site = seedActiveSite();
+        const teams = TestBed.inject(TeamService);
+        const previousTeam = teams.activeTeamId();
+        const next: Team = { id: 'team-2', name: 'Second team', logo_url: '', role: 'owner', created_at: '2026-01-01T00:00:00Z' };
+        teams.teams.update((items) => [...items, next]);
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        layoutContext.onTeamSelected(next);
+        layoutContext.onTeamSelected(next);
+        expect(layoutContext.isTeamSwitchPending()).toBe(true);
+        layoutContext.onSiteSelected({ ...site, id: 'stale-site' });
+        layoutContext.openSiteSettings();
+        expect(TestBed.inject(SiteService).activeSite()).toEqual(site);
+        expect(navigate).toHaveBeenCalledTimes(1);
+        const request = httpMock.expectOne('/api/user/teams/active');
+        request.flush({}, { status: 500, statusText: 'Server Error' });
+        expect(teams.activeTeamId()).toBe(previousTeam);
+        expect(layoutContext.isTeamSwitchPending()).toBe(false);
+        expect(TestBed.inject(NavigationNoticeService).key()).toBe('teams.switcher.switchError');
+    });
+
+    it('discards old permissions after a committed team switch even when permission refresh fails', () => {
+        seedActiveSite();
+        const teams = TestBed.inject(TeamService);
+        const next = teams.teams()[1];
+        const permissions = TestBed.inject(PermissionService);
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        layoutContext.onTeamSelected(next);
+        httpMock.expectOne('/api/user/teams/active').flush({ active_team_id: next.id });
+        httpMock.expectOne('/api/user/teams').flush({ teams: teams.teams(), active_team_id: next.id });
+        httpMock.expectOne('/api/user/permissions').flush({}, { status: 500, statusText: 'Server Error' });
+        httpMock.expectOne('/api/sites').flush([]);
+        expect(teams.activeTeamId()).toBe(next.id);
+        expect(permissions.permissions()).toBeNull();
+        expect(layoutContext.isTeamAdmin()).toBe(false);
+        expect(layoutContext.isContextPending()).toBe(false);
     });
 
     it('keeps the current settings section when selecting another site', () => {
@@ -1438,9 +1676,7 @@ describe('MainLayout', () => {
     }
 
     function openAskAIDrawer() {
-        const trigger = fixture.nativeElement.querySelector('.ask-ai-trigger') as HTMLElement | null;
-        expect(trigger).toBeTruthy();
-        trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        TestBed.inject(AskAIControlService).requestOpen();
         fixture.detectChanges();
     }
 

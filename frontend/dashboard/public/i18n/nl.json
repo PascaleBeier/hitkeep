@@ -77,6 +77,13 @@
     "resumeFailed": "De openstaande autorisatie kon niet worden hersteld. Je factureringsinstellingen blijven beschikbaar. Probeer het opnieuw."
   },
   "nav": {
+    "resizeSidebar": "Breedte van zijbalk wijzigen",
+    "search": "Navigatie doorzoeken",
+    "searchPlaceholder": "Een pagina zoeken…",
+    "noSearchResults": "Geen pagina’s gevonden",
+    "expandSidebar": "Zijbalk uitklappen",
+    "collapseSidebar": "Zijbalk inklappen",
+    "openNavigation": "Navigatie openen",
     "mainSidebarAria": "Hoofdzijbalk",
     "primaryNavigationAria": "Primaire navigatie",
     "contentAreaAria": "Inhoudsgebied",
@@ -102,7 +109,7 @@
     "goals": "Doelen",
     "funnels": "Funnels",
     "utm": "UTM",
-    "apiClients": "API-clients",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "API-referentie",
     "expandItem": "{{item}} uitklappen",
@@ -670,6 +677,7 @@
   },
   "teams": {
     "switcher": {
+      "switchError": "Wisselen van team is mislukt. Probeer het opnieuw.",
       "label": "Teams",
       "regionAria": "Teamkiezer",
       "selectAria": "Selecteer actief team",
@@ -1312,7 +1320,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Instellingen",
       "title": "Instellingen",
       "subtitle": "Beheer je accountbeveiliging en voorkeuren.",
       "profile": {
@@ -1357,7 +1364,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Rapportage",
       "subtitle": "Maak betrouwbare, geplande analyserapporten voor jezelf of je team.",
       "newReport": "Nieuw rapport",
       "mailUnavailable": "SMTP is niet beschikbaar. Je kunt concepten bewerken, maar rapporten niet activeren, testen of opnieuw proberen.",
@@ -1714,19 +1720,11 @@
     },
     "selector": {
       "regionAria": "Locatieselectie",
-      "sitesLabel": "Sites",
-      "addSiteAria": "Voeg een nieuwe site toe",
       "selectPlaceholder": "Selecteer locatie",
       "selectSiteAria": "Selecteer een site om statistieken te bekijken",
-      "siteSettingsAria": "Site-instellingen",
-      "trackingCodeAria": "Trackingcode",
-      "shareDashboardAria": "Dashboard delen"
+      "siteSettingsAria": "Site-instellingen"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Instellingen"
-      },
       "title": "Site-instellingen",
       "tabs": {
         "general": "Algemeen",
@@ -1734,6 +1732,7 @@
         "filtering": "Filteren",
         "retention": "Behoud",
         "access": "Toegang",
+        "share": "Delen",
         "dangerZone": "Gevarenzone"
       },
       "notices": {
@@ -1877,7 +1876,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Instantiebeheer",
     "tabs": {
       "users": "Gebruikers",
       "sites": "Sites",
@@ -1900,6 +1898,7 @@
     },
     "sites": {
       "title": "Sites",
+      "addSite": "Site toevoegen",
       "ownerUnknown": "Onbekende eigenaar"
     },
     "exclusions": {
@@ -2034,7 +2033,6 @@
         "status": { "createSuccess": "Teamfilter {{value}} gemaakt.", "deleteSuccess": "Teamfilter {{value}} verwijderd." }
       },
       "overview": {
-        "breadcrumb": "Teamoverzicht",
         "title": "Team",
         "teamIdLabel": "TeamID",
         "memberCount": "Leden",
@@ -2101,7 +2099,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Teamleden",
         "title": "Teamleden"
       },
       "sso": {
@@ -2167,7 +2164,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Teaminstellingen",
         "title": "Teaminstellingen",
         "nameSectionTitle": "Teamnaam",
         "nameSectionDescription": "De weergavenaam voor dit team. Eigenaren en beheerders kunnen het updaten.",
@@ -3006,7 +3002,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Voorkeuren",
     "subtitle": "Beheer je applicatievoorkeuren.",
     "actions": {
       "saveChanges": "Wijzigingen opslaan"
@@ -3328,6 +3323,10 @@
       }
     },
     "apiClients": {
+      "tabs": {
+        "clients": "Clients",
+        "reference": "Referentie"
+      },
       "subtitle": "Creëer en beheer API-clients voor integraties.",
       "manageTeamClients": "Team-API-clients beheren"
     },
@@ -3839,7 +3838,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "QR-codes",
     "actions": {
       "create": "QR-code maken",
       "exportSvg": "SVG exporteren",

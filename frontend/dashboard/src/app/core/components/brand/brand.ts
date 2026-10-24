@@ -11,7 +11,9 @@ import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
     template: `
         <a class="flex items-center gap-3 select-none no-underline" routerLink="/">
             <img [ngSrc]="iconUrl()" alt="HitKeep Logo" class="hk-brand-icon object-cover" [class]="imgClass()" [width]="imgSize()" [height]="imgSize()" priority />
-            <span class="font-bold tracking-tight text-[var(--p-text-color)]" [class]="textClass()"> HitKeep </span>
+            @if (!compact()) {
+                <span class="font-bold tracking-tight text-[var(--p-text-color)]" [class]="textClass()"> HitKeep </span>
+            }
         </a>
     `,
     styles: [
@@ -25,6 +27,7 @@ import { browserAppUrl } from '@core/interceptors/base-path.interceptor';
 export class Brand {
     private document = inject(DOCUMENT);
     size = input<'small' | 'large'>('small');
+    readonly compact = input(false);
 
     protected iconUrl = computed(() => browserAppUrl(this.document, '/brand-icon.svg'));
 

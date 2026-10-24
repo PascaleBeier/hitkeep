@@ -1,0 +1,47 @@
+<button
+    #trigger
+    type="button"
+    class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-color hover:bg-emphasis focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50"
+    [disabled]="disabled()"
+    (click)="open()"
+    [attr.aria-label]="'nav.search' | transloco"
+    [title]="('nav.search' | transloco) + ' (⌘ / Ctrl K)'"
+>
+    <i class="pi pi-search" aria-hidden="true"></i>
+</button>
+<p-dialog [header]="'nav.search' | transloco" [visible]="visible()" (visibleChange)="!$event && close()" (onHide)="restoreFocus()" [modal]="true" [draggable]="false" [resizable]="false" appendTo="body" [style]="{ width: '36rem', maxWidth: '96vw' }">
+    @if (visible()) {
+    <p-autocomplete
+        inputId="navigation-search-input"
+        appendTo="body"
+        [formControl]="control"
+        [suggestions]="results()"
+        (completeMethod)="query.set($event.query)"
+        (onSelect)="activate($event.value)"
+        optionLabel="label"
+        [forceSelection]="true"
+        [autoOptionFocus]="true"
+        [autofocus]="true"
+        [delay]="0"
+        [showEmptyMessage]="true"
+        [emptyMessage]="'nav.noSearchResults' | transloco"
+        [placeholder]="'nav.searchPlaceholder' | transloco"
+        [ariaLabel]="'nav.search' | transloco"
+        class="w-full"
+        [inputStyle]="{ width: '100%' }"
+        [style]="{ width: '100%' }"
+    >
+        <ng-template #item let-item>
+            @if (item.routerLink) {
+            <a class="flex w-full items-center gap-3 py-1 text-color no-underline" [routerLink]="item.routerLink" [target]="item.target" tabindex="-1" (click)="close(); $event.stopPropagation()"
+                ><i [class]="item.icon" aria-hidden="true"></i>{{ item.label }}</a
+            >
+            } @else {
+            <a class="flex w-full items-center gap-3 py-1 text-color no-underline" [href]="item.url" [target]="item.target" rel="noopener noreferrer" tabindex="-1" (click)="close(); $event.stopPropagation()"
+                ><i [class]="item.icon" aria-hidden="true"></i>{{ item.label }}</a
+            >
+            }
+        </ng-template>
+    </p-autocomplete>
+    }
+</p-dialog>

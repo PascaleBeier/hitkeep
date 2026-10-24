@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterRenderEffect, computed, effect, inject, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterRenderEffect, computed, effect, inject, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -14,6 +14,7 @@ import { AskAIAction, AskAIRequest, AskAIStatus } from '@models/analytics.types'
 import { DOCS_LINKS } from '@core/config/docs-links';
 import { INSTANCE_CAPABILITIES, TEAM_CAPABILITIES } from '@core/access/capabilities';
 import { AskAIService } from '@services/ask-ai.service';
+import { AskAIControlService } from './ask-ai-control.service';
 import { AskAISession, type AskAIConversationTurn, type ToolCallProgress } from './ask-ai-session';
 import { DashboardBootstrapService } from '@services/dashboard-bootstrap.service';
 import { AccessService } from '@services/access.service';
@@ -103,6 +104,7 @@ export class AskAIControl {
     private readonly transloco = inject(TranslocoService);
     private readonly activeLanguage = injectActiveLang();
     private readonly destroyRef = inject(DestroyRef);
+    private readonly controlService = inject(AskAIControlService);
     private readonly promptInput = viewChild<ElementRef<HTMLTextAreaElement>>('promptInput');
     private readonly transcriptScroll = viewChild<ElementRef<HTMLElement>>('transcriptScroll');
     private followTranscript = true;
@@ -113,12 +115,10 @@ export class AskAIControl {
     private speechRecognition: SpeechRecognitionLike | null = null;
     private dictationBaseQuery = '';
 
-    readonly opened = output<void>();
     protected readonly mcpGuideUrl = DOCS_LINKS.mcp;
     protected readonly aiConfigurationGuideUrl = DOCS_LINKS.aiModelConfiguration;
     protected readonly query = signal('');
     protected readonly siteStatus = signal<AskAIStatus | null>(null);
-    protected readonly drawerVisible = signal(false);
     protected readonly isLoading = this.session.isLoading;
     protected readonly response = this.session.response;
     protected readonly partialAnswer = this.session.partialAnswer;
@@ -161,6 +161,10 @@ export class AskAIControl {
         const status = this.status();
         return !this.share.isShareMode() && !!this.activeSite() && !!status?.enabled;
     });
+    protected readonly drawerVisible = linkedSignal(() => {
+        this.shouldRender();
+        return false;
+    });
     protected readonly canSubmit = computed(() => this.shouldRender() && !!this.status()?.available && this.query().trim().length > 0 && !this.isLoading());
     protected readonly statusLabelKey = computed(() => {
         const status = this.status();
@@ -189,6 +193,14 @@ export class AskAIControl {
     protected readonly canStartNewChat = computed(() => this.query().trim().length > 0 || this.hasSession());
 
     constructor() {
+        effect(() => {
+            const openCount = this.controlService.openCount();
+            if (openCount === 0) {
+                return;
+            }
+            untracked(() => this.openDrawer());
+        });
+
         effect(() => {
             const siteId = this.activeSiteId();
             if (siteId === this.lastSiteId) return;
@@ -225,7 +237,6 @@ export class AskAIControl {
         if (!site || !query) return;
         this.stopDictation(true);
         this.followTranscript = true;
-        this.opened.emit();
         this.drawerVisible.set(true);
         this.query.set('');
         this.feedbackStatus.set(null);
@@ -244,7 +255,6 @@ export class AskAIControl {
             return;
         }
         this.followTranscript = true;
-        this.opened.emit();
         this.drawerVisible.set(true);
         const siteId = this.activeSiteId();
         if (siteId) this.refreshStatus(siteId);

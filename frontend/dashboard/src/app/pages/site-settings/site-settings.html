@@ -1,5 +1,10 @@
-<app-page-frame [breadcrumbItems]="breadcrumbItems()">
+<app-page-frame>
     <section class="flex flex-col gap-4">
+        <p-breadcrumb [model]="breadcrumbs()" [style]="{ '--p-breadcrumb-background': 'transparent', '--p-breadcrumb-padding': '0' }">
+            <ng-template #item let-item>
+                @if (item.routerLink) { <a [routerLink]="item.routerLink" class="text-muted-color hover:text-color no-underline">{{ item.label }}</a> } @else { <span aria-current="page" class="text-color">{{ item.label }}</span> }
+            </ng-template>
+        </p-breadcrumb>
         <p-tabs [value]="activeTab()" class="hk-admin-tabs">
             <p-tablist>
                 @for (tab of tabs(); track tab.route) {

@@ -140,7 +140,7 @@ test("funnel workspace supports accessible reordering and the full CRUD lifecycl
 });
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
-    const combobox = page.locator('[role="combobox"]:visible').first();
+    const combobox = page.locator('app-site-selector [role="combobox"]:visible').first();
     await expect(combobox).toBeVisible();
     if (((await combobox.textContent()) || "").includes(domain)) return;
     await page.locator('[aria-label="Select a site to view stats"]:visible').first().click();

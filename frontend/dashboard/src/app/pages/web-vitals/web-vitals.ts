@@ -13,8 +13,6 @@ import { TagModule } from '@openng/optimus-ui/tag';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
 import { injectActiveLang } from '@core/i18n/active-lang';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
 import { SetupCallout } from '@components/setup-callout/setup-callout';
@@ -71,25 +69,7 @@ const WEB_VITAL_THRESHOLDS: Record<WebVitalMetric, { good: number; poor: number 
 };
 @Component({
     selector: 'app-web-vitals',
-    imports: [
-        NgOptimizedImage,
-        FormsModule,
-        TranslocoPipe,
-        ButtonModule,
-        CardModule,
-        SelectModule,
-        TabsModule,
-        AppTable,
-        AppTableCell,
-        TagModule,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        ReportRangeToolbar,
-        SeriesChart,
-        NoSiteSelected,
-        SetupCallout
-    ],
+    imports: [NgOptimizedImage, FormsModule, TranslocoPipe, ButtonModule, CardModule, SelectModule, TabsModule, AppTable, AppTableCell, TagModule, ReportRangeToolbar, SeriesChart, NoSiteSelected, SetupCallout],
     templateUrl: './web-vitals.html',
     styleUrl: './web-vitals.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -136,17 +116,6 @@ export class WebVitalsPage {
 
     protected readonly isShortRange = this.reportRange.isShortRange;
 
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.webVitals'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.webVitals'), isCurrent: true }
-        ];
-    });
     protected readonly metricOptions = computed<SelectOption<WebVitalMetric>[]>(() => {
         this.activeLanguage();
         return METRICS.map((metric) => ({ label: this.metricLabel(metric), value: metric }));

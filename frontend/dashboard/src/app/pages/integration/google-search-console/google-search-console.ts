@@ -13,7 +13,6 @@ import { TooltipModule } from '@openng/optimus-ui/tooltip';
 import { finalize } from 'rxjs';
 
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { RelativeDateTime } from '@components/relative-date-time/relative-date-time';
 import { SettingsCard } from '@features/settings/components/settings-card';
@@ -62,14 +61,6 @@ export class GoogleSearchConsolePage {
 
     protected readonly docsURL = 'https://hitkeep.com/guides/integrations/google-search-console/';
     protected readonly activeSite = computed(() => this.siteService.activeSite());
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        return [
-            { label: this.transloco.translate('nav.integration'), routerLink: '/integration/api-clients' },
-            { label: this.transloco.translate('integration.googleSearchConsole.title'), isCurrent: true }
-        ];
-    });
 
     protected readonly statusKey = computed(() => {
         if (this.loading() && !this.status()) {

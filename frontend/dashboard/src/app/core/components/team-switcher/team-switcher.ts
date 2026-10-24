@@ -40,6 +40,7 @@ export class TeamSwitcher {
 
     constructor() {
         effect(() => {
+            this.switching();
             this.teamForm.selectedTeam().control().setValue(this.activeTeam(), { emitEvent: false });
         });
 

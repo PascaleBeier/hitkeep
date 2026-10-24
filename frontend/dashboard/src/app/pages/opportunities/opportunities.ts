@@ -6,7 +6,6 @@ import { ButtonModule } from '@openng/optimus-ui/button';
 import { MessageModule } from '@openng/optimus-ui/message';
 import { TagModule } from '@openng/optimus-ui/tag';
 import { SiteService } from '@features/sites/services/site.service';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { EmptyState } from '@components/molecules/empty-state';
 import { PageFrame } from '@components/page-frame/page-frame';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
@@ -103,18 +102,6 @@ export class OpportunitiesPage {
         const status = this.aiStatus();
         if (!status?.enabled) return 'info';
         return status.budget_exhausted || !status.configured ? 'warn' : 'info';
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.opportunities'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.opportunities'), isCurrent: true }
-        ];
     });
 
     protected readonly visibleOpportunities = computed(() =>

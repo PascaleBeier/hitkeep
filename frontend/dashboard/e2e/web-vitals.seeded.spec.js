@@ -9,7 +9,7 @@ const SEEDED_PROVIDER_RE = /Google LLC|Verizon Business|Comcast Cable|Deutsche T
 const SEEDED_ASN_RE = /AS15169|AS701|AS7922|AS3320|AS3209|AS2856|AS3215|AS1136/;
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
-    const combobox = page.locator('[role="combobox"]:visible').first();
+    const combobox = page.locator('app-site-selector [role="combobox"]:visible').first();
     await expect(combobox).toBeVisible();
 
     const currentSite = ((await combobox.textContent()) || "").trim();

@@ -77,6 +77,13 @@
     "resumeFailed": "The pending authorization could not be restored. Your billing settings are still available. Try again."
   },
   "nav": {
+    "resizeSidebar": "Resize sidebar",
+    "search": "Search navigation",
+    "searchPlaceholder": "Find a page…",
+    "noSearchResults": "No pages found",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "openNavigation": "Open navigation",
     "mainSidebarAria": "Main sidebar",
     "primaryNavigationAria": "Primary navigation",
     "contentAreaAria": "Content area",
@@ -102,7 +109,7 @@
     "goals": "Goals",
     "funnels": "Funnels",
     "utm": "UTM",
-    "apiClients": "API Clients",
+    "apiClients": "API",
     "webhooks": "Webhooks",
     "apiReference": "API Reference",
     "expandItem": "Expand {{item}}",
@@ -670,6 +677,7 @@
   },
   "teams": {
     "switcher": {
+      "switchError": "Could not switch teams. Please try again.",
       "label": "Teams",
       "regionAria": "Team selector",
       "selectAria": "Select active team",
@@ -1368,7 +1376,6 @@
       }
     },
     "user": {
-      "breadcrumb": "Settings",
       "title": "Settings",
       "subtitle": "Manage your account security and preferences.",
       "profile": {
@@ -1413,7 +1420,6 @@
       }
     },
     "reports": {
-      "breadcrumb": "Reporting",
       "subtitle": "Create reliable, scheduled analytics reports for yourself or your team.",
       "newReport": "New report",
       "mailUnavailable": "SMTP is unavailable. You can create and edit drafts, but reports cannot be activated, tested, or retried.",
@@ -1800,19 +1806,11 @@
     },
     "selector": {
       "regionAria": "Site selection",
-      "sitesLabel": "Sites",
-      "addSiteAria": "Add a new site",
       "selectPlaceholder": "Select site",
       "selectSiteAria": "Select a site to view stats",
-      "siteSettingsAria": "Site settings",
-      "trackingCodeAria": "Tracking code",
-      "shareDashboardAria": "Share dashboard"
+      "siteSettingsAria": "Site settings"
     },
     "settings": {
-      "breadcrumb": {
-        "sites": "Sites",
-        "settings": "Settings"
-      },
       "title": "Site settings",
       "tabs": {
         "general": "General",
@@ -1820,6 +1818,7 @@
         "filtering": "Filtering",
         "retention": "Retention",
         "access": "Access",
+        "share": "Share",
         "dangerZone": "Danger zone"
       },
       "notices": {
@@ -1963,7 +1962,6 @@
     }
   },
   "admin": {
-    "breadcrumb": "Instance administration",
     "tabs": {
       "users": "Users",
       "sites": "Sites",
@@ -1986,6 +1984,7 @@
     },
     "sites": {
       "title": "Sites",
+      "addSite": "Add site",
       "ownerUnknown": "Unknown owner"
     },
     "exclusions": {
@@ -2142,7 +2141,6 @@
         }
       },
       "overview": {
-        "breadcrumb": "Team Overview",
         "title": "Team",
         "teamIdLabel": "Team ID",
         "memberCount": "Members",
@@ -2209,7 +2207,6 @@
         }
       },
       "members": {
-        "breadcrumb": "Team Members",
         "title": "Team Members"
       },
       "sso": {
@@ -2278,7 +2275,6 @@
         }
       },
       "settings": {
-        "breadcrumb": "Team Settings",
         "title": "Team Settings",
         "nameSectionTitle": "Team name",
         "nameSectionDescription": "The display name for this team. Owners and admins can update it.",
@@ -3125,7 +3121,6 @@
     }
   },
   "preferences": {
-    "breadcrumb": "Preferences",
     "subtitle": "Manage your application preferences.",
     "actions": {
       "saveChanges": "Save changes"
@@ -3360,6 +3355,10 @@
   },
   "integration": {
     "apiClients": {
+      "tabs": {
+        "clients": "Clients",
+        "reference": "Reference"
+      },
       "subtitle": "Create and manage API clients for integrations.",
       "manageTeamClients": "Manage team API clients"
     },
@@ -3958,7 +3957,6 @@
     }
   },
   "qrCodes": {
-    "breadcrumb": "QR codes",
     "actions": {
       "create": "Create QR code",
       "exportSvg": "Export SVG",

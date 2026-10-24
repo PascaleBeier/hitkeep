@@ -1,19 +1,26 @@
-@if (context.hasPageHeader()) {
-<div class="mb-6 flex min-h-[36px] items-center justify-between gap-4 border-b border-surface-200 pb-4 dark:border-surface-700">
-    <div class="min-w-0 flex flex-1 items-center">
-        <ng-container [ngTemplateOutlet]="context.pageHeaderLeft()" />
+<header class="focus-header" [class.focus-header--mobile]="!desktop()">
+    <div class="focus-header__identity">
+        <button
+            type="button"
+            class="focus-header__toggle"
+            [attr.aria-controls]="desktop() ? 'focus-sidebar' : 'focus-mobile-navigation'"
+            [attr.aria-haspopup]="desktop() ? null : 'dialog'"
+            (click)="desktop() ? context.toggleSidebar() : context.isMobileDrawerOpen.set(true)"
+            [attr.aria-expanded]="desktop() ? !context.isSidebarCollapsed() : context.isMobileDrawerOpen()"
+            [attr.aria-label]="(desktop() ? (context.isSidebarCollapsed() ? 'nav.expandSidebar' : 'nav.collapseSidebar') : 'nav.openNavigation') | transloco"
+        >
+            <i class="pi pi-bars" aria-hidden="true"></i>
+        </button>
+        <app-brand size="small" [compact]="!desktop()" />
     </div>
-
-    <div class="hidden shrink-0 items-center gap-2 md:flex">
-        @if (context.pageHeaderRight(); as headerRight) {
-        <ng-container [ngTemplateOutlet]="headerRight" />
-        } @if (!shareService.isShareMode()) {
+    <div class="focus-header__context" [attr.aria-busy]="context.isContextPending()">
+        @if (!shareService.isShareMode()) {
         <app-team-switcher
-            class="max-w-[16rem]"
+            class="focus-header__team"
             [teams]="teamService.teams()"
             [currentTeamId]="teamService.activeTeamId()"
             [loading]="teamService.isLoading()"
-            [switching]="teamService.isSwitching()"
+            [switching]="context.isContextPending()"
             [showBrand]="false"
             [showAdd]="canCreateTeams()"
             [compact]="true"
@@ -21,8 +28,37 @@
             (teamSelected)="context.onTeamSelected($event)"
             (addClicked)="isCreateTeamVisible.set(true)"
         />
+        <span class="focus-header__divider" aria-hidden="true">/</span>
+        <app-site-selector
+            class="focus-header__site"
+            [sites]="siteService.sites()"
+            [current]="siteService.activeSite()"
+            [actions]="context.siteActions()"
+            [loading]="siteService.isLoading()"
+            [disabled]="context.isContextPending()"
+            (siteSelected)="context.onSiteSelected($event)"
+        />
+        <button
+            type="button"
+            class="focus-header__toggle"
+            (click)="context.openSiteSettings('general')"
+            [disabled]="!context.canOpenSiteSettings() || context.isContextPending()"
+            [attr.aria-label]="'sites.selector.siteSettingsAria' | transloco"
+            [title]="'sites.selector.siteSettingsAria' | transloco"
+        >
+            <i class="pi pi-cog" aria-hidden="true"></i>
+        </button>
+        } @else {
+        <span class="truncate text-sm font-medium" [title]="shareService.site()?.domain"><i class="pi pi-lock mr-2 text-muted-color" aria-hidden="true"></i>{{ shareService.site()?.domain }}</span>
         }
-        <app-user-controls [showMenu]="!shareService.isShareMode()" />
     </div>
-</div>
-}
+    <div class="focus-header__actions">
+        <app-navigation-search [disabled]="context.isContextPending()" />
+        @if (showAskAI()) {
+        <button type="button" class="ask-ai-trigger" [disabled]="!siteService.activeSite() || context.isContextPending()" [attr.aria-label]="'askAi.triggerAria' | transloco" (click)="askAI.requestOpen()">
+            <i class="pi pi-sparkles" aria-hidden="true"></i><span>{{ 'askAi.title' | transloco }}</span>
+        </button>
+        }
+        <app-user-controls [compact]="true" [showMenu]="!shareService.isShareMode()" />
+    </div>
+</header>

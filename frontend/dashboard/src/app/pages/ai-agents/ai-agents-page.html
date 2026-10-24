@@ -1,12 +1,4 @@
 <div class="flex flex-col h-full w-full gap-4">
-    <app-page-header>
-        <ng-template appPageHeaderLeft>
-            <div>
-                <app-page-breadcrumb [items]="breadcrumbItems()" />
-            </div>
-        </ng-template>
-    </app-page-header>
-
     <app-report-range-toolbar [loading]="isLoading()" (refresh)="refresh('background')" />
 
     @if (noSite()) {

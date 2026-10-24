@@ -1,168 +1,49 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { Component } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router, Route } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { provideHttpClient } from '@angular/common/http';
 import { TranslocoTestingModule } from '@jsverse/transloco';
-import { TRANSLOCO_LOCALE_CONFIG, TRANSLOCO_LOCALE_LANG_MAPPING, TranslocoLocaleService } from '@jsverse/transloco-locale';
-import { of } from 'rxjs';
-import { vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
+import { routes } from '../../app.routes';
+import { ShareService } from '@services/share.service';
 
-import { StatsService } from '@features/analytics/services/stats.service';
-import { SiteService } from '@features/sites/services/site.service';
-import { UtmDashboard } from './utm';
+@Component({ selector: 'app-utm-route-probe', template: '' })
+class UtmRouteProbe {}
 
-describe('UtmDashboard', () => {
-    let fixture: ComponentFixture<UtmDashboard>;
-    const stats = signal({
-        live_visitors: 0,
-        total_pageviews: 0,
-        unique_sessions: 0,
-        bounce_rate: 0,
-        avg_session_duration: 0,
-        pages_per_session: 0,
-        chart_data: [],
-        top_pages: [],
-        top_landing_pages: [],
-        top_exit_pages: [],
-        top_referrers: [],
-        top_devices: [],
-        top_countries: [],
-        top_cities: [],
-        top_providers: [],
-        top_asns: [],
-        top_languages: [],
-        top_utm_campaigns: [{ name: 'launch', value: 12 }],
-        top_utm_contents: [{ name: 'hero', value: 7 }],
-        top_utm_mediums: [{ name: 'cpc', value: 8 }],
-        top_utm_sources: [{ name: 'google', value: 10 }],
-        top_utm_terms: [{ name: 'analytics', value: 4 }],
-        utm_campaign_hits: 12,
-        utm_content_hits: 7,
-        utm_medium_hits: 8,
-        utm_source_hits: 10,
-        utm_term_hits: 4,
-        goals: [],
-        funnels: []
-    });
-    const statsServiceStub = {
-        stats,
-        isLoading: signal(false),
-        currentComparisonRange: signal(null),
-        comparisonRange: vi.fn(() => ({ from: '2026-04-01T00:00:00Z', to: '2026-04-30T00:00:00Z' })),
-        fetchStats: vi.fn(() => of(stats())),
-        loadStats: vi.fn()
-    };
+async function configure(shared = false) {
+    const main = routes.find((route) => route.path === '')!.children!;
+    const branch = shared ? main.find((route) => route.path === 'share/:token')!.children! : main;
+    const utm = branch.find((route) => route.path === 'utm')!;
+    const route: Route = { ...utm, path: shared ? 'share/:token/utm' : 'utm', children: utm.children!.map((child) => (child.redirectTo ? child : { ...child, loadComponent: undefined, component: UtmRouteProbe })) };
+    await TestBed.configureTestingModule({
+        imports: [TranslocoTestingModule.forRoot({ langs: { en: { nav: { utm: 'UTM', analytics: 'Analytics', utmBuilder: 'Generator', qrCodes: 'QR codes' } } }, translocoConfig: { availableLangs: ['en'], defaultLang: 'en' }, preloadLangs: true })],
+        providers: [provideRouter([route]), provideHttpClient()]
+    }).compileComponents();
+    if (shared) TestBed.inject(ShareService).setToken('public-token');
+}
 
-    beforeEach(async () => {
-        statsServiceStub.loadStats.mockClear();
-        statsServiceStub.fetchStats.mockClear();
+it('opens Analytics by default and preserves addressable Generator/QR navigation', async () => {
+    await configure();
+    const harness = await RouterTestingHarness.create('/utm');
+    const selected = () => harness.routeNativeElement?.querySelector('[role="tab"][aria-selected="true"]')?.textContent;
+    expect(TestBed.inject(Router).url).toBe('/utm');
+    expect(selected()).toContain('Analytics');
+    const generator = Array.from(harness.routeNativeElement!.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent?.includes('Generator'))!;
+    await userEvent.click(generator);
+    await expect.poll(() => TestBed.inject(Router).url).toBe('/utm/builder');
+    await harness.navigateByUrl('/utm/qr-codes');
+    expect(selected()).toContain('QR codes');
+    await harness.navigateByUrl('/utm');
+    expect(selected()).toContain('Analytics');
+});
 
-        await TestBed.configureTestingModule({
-            imports: [
-                UtmDashboard,
-                TranslocoTestingModule.forRoot({
-                    langs: {
-                        en: {
-                            nav: { utm: 'UTM' },
-                            common: {
-                                loadingSiteData: 'Loading site data...',
-                                noSiteSelected: 'No site selected',
-                                noActiveFilter: 'No active filter',
-                                removeFilterAria: 'Remove filter',
-                                selectDateRange: 'Select date range',
-                                actions: { apply: 'Apply', cancel: 'Cancel', clearAll: 'Clear all' },
-                                metricGroups: { acquisition: 'Acquisition' }
-                            },
-                            dashboard: {
-                                kpis: { pageviews: 'Pageviews' },
-                                traffic: { visitors: 'Visitors' }
-                            },
-                            utm: {
-                                kpis: {
-                                    campaign: 'Campaign',
-                                    content: 'Content',
-                                    medium: 'Medium',
-                                    source: 'Source',
-                                    term: 'Term'
-                                },
-                                metrics: {
-                                    topCampaigns: 'Campaigns',
-                                    topSources: 'Sources',
-                                    topMediums: 'Mediums',
-                                    topContents: 'Contents',
-                                    topTerms: 'Terms'
-                                },
-                                filters: {
-                                    campaign: 'Campaign: {{value}}',
-                                    content: 'Content: {{value}}',
-                                    medium: 'Medium: {{value}}',
-                                    source: 'Source: {{value}}',
-                                    term: 'Term: {{value}}'
-                                }
-                            }
-                        }
-                    },
-                    translocoConfig: {
-                        availableLangs: ['en'],
-                        defaultLang: 'en'
-                    }
-                })
-            ],
-            providers: [
-                provideRouter([]),
-                {
-                    provide: SiteService,
-                    useValue: {
-                        activeSite: signal({
-                            id: 'site-1',
-                            user_id: 'user-1',
-                            domain: 'utm.test',
-                            created_at: '2026-05-01T00:00:00Z'
-                        }),
-                        isLoading: signal(false)
-                    }
-                },
-                { provide: StatsService, useValue: statsServiceStub },
-                {
-                    provide: TranslocoLocaleService,
-                    useValue: {
-                        langChanges$: of('en'),
-                        localeChanges$: of('en'),
-                        getLocale: () => 'en-US',
-                        localizeNumber: (value: number) => value.toString(),
-                        localizeDate: (value: Date) => value.toISOString()
-                    }
-                },
-                { provide: TRANSLOCO_LOCALE_CONFIG, useValue: {} },
-                { provide: TRANSLOCO_LOCALE_LANG_MAPPING, useValue: { en: 'en-US' } }
-            ]
-        }).compileComponents();
-
-        fixture = TestBed.createComponent(UtmDashboard);
-        fixture.detectChanges();
-    });
-
-    it('keeps UTM metric cards acquisition-only and preserves metric filter clicks', () => {
-        const component = fixture.componentInstance as unknown as {
-            metricCardTabs: () => { id: string; cards: { id: string; linkMode?: string }[] }[];
-            onMetricCardClick: (event: { tabId: string; cardId: string; filterType: string; metric: { name: string; value: number } }) => void;
-            activeFilters: () => { type: string; value: string }[];
-            activeFilterValue: (type: 'utm_source') => string | null;
-        };
-
-        const tabs = component.metricCardTabs();
-
-        expect(tabs.map((tab) => tab.id)).toEqual(['acquisition']);
-        expect(tabs[0]?.cards.map((card) => card.id)).toEqual(['campaigns', 'sources', 'mediums', 'contents', 'terms']);
-        expect(tabs[0]?.cards.find((card) => card.id === 'sources')?.linkMode).toBeUndefined();
-
-        component.onMetricCardClick({
-            tabId: 'acquisition',
-            cardId: 'sources',
-            filterType: 'utm_source',
-            metric: { name: 'google', value: 10 }
-        });
-
-        expect(component.activeFilters()).toEqual([{ type: 'utm_source', value: 'google' }]);
-        expect(component.activeFilterValue('utm_source')).toBe('google');
-    });
+it('keeps shared UTM default analytics read-only and preserves its QR deep link', async () => {
+    await configure(true);
+    const harness = await RouterTestingHarness.create('/share/public-token/utm');
+    expect(TestBed.inject(Router).url).toBe('/share/public-token/utm');
+    expect(harness.routeNativeElement?.querySelector('[aria-selected="true"]')?.textContent).toContain('Analytics');
+    expect(harness.routeNativeElement?.textContent).not.toContain('Generator');
+    await harness.navigateByUrl('/share/public-token/utm/qr-codes');
+    expect(harness.routeNativeElement?.querySelector('[aria-selected="true"]')?.textContent).toContain('QR codes');
 });

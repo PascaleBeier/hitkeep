@@ -140,18 +140,21 @@ export const routes: Routes = [
                     },
                     {
                         path: 'utm',
-                        loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmDashboard),
-                        data: titleData('nav.utm', 'site')
-                    },
-                    {
-                        path: 'utm/qr-codes',
-                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                        data: titleData('nav.qrCodes', 'site')
-                    },
-                    {
-                        path: 'utm/qr-codes/:qrID',
-                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                        data: titleData('nav.qrCodes', 'site')
+                        loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
+                        data: titleData('nav.utm', 'site'),
+                        children: [
+                            { path: '', pathMatch: 'full', loadComponent: () => import('@pages/utm/utm-analytics').then((m) => m.UtmAnalytics) },
+                            {
+                                path: 'qr-codes',
+                                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                                data: titleData('nav.qrCodes', 'site')
+                            },
+                            {
+                                path: 'qr-codes/:qrID',
+                                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                                data: titleData('nav.qrCodes', 'site')
+                            }
+                        ]
                     },
                     { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
                 ]
@@ -211,23 +214,26 @@ export const routes: Routes = [
             },
             {
                 path: 'utm',
-                loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmDashboard),
-                data: titleData('nav.utm', 'site')
-            },
-            {
-                path: 'utm/builder',
-                loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
-                data: titleData('nav.utmBuilder', 'site')
-            },
-            {
-                path: 'utm/qr-codes',
-                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                data: titleData('nav.qrCodes', 'site')
-            },
-            {
-                path: 'utm/qr-codes/:qrID',
-                loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
-                data: titleData('nav.qrCodes', 'site')
+                loadComponent: () => import('@pages/utm/utm').then((m) => m.UtmHub),
+                data: titleData('nav.utm', 'site'),
+                children: [
+                    { path: '', pathMatch: 'full', loadComponent: () => import('@pages/utm/utm-analytics').then((m) => m.UtmAnalytics) },
+                    {
+                        path: 'builder',
+                        loadComponent: () => import('@pages/utm/builder/utm-builder').then((m) => m.UtmBuilder),
+                        data: titleData('nav.utmBuilder', 'site')
+                    },
+                    {
+                        path: 'qr-codes',
+                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                        data: titleData('nav.qrCodes', 'site')
+                    },
+                    {
+                        path: 'qr-codes/:qrID',
+                        loadComponent: () => import('@pages/utm/qr-codes/qr-codes').then((m) => m.QRCodesPage),
+                        data: titleData('nav.qrCodes', 'site')
+                    }
+                ]
             },
             {
                 path: 'sites/:siteId/settings',
@@ -273,6 +279,15 @@ export const routes: Routes = [
                         }
                     },
                     {
+                        path: 'share',
+                        loadComponent: () => import('@pages/site-settings/site-share-settings-page').then((m) => m.SiteShareSettingsPage),
+                        canActivate: [siteSettingsSectionGuard],
+                        data: {
+                            ...titleData('sites.settings.tabs.share', 'site'),
+                            siteSettingsSection: 'share'
+                        }
+                    },
+                    {
                         path: 'danger-zone',
                         loadComponent: () => import('@pages/site-settings/site-danger-zone-page').then((m) => m.SiteDangerZonePage),
                         canActivate: [siteSettingsSectionGuard],
@@ -294,8 +309,21 @@ export const routes: Routes = [
             },
             {
                 path: 'integration/api-clients',
-                loadComponent: () => import('@pages/integration/api-clients/api-clients').then((m) => m.APIClientsPage),
-                data: titleData('nav.apiClients', 'team')
+                loadComponent: () => import('@pages/integration/api-clients/api-clients-hub').then((m) => m.ApiClientsHub),
+                data: titleData('nav.apiClients', 'team'),
+                children: [
+                    { path: '', pathMatch: 'full', redirectTo: 'clients' },
+                    {
+                        path: 'clients',
+                        loadComponent: () => import('@pages/integration/api-clients/api-clients').then((m) => m.APIClientsPage),
+                        data: titleData('nav.apiClients', 'team')
+                    },
+                    {
+                        path: 'reference',
+                        loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage),
+                        data: titleData('nav.apiReference')
+                    }
+                ]
             },
             {
                 path: 'integration/oauth-clients',
@@ -305,8 +333,8 @@ export const routes: Routes = [
             },
             {
                 path: 'integration/api-reference',
-                loadComponent: () => import('@pages/integration/api-reference/api-reference').then((m) => m.APIReferencePage),
-                data: titleData('nav.apiReference')
+                pathMatch: 'full',
+                redirectTo: '/integration/api-clients/reference'
             },
             {
                 path: 'integration/webhooks',

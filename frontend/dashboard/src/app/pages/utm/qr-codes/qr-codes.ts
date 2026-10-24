@@ -21,8 +21,6 @@ import { injectActiveLang } from '@core/i18n/active-lang';
 import { CopyControl } from '@components/copy-control/copy-control';
 import { dialogCancelButton, dialogDangerButton } from '@components/dialog-actions/dialog-actions';
 import { DialogShell } from '@components/dialog-shell/dialog-shell';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
 import { PageState } from '@components/page-state/page-state';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
 import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table';
@@ -76,9 +74,6 @@ const QR_CORNER_OPTIONS = ['square', 'dot', 'extra-rounded'] as const;
         TextareaModule,
         CopyControl,
         DialogShell,
-        PageBreadcrumb,
-        PageHeader,
-        PageHeaderLeft,
         PageState,
         AppTable,
         AppTableCell,
@@ -176,18 +171,6 @@ export class QRCodesPage {
         const items = this.qrs();
         if (id) return items.find((qr) => qr.id === id) ?? null;
         return null;
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        const items: PageBreadcrumbItem[] = [];
-        if (site && !this.isShareMode()) {
-            items.push({ label: site.domain, favicon: site, routerLink: '/dashboard' });
-        }
-        items.push({ label: this.transloco.translate('nav.utm'), routerLink: this.shareAwareLink('/utm') });
-        items.push({ label: this.transloco.translate('qrCodes.breadcrumb'), isCurrent: true });
-        return items;
     });
 
     protected readonly dotOptions = computed(() =>

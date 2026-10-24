@@ -1,6 +1,6 @@
 <p-confirmdialog />
 
-<app-admin-page-frame [breadcrumbItems]="breadcrumbItems()">
+<app-admin-page-frame>
     <div class="grid gap-4">
         @if (isSettingsPage()) {
         <p-tabs [(value)]="activeSettingsTab" class="hk-admin-tabs">
@@ -70,6 +70,7 @@
                             <p-message [severity]="status.severity" styleClass="w-full" [text]="siteActionStatusMessage()" />
                         </div>
                         }
+                        <p-button admin-panel-header [label]="'admin.sites.addSite' | transloco" icon="pi pi-plus" styleClass="p-button-sm" (onClick)="openAddSiteDialog()" data-testid="admin-add-site-button" />
                         <app-table
                             [value]="siteRows()"
                             [columns]="siteColumns"

@@ -1,87 +1,128 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { afterNextRender, afterRenderEffect, ChangeDetectionStrategy, Component, computed, ElementRef, inject, Injector, input, viewChild, ViewEncapsulation } from '@angular/core';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { filter } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { MenuItem } from '@openng/optimus-ui/api';
 import { DrawerModule } from '@openng/optimus-ui/drawer';
-import { Brand } from '@components/brand/brand';
-import { TeamSwitcher } from '@components/team-switcher/team-switcher';
-import { SiteSelector } from '@features/sites/components/site-selector';
-import { AskAIControl } from '@features/ask-ai/ask-ai-control';
+import { PanelMenuModule } from '@openng/optimus-ui/panelmenu';
 import { FreePlanChip } from '@layout/free-plan-chip';
 import { MainLayoutContextService } from '@layout/main-layout-context.service';
-import { SidebarMenuService } from '@layout/sidebar-menu.service';
+import { SidebarMenuService, type SidebarMenuSectionItem } from '@layout/sidebar-menu.service';
 
 @Component({
     selector: 'app-layout-sidebar',
-    imports: [NgTemplateOutlet, Brand, SiteSelector, TeamSwitcher, AskAIControl, FreePlanChip, DrawerModule, RouterLink, RouterLinkActive, TranslocoPipe],
+    imports: [NgTemplateOutlet, FreePlanChip, DrawerModule, PanelMenuModule, RouterLink, RouterLinkActive, TranslocoPipe],
     templateUrl: './layout-sidebar.html',
     styleUrl: './layout-sidebar.css',
+    encapsulation: ViewEncapsulation.None,
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LayoutSidebar {
+    readonly hiddenDesktop = input(false);
     protected readonly context = inject(MainLayoutContextService);
     private readonly sidebarMenu = inject(SidebarMenuService);
-
-    protected readonly siteService = this.context.siteService;
+    private readonly router = inject(Router);
+    private readonly document = inject(DOCUMENT);
+    private readonly injector = inject(Injector);
+    private readonly mobileNavigation = viewChild<ElementRef<HTMLElement>>('mobileNavigation');
+    private mobileOpener: HTMLElement | null = null;
     protected readonly shareService = this.context.shareService;
     protected readonly teamService = this.context.teamService;
     protected readonly canCreateTeams = this.context.canCreateTeams;
     protected readonly isMobileDrawerOpen = this.context.isMobileDrawerOpen;
-    protected readonly isAddSiteVisible = this.context.isAddSiteVisible;
     protected readonly isCreateTeamVisible = this.context.isCreateTeamVisible;
     protected readonly beforeTeamSwitch = this.context.beforeTeamSwitch;
-    private readonly expandedMenuLabels = signal<ReadonlySet<string>>(new Set());
-    protected readonly desktopMenuItems = computed(() => this.applyExpandedState(this.sidebarMenu.desktopItems()));
-    private readonly closeMobileMenuCommand = () => this.closeMobileDrawer();
-    protected readonly mobileMenuItems = computed(() => this.applyExpandedState(this.sidebarMenu.mobileItems(this.closeMobileMenuCommand)));
+    private readonly expansionOverrides = this.readStoredOverrides();
+    private lastPath = this.router.url.split(/[?#]/, 1)[0];
+    protected readonly desktopMenuItems = computed(() => this.sidebarMenu.desktopItems().map((section) => this.sectionModel(section)));
+    protected readonly primaryMenuItems = computed(() => this.desktopMenuItems().filter((section) => !section.collapsible));
+    protected readonly secondaryMenuItems = computed(() => this.desktopMenuItems().filter((section) => section.collapsible));
+    protected readonly mobileMenuItems = computed(() => this.sidebarMenu.mobileItems(() => this.closeMobileDrawer()));
 
-    protected openSiteSettings(section: 'general' | 'tracking' = 'general') {
-        this.context.openSiteSettings(section);
+    constructor() {
+        afterRenderEffect({
+            write: () => {
+                if (!this.isMobileDrawerOpen() && this.mobileOpener) {
+                    this.mobileOpener.focus();
+                    this.mobileOpener = null;
+                }
+            }
+        });
+        this.revealActiveSection();
+        this.router.events
+            .pipe(
+                filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+                takeUntilDestroyed()
+            )
+            .subscribe((event) => {
+                const path = event.urlAfterRedirects.split(/[?#]/, 1)[0];
+                if (path !== this.lastPath) {
+                    this.lastPath = path;
+                    this.revealActiveSection();
+                }
+            });
     }
 
-    protected closeMobileDrawer() {
+    protected closeMobileDrawer(): void {
         this.isMobileDrawerOpen.set(false);
     }
 
-    protected onMenuItemNavigate(event: Event) {
-        event.stopPropagation();
-        this.closeMobileDrawer();
+    protected focusMobileNavigation(): void {
+        this.mobileOpener = this.document.activeElement instanceof HTMLElement ? this.document.activeElement : null;
+        afterNextRender(
+            {
+                write: () => {
+                    if (this.isMobileDrawerOpen()) this.mobileNavigation()?.nativeElement.focus();
+                }
+            },
+            { injector: this.injector }
+        );
     }
 
-    protected toggleMenuItem(item: MenuItem, isExpanded: boolean | undefined, event: Event) {
-        event.preventDefault();
-        event.stopPropagation();
-        this.expandedMenuLabels.update((labels) => {
-            const next = new Set(labels);
-            const key = this.getMenuItemKey(item);
-            if (isExpanded) {
-                next.delete(key);
-            } else {
-                next.add(key);
-            }
-            return next;
-        });
-    }
-
-    private applyExpandedState(items: MenuItem[]): MenuItem[] {
-        const expandedLabels = this.expandedMenuLabels();
-        return items.map((item) => this.withExpandedState(item, expandedLabels));
-    }
-
-    private withExpandedState(item: MenuItem, expandedLabels: ReadonlySet<string>): MenuItem {
-        const children = item.items?.map((child) => this.withExpandedState(child, expandedLabels));
-        return {
-            ...item,
-            expanded: item.expanded || expandedLabels.has(this.getMenuItemKey(item)),
-            items: children
+    private sectionModel(section: SidebarMenuSectionItem): SidebarMenuSectionItem {
+        const key = 's:' + section.sectionId;
+        const model = {
+            ...section,
+            styleClass: 'layout-sidebar-menu__section-toggle',
+            expanded: !section.collapsible || (this.expansionOverrides[key] ?? this.sidebarMenu.activeSectionId() === section.sectionId),
+            items: section.items?.map((item) => ({ ...item, command: () => this.closeMobileDrawer() }))
         };
+        if (section.collapsible) {
+            model.command = () => {
+                // PanelMenu invokes commands before toggling its model; keep its DOM and focus stable.
+                this.expansionOverrides[key] = !model.expanded;
+                this.storeOverrides();
+            };
+        }
+        return model;
     }
 
-    private getMenuItemKey(item: MenuItem): string {
-        if (typeof item.routerLink === 'string') {
-            return item.routerLink;
+    private revealActiveSection(): void {
+        const id = this.sidebarMenu.activeSectionId();
+        if (id) {
+            this.expansionOverrides['s:' + id] = true;
+            this.storeOverrides();
         }
-        return item.url ?? item.label ?? '';
+    }
+
+    private readStoredOverrides(): Record<string, boolean> {
+        try {
+            const parsed: unknown = JSON.parse(localStorage.getItem('hk_sidebar_sections') ?? 'null');
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return Object.fromEntries(Object.entries(parsed).filter(([key, value]) => /^(s:(integration|account|resources|administration)|i:.+)$/.test(key) && typeof value === 'boolean'));
+            }
+        } catch {
+            // Navigation remains usable when browser storage is unavailable.
+        }
+        return {};
+    }
+
+    private storeOverrides(): void {
+        try {
+            localStorage.setItem('hk_sidebar_sections', JSON.stringify(this.expansionOverrides));
+        } catch {
+            // Keep the in-memory expansion state when storage is blocked or full.
+        }
     }
 }

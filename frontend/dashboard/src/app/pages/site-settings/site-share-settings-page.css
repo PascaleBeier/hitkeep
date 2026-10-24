@@ -1,0 +1,15 @@
+:host {
+    display: block;
+}
+
+.share-token {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.375rem;
+    background: var(--p-surface-100);
+    border: 1px solid var(--p-surface-200);
+}
+
+.share-url-input {
+    min-width: 14rem;
+}

@@ -1,123 +1,64 @@
-<aside class="hidden md:flex w-64 flex-col bg-[var(--p-surface-card)] border-r border-surface-200 dark:border-surface-700 p-4 gap-6 overflow-y-auto" [attr.aria-label]="'nav.mainSidebarAria' | transloco">
-    <div class="px-1">
-        <app-brand size="small" />
-    </div>
-
-    <div class="flex min-w-0 flex-col gap-3">
-        <app-site-selector
-            class="min-w-0 flex-1"
-            [sites]="siteService.sites()"
-            [current]="siteService.activeSite()"
-            [loading]="siteService.isLoading()"
-            (siteSelected)="context.onSiteSelected($event)"
-            (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('general')"
-            (trackingClicked)="openSiteSettings('tracking')"
-        />
-        <app-ask-ai-control (opened)="closeMobileDrawer()" />
-    </div>
-
+<aside
+    id="focus-sidebar"
+    class="focus-sidebar flex h-full w-full flex-col bg-[var(--p-surface-card)] p-3 gap-4 overflow-y-auto"
+    [hidden]="hiddenDesktop()"
+    [attr.inert]="hiddenDesktop() ? '' : null"
+    [attr.aria-label]="'nav.mainSidebarAria' | transloco"
+>
     <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
-        <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: desktopMenuItems() }" />
+        <ng-container [ngTemplateOutlet]="navigation" />
     </nav>
-
-    <app-free-plan-chip class="px-1" />
+    <app-free-plan-chip class="px-2" />
 </aside>
-
-<p-drawer [visible]="isMobileDrawerOpen()" (visibleChange)="isMobileDrawerOpen.set($event)">
-    <div class="flex flex-col gap-6 h-full">
-        @if (!shareService.isShareMode()) {
-        <app-team-switcher
-            [teams]="teamService.teams()"
-            [currentTeamId]="teamService.activeTeamId()"
-            [loading]="teamService.isLoading()"
-            [switching]="teamService.isSwitching()"
-            [showAdd]="canCreateTeams()"
-            [compact]="false"
-            [beforeSwitch]="beforeTeamSwitch"
-            (teamSelected)="context.onTeamSelected($event)"
-            (addClicked)="isCreateTeamVisible.set(true)"
-        />
-        }
-
-        <app-site-selector
-            [sites]="siteService.sites()"
-            [current]="siteService.activeSite()"
-            [loading]="siteService.isLoading()"
-            (siteSelected)="context.onSiteSelected($event); closeMobileDrawer()"
-            (addClicked)="isAddSiteVisible.set(true)"
-            (settingsClicked)="openSiteSettings('general'); closeMobileDrawer()"
-            (trackingClicked)="openSiteSettings('tracking'); closeMobileDrawer()"
-        />
-        <app-ask-ai-control (opened)="closeMobileDrawer()" />
-
-        <nav class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco">
-            <ng-container *ngTemplateOutlet="sidebarMenu; context: { items: mobileMenuItems() }" />
-        </nav>
-
+<p-drawer
+    [visible]="isMobileDrawerOpen()"
+    (visibleChange)="isMobileDrawerOpen.set($event)"
+    (onShow)="focusMobileNavigation()"
+    [pt]="{ root: { id: 'focus-mobile-navigation', role: 'dialog', 'aria-modal': 'true', 'aria-label': ('nav.primaryNavigationAria' | transloco) } }"
+    [header]="'nav.primaryNavigationAria' | transloco"
+    appendTo="body"
+    styleClass="focus-navigation-drawer"
+    [style]="{ width: 'min(20rem, 100vw)' }"
+>
+    <div class="flex h-full flex-col gap-4">
+        <nav #mobileNavigation tabindex="-1" class="flex-1" [attr.aria-label]="'nav.primaryNavigationAria' | transloco"><ng-container [ngTemplateOutlet]="navigation" /></nav>
         <app-free-plan-chip />
     </div>
 </p-drawer>
-
-<ng-template #sidebarMenu let-items="items">
-    <div class="layout-sidebar-menu">
-        @for (section of items; track section.label) {
-        <section class="layout-sidebar-menu__section">
-            <h2 class="layout-sidebar-menu__section-label">{{ section.label }}</h2>
-            <ul class="layout-sidebar-menu__list" role="tree">
-                @for (item of section.items ?? []; track item.label) {
-                <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: item, level: 1 }" />
-                }
-            </ul>
-        </section>
+<ng-template #navigation>
+    @for (section of primaryMenuItems(); track section.sectionId) { @if (section.label) {
+    <h2 class="focus-sidebar__heading">{{ section.label }}</h2>
+    }
+    <ul class="m-0 mb-3 list-none p-0">
+        @for (item of section.items; track item.routerLink || item.url) {
+        <li><ng-container [ngTemplateOutlet]="link" [ngTemplateOutletContext]="{ $implicit: item }" /></li>
         }
-    </div>
-</ng-template>
-
-<ng-template #sidebarMenuItem let-item let-level="level">
-    <li class="layout-sidebar-menu__node" role="treeitem" [attr.aria-label]="item.label" [attr.aria-expanded]="item.items?.length ? (item.expanded ? 'true' : 'false') : null" [attr.aria-level]="level" aria-selected="false">
-        <span class="layout-sidebar-menu__item-row">
-            @if (item.routerLink) {
-            <a
-                class="layout-sidebar-menu__item-main"
-                [routerLink]="item.routerLink"
-                routerLinkActive="p-panelmenu-item-link-active"
-                [routerLinkActiveOptions]="item.routerLinkActiveOptions || { exact: false }"
-                [target]="item.target"
-                [attr.title]="item.title"
-                (click)="onMenuItemNavigate($event)"
-            >
-                <span class="layout-sidebar-menu__item-icon" [class]="item.icon" aria-hidden="true"></span>
-                <span class="layout-sidebar-menu__item-label">{{ item.label }}</span>
-            </a>
-            } @else if (item.url) {
-            <a class="layout-sidebar-menu__item-main" [href]="item.url" [target]="item.target" [attr.title]="item.title" (click)="onMenuItemNavigate($event)">
-                <span class="layout-sidebar-menu__item-icon" [class]="item.icon" aria-hidden="true"></span>
-                <span class="layout-sidebar-menu__item-label">{{ item.label }}</span>
-            </a>
+    </ul>
+    }
+    <p-panelmenu [model]="secondaryMenuItems()" [multiple]="true">
+        <ng-template #item let-item>
+            @if (item.items?.length) {
+            <span class="focus-sidebar__group"><span>{{ item.label }}</span><i class="pi text-xs" [class.pi-chevron-down]="item.expanded" [class.pi-chevron-right]="!item.expanded" aria-hidden="true"></i></span>
             } @else {
-            <span class="layout-sidebar-menu__item-main">
-                <span class="layout-sidebar-menu__item-icon" [class]="item.icon" aria-hidden="true"></span>
-                <span class="layout-sidebar-menu__item-label">{{ item.label }}</span>
-            </span>
-            } @if (item.items?.length) {
-            <button
-                type="button"
-                class="layout-sidebar-menu__toggle"
-                [attr.aria-label]="(item.expanded ? 'nav.collapseItem' : 'nav.expandItem') | transloco: { item: item.label }"
-                [attr.aria-expanded]="item.expanded ? 'true' : 'false'"
-                (click)="toggleMenuItem(item, item.expanded, $event)"
-            >
-                <i [class]="item.expanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'" aria-hidden="true"></i>
-            </button>
+            <ng-container [ngTemplateOutlet]="link" [ngTemplateOutletContext]="{ $implicit: item }" />
             }
-        </span>
-        @if (item.items?.length && item.expanded) {
-        <ul class="layout-sidebar-menu__list layout-sidebar-menu__list--nested" role="group">
-            @for (child of item.items ?? []; track child.label) {
-            <ng-container *ngTemplateOutlet="sidebarMenuItem; context: { $implicit: child, level: level + 1 }" />
-            }
-        </ul>
-        }
-    </li>
+        </ng-template>
+    </p-panelmenu>
+</ng-template>
+<ng-template #link let-item>
+    @if (item.routerLink) {
+    <a
+        class="focus-sidebar__link"
+        [routerLink]="item.routerLink"
+        routerLinkActive="focus-sidebar__link--active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="item.routerLinkActiveOptions || { exact: false }"
+        [target]="item.target"
+        [title]="item.label"
+        (click)="closeMobileDrawer()"
+        ><i [class]="item.icon" aria-hidden="true"></i><span>{{ item.label }}</span></a
+    >
+    } @else {
+    <a class="focus-sidebar__link" [href]="item.url" [target]="item.target" rel="noopener noreferrer" [title]="item.label" (click)="closeMobileDrawer()"><i [class]="item.icon" aria-hidden="true"></i><span>{{ item.label }}</span></a>
+    }
 </ng-template>

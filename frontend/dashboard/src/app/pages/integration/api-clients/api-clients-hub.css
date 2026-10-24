@@ -1,0 +1,16 @@
+.api-clients-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.api-clients-tab-label {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.api-clients-content {
+    min-height: 18rem;
+}

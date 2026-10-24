@@ -1,11 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { filter, map, startWith } from 'rxjs';
 import { TabsModule } from '@openng/optimus-ui/tabs';
 import { PageFrame } from '@components/page-frame/page-frame';
-import { PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 
 type ImportExportTab = 'import' | 'export';
 
@@ -31,15 +30,6 @@ export class ImportExportPage {
         ),
         { initialValue: this.tabFromUrl(this.router.url) }
     );
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        return [
-            {
-                label: this.pageTitle(),
-                isCurrent: true
-            }
-        ];
-    });
 
     protected onTabChange(value: string | number | undefined): void {
         const tab = value === 'import' || value === 'export' ? value : this.activeTab();

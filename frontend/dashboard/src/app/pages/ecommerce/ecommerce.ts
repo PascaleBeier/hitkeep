@@ -12,8 +12,6 @@ import { AppTable, AppTableCell, AppTableColumn } from '@components/table/table'
 import { TabsModule } from '@openng/optimus-ui/tabs';
 import { SiteService } from '@features/sites/services/site.service';
 import { AnalyticsService } from '@core/services/analytics.service';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { NoSiteSelected } from '@components/no-site-selected/no-site-selected';
 import { SetupCallout } from '@components/setup-callout/setup-callout';
 import { KPI_MONEY_FALLBACK_FORMAT, KPI_PERCENT_FORMAT, KpiCard, KpiCardModel } from '@features/analytics/components/kpi-card';
@@ -43,25 +41,7 @@ type DataLoadMode = 'blocking' | 'background';
 
 @Component({
     selector: 'app-ecommerce',
-    imports: [
-        NgOptimizedImage,
-        ReactiveFormsModule,
-        TranslocoPipe,
-        ButtonModule,
-        CardModule,
-        AppTable,
-        AppTableCell,
-        TabsModule,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        ReportRangeToolbar,
-        KpiCard,
-        MetricCardGroup,
-        SeriesChart,
-        NoSiteSelected,
-        SetupCallout
-    ],
+    imports: [NgOptimizedImage, ReactiveFormsModule, TranslocoPipe, ButtonModule, CardModule, AppTable, AppTableCell, TabsModule, ReportRangeToolbar, KpiCard, MetricCardGroup, SeriesChart, NoSiteSelected, SetupCallout],
     templateUrl: './ecommerce.html',
     styleUrl: './ecommerce.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -118,17 +98,6 @@ export class EcommercePage {
     protected readonly selectedProduct = signal<ProductFilter | null>(null);
     protected readonly hasFilters = computed(() => this.activeFilters().length > 0 || this.selectedProduct() !== null);
     protected readonly summaryCurrency = computed(() => this.resolveCurrency(this.summary()?.currency));
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) {
-            return [{ label: this.transloco.translate('nav.ecommerce'), isCurrent: true }];
-        }
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('nav.ecommerce'), isCurrent: true }
-        ];
-    });
 
     protected readonly kpiCards = computed<KpiCardModel[]>(() => {
         this.activeLanguage();

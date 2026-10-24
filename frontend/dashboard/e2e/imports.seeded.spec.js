@@ -198,7 +198,7 @@ async function dropImportFiles(page, files) {
 }
 
 async function selectSeededSite(page, domain = PRIMARY_SEEDED_SITE_DOMAIN) {
-    const combobox = page.locator('[role="combobox"]:visible').first();
+    const combobox = page.locator('app-site-selector [role="combobox"]:visible').first();
     await expect(combobox).toBeVisible();
 
     const currentSite = ((await combobox.textContent()) || "").trim();
@@ -441,7 +441,8 @@ async function setDarkMode(page, enabled) {
     }
 
     const label = enabled ? "Switch to dark mode" : "Switch to light mode";
-    await page.locator(`button[aria-label="${label}"]:visible`).first().click();
+    await page.getByRole("button", { name: "Open user menu", exact: true }).click();
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
     await expect.poll(isDark).toBe(enabled);
 }
 

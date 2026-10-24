@@ -12,8 +12,6 @@ import { toggleDimensionFilter } from '@core/analytics/filter-utils';
 import { AnalyticsService, EventDimensionFilter } from '@core/services/analytics.service';
 import { MetricCardConfig, MetricCardGroup, MetricCardGroupRowClick, MetricCardGroupTab } from '@features/analytics/components/metric-card-group';
 import { ReportRangeToolbar } from '@components/report-range-toolbar/report-range-toolbar';
-import { PageHeader, PageHeaderLeft } from '@components/page-header/page-header';
-import { PageBreadcrumb, PageBreadcrumbItem } from '@components/page-breadcrumb/page-breadcrumb';
 import { SeriesChart, SeriesDefinition, SeriesChartPoint } from '@features/analytics/components/series-chart';
 import { MetricStat, EventSeriesPoint, EventAudience } from '@models/analytics.types';
 import { finalize } from 'rxjs';
@@ -53,25 +51,7 @@ const AUTOMATIC_EVENT_NAMES = Object.keys(AUTOMATIC_EVENT_META);
 
 @Component({
     selector: 'app-events',
-    imports: [
-        FormsModule,
-        ReactiveFormsModule,
-        TranslocoPipe,
-        SelectModule,
-        CardModule,
-        SkeletonModule,
-        ButtonModule,
-        MessageModule,
-        MetricCardGroup,
-        ReportRangeToolbar,
-        PageHeader,
-        PageHeaderLeft,
-        PageBreadcrumb,
-        SeriesChart,
-        AnimatedNumber,
-        NoSiteSelected,
-        SetupCallout
-    ],
+    imports: [FormsModule, ReactiveFormsModule, TranslocoPipe, SelectModule, CardModule, SkeletonModule, ButtonModule, MessageModule, MetricCardGroup, ReportRangeToolbar, SeriesChart, AnimatedNumber, NoSiteSelected, SetupCallout],
     templateUrl: './events.html',
     styleUrl: './events.css',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -167,16 +147,6 @@ export class Events {
                 gradientFrom: 'rgba(99, 102, 241, 0.5)',
                 gradientTo: 'rgba(99, 102, 241, 0.0)'
             }
-        ];
-    });
-
-    protected readonly breadcrumbItems = computed<PageBreadcrumbItem[]>(() => {
-        this.activeLanguage();
-        const site = this.siteService.activeSite();
-        if (!site) return [{ label: this.transloco.translate('events.title'), isCurrent: true }];
-        return [
-            { label: site.domain, favicon: site, routerLink: '/dashboard' },
-            { label: this.transloco.translate('events.title'), isCurrent: true }
         ];
     });
 
